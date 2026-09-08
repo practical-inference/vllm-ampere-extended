@@ -1889,6 +1889,9 @@ class SpeculativeConfig:
 
         Use the draft TP size and disable inherited EP for known dense drafts.
         Without a draft model config, preserve the previous EP inheritance.
+        The drafter runs only on the last pipeline-parallel rank, so its
+        own pipeline parallel size is always 1; the draft model is never
+        split across PP ranks.
         """
         enable_ep = target_parallel_config.enable_expert_parallel
         if draft_model_config is not None:
