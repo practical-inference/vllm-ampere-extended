@@ -692,16 +692,23 @@ def sparse_attn_indexer(
             # uint8 tensors (values + ue8m0 scales) — use the dedicated uint8
             # packer with pad_byte=0 so padded slots dequantize to 0 and
             # can't produce NaN/Inf in the logits kernel.
+            # fp8 pad retention: pre-SM89 Triton cannot materialize fp8e4nv,
+            # so on SM80 the fp8 Q is packed as its uint8 byte view (the
+            # values are already-stored fp8 bytes; bytes in = bytes out, and
+            # downstream context_lens masks stale slots so pad 0 is safe).
+            _pack_as_u8 = not current_platform.has_device_capability(89)
             if q_scale is not None:
+                q_pack = q_quant.view(torch.uint8) if _pack_as_u8 else q_quant
                 padded_q_quant_decode_tokens = pack_seq_triton(
-                    q_quant[:num_decode_tokens], decode_lens, pad_value=0
+                    q_pack[:num_decode_tokens], decode_lens, pad_value=0
                 )
                 padded_q_scale = pack_seq_triton(
                     q_scale[:num_decode_tokens], decode_lens, pad_value=0
                 )
             else:
+                q_pack = q_quant.view(torch.uint8) if _pack_as_u8 else q_quant
                 padded_q_quant_decode_tokens = pack_seq_triton(
-                    q_quant[:num_decode_tokens], decode_lens
+                    q_pack[:num_decode_tokens], decode_lens, pad_value=0
                 )
                 padded_q_scale = None
         else:
@@ -950,16 +957,21 @@ class SparseAttnIndexer(CustomOp):
                 _UNPACK_SEQ_TRITON_KERNEL,
             )
 
-            pack_dtype = torch.uint8 if use_fp4_cache else current_platform.fp8_dtype()
-            # The fp8 warmup compiles an fp8e4nv pointer type, which Triton
-            # only supports on SM89+; older archs (SM80/SM86) skip the
-            # speculative precompile (the kernel is still compiled on demand
-            # if the fp8 pack branch is ever reached).
-            if pack_dtype == torch.uint8 or current_platform.has_device_capability(89):
-                _PACK_SEQ_TRITON_KERNEL.register_warmup(
-                    dtype=pack_dtype,
-                    pad_value=0 if use_fp4_cache else -float("inf"),
+            # fp4 packs uint8 natively; on pre-SM89 Triton the fp8 pack runs
+            # as its uint8 byte view (see the pack site above), so warm the
+            # uint8 signature there too.
+            pack_dtype = (
+                torch.uint8
+                if (
+                    use_fp4_cache
+                    or not current_platform.has_device_capability(89)
                 )
+                else current_platform.fp8_dtype()
+            )
+            _PACK_SEQ_TRITON_KERNEL.register_warmup(
+                dtype=pack_dtype,
+                pad_value=0 if pack_dtype == torch.uint8 else -float("inf"),
+            )
             _UNPACK_SEQ_TRITON_KERNEL.register_warmup()
 
             if self.dcp_world_size > 1 and current_platform.is_cuda() and has_cutedsl():
