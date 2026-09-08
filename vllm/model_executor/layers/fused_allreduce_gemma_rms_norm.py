@@ -67,10 +67,13 @@ def _max_token_num(tp_size: int, hidden_size: int, dtype: torch.dtype) -> int | 
 
 def _can_use_flashinfer(hidden_states: torch.Tensor, tp_size: int) -> tuple[bool, int]:
     """Whether the flashinfer fused path applies; returns (ok, max_token_num)."""
+    from vllm.envs import VLLM_ALLREDUCE_USE_FLASHINFER
+
     if (
         flashinfer_trtllm_fused_allreduce_norm is None
         or get_fi_ar_workspace is None
         or _AR_RESIDUAL_RMS_NORM is None
+        or not VLLM_ALLREDUCE_USE_FLASHINFER
     ):
         return False, 0
     if (
@@ -88,6 +91,13 @@ def _can_use_flashinfer(hidden_states: torch.Tensor, tp_size: int) -> tuple[bool
 
     # Lazily create / fetch the (globally cached) workspace; returns None on
     # GPUs without NVSwitch, in which case we fall back gracefully.
+    # Skip the lazy creation inside cudagraph capture: allocating GPU memory
+    # during capture is illegal, and a failed allocation here leaves a sticky
+    # CUDA error that poisons the rest of the capture. If the workspace was
+    # not already created (at init, outside capture), take the unfused path
+    # inside captured regions.
+    if torch.cuda.is_current_stream_capturing():
+        return False, 0
     workspace = get_fi_ar_workspace(
         world_size=tp_size,
         rank=get_tensor_model_parallel_rank(),
