@@ -207,25 +207,16 @@ class PPHandler:
             torch.distributed.broadcast(
                 combined, src=self.last_rank, group=self.broadcast_group
             )
-            draft_tokens = None
-            if self.num_speculative_steps > 0:
-                draft_tokens = torch.empty(
-                    num_reqs,
-                    self.num_speculative_steps,
-                    dtype=torch.int64,
-                    device=self.device,
-                )
-                torch.distributed.broadcast(
-                    draft_tokens, src=self.last_rank, group=self.broadcast_group
-                )
             event = self.broadcast_stream.record_event()
             num_sampled, num_rejected = combined.unbind(dim=0)
             # Must record_stream since these were allocated on broadcast stream but
             # later used on the main stream.
             sampled_tokens.record_stream(self.main_stream)
             combined.record_stream(self.main_stream)
-            if draft_tokens is not None:
-                draft_tokens.record_stream(self.main_stream)
+        # ponytail: draft_tokens broadcast removed — the matching sender
+        # (broadcast_drafts) is not wired, so this collective desynced the
+        # pp_broadcast group by one op per step under MTP+PP. Re-add together
+        # with a sender if draft-token propagation to earlier stages is needed.
         self.queue[-1] = PendingRecv(
             event,
             sampled_tokens,
@@ -235,7 +226,6 @@ class PPHandler:
             input_batch.idx_mapping_np,
             need_sampled_mask,
             gen_at_receive_np,
-            draft_tokens,
         )
         return bool(need_sampled_mask.all())
 
