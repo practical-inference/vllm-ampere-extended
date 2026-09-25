@@ -197,6 +197,10 @@ def _canonical_block_sizes(
 # Bound registration size to avoid driver limits on large host allocations.
 MAX_HOST_REGISTER_CHUNK_BYTES = 64 * 1024**3
 
+# cudaHostRegister on multi-hundred-GB regions pins enough RAM that NCCL's
+# own host allocations fail on the first collective. Unpinned DMA is slower.
+PIN_MAX_BYTES = 50 * 1024**3
+
 
 def pin_mmap_region(region: SharedOffloadRegion) -> None:
     """Register row-aligned chunks, rolling back on failure."""
@@ -205,6 +209,14 @@ def pin_mmap_region(region: SharedOffloadRegion) -> None:
             "Skipping mmap host registration on %s; cudaHostRegister is only "
             "available on CUDA/ROCm.",
             current_platform.device_name,
+        )
+        return
+
+    if region.total_size_bytes > PIN_MAX_BYTES:
+        logger.info(
+            "Skipping mmap host registration: %.1f GB region exceeds %d GB cap",
+            region.total_size_bytes / 1e9,
+            PIN_MAX_BYTES // 1024**3,
         )
         return
 
