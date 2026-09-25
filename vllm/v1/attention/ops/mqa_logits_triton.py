@@ -295,6 +295,10 @@ def _fp8_mqa_logits_kernel(
     n_start = n_block * BLOCK_N
     offs_n = n_start + tl.arange(0, BLOCK_N)
     mask_n = offs_n < N
+    # int64: at prod prefill M=2048 x ~1.05M gathered rows, the logits row
+    # offset m*stride_l_m exceeds 2**31 in int32 and wraps negative -> IMA.
+    # Row offsets only; q/k/weights offsets stay int32 (M*H*D and N*D << 2**31).
+    logits_row = logits_ptr + m.to(tl.int64) * stride_l_m
     # Early-exit when this row's `[ks, ke)` range doesn't overlap the tile.
     # Chunked prefill produces many such all-masked tiles per row.
     ks = tl.load(ks_ptr + m)
@@ -303,7 +307,7 @@ def _fp8_mqa_logits_kernel(
         # When `clean_logits=False` the caller skipped the -inf pre-fill, so
         # write -inf here for the early-exit tile.
         tl.store(
-            logits_ptr + m * stride_l_m + offs_n * stride_l_n,
+            logits_row + offs_n * stride_l_n,
             tl.full([BLOCK_N], float("-inf"), dtype=tl.float32),
             mask=mask_n,
         )
@@ -343,7 +347,7 @@ def _fp8_mqa_logits_kernel(
     out = tl.where(valid, out, float("-inf"))
 
     tl.store(
-        logits_ptr + m * stride_l_m + offs_n * stride_l_n,
+        logits_row + offs_n * stride_l_n,
         out,
         mask=mask_n,
     )
