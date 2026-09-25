@@ -209,7 +209,11 @@ class SharedOffloadRegion:
                 self.fd = None
                 raise
             if self._creator:
-                os.unlink(self.mmap_path)
+                # A dead-creator takeover can leave two processes that both
+                # consider themselves the creator; the loser's FileNotFoundError
+                # is benign.
+                with contextlib.suppress(FileNotFoundError):
+                    os.unlink(self.mmap_path)
                 self._creator = False
                 logger.info("Unlinked mmap file %s", self.mmap_path)
 
