@@ -562,9 +562,6 @@ class GPUModelRunner(
         # Async scheduling
         self.use_async_scheduling = self.scheduler_config.async_scheduling
 
-        # Async PP broadcast of sampled token ids, waited on in _prepare_input_ids.
-        self._pp_recv_work: torch.distributed.Work | None = None
-
         # Sampler
         self.sampler = Sampler(
             logprobs_mode=self.model_config.logprobs_mode,
@@ -1780,10 +1777,12 @@ class GPUModelRunner(
         Uses self.prev_positions[:num_reqs] which maps current pos -> prev pos
         (-1 for new requests).
         """
-        # Sync the async PP broadcast before reading sampled tokens.
-        if self._pp_recv_work is not None:
-            self._pp_recv_work.wait()
-            self._pp_recv_work = None
+        if self._pp_recv_pending:
+            # Async PP echo: gate the main stream on the side-stream
+            # broadcast before prev_sampled_token_ids is read on the GPU.
+            assert self._pp_recv_event is not None
+            torch.cuda.current_stream().wait_event(self._pp_recv_event)
+            self._pp_recv_pending = False
 
         if self.input_batch.prev_sampled_token_ids is None:
             # Normal scheduling case
@@ -4784,10 +4783,26 @@ class GPUModelRunner(
 
         return async_output
 
+    # PP sampled-token echo: async side-stream machinery. Class-level None
+    # defaults; allocated lazily on first use (per worker process).
+    _pp_recv_bufs: list[torch.Tensor] | None = None
+    _pp_recv_stream: torch.cuda.Stream | None = None
+    _pp_recv_event: torch.cuda.Event | None = None
+    _pp_recv_pending: bool = False
+    _pp_recv_step: int = 0
+    _pp_send_buf: torch.Tensor | None = None
+    _pp_send_stream: torch.cuda.Stream | None = None
+
     def _pp_broadcast_prev_sampled_token_ids(
         self, sampled_token_ids: torch.Tensor
     ) -> None:
-        """Broadcast sampled token ids (GPU) from last PP stage"""
+        """Broadcast sampled token ids (GPU) from last PP stage.
+
+        Async: staged into a persistent buffer and broadcast on a side
+        stream. Receivers arrive one pipeline-drain later; the previous
+        main-stream variant blocked this rank's compute stream on that
+        skew every step.
+        """
         pp = get_pp_group()
         assert pp.is_last_rank
         # `prev_sampled_token_ids` is expected to have shape [num_reqs, 1].
@@ -4796,23 +4811,60 @@ class GPUModelRunner(
         )
         # Skip for chunked prefill: sampled tokens are dummy
         # and will be discarded, no need to broadcast.
-        if not self._is_all_reqs_chunked_prefill():
-            torch.distributed.broadcast(
-                sampled_token_ids, src=pp.rank, group=pp.device_group
+        if self._is_all_reqs_chunked_prefill():
+            return
+        if self._pp_send_buf is None:
+            self._pp_send_buf = torch.empty(
+                (self.max_num_reqs, 1),
+                dtype=sampled_token_ids.dtype,
+                device=self.device,
             )
+            self._pp_send_stream = torch.cuda.Stream(device=self.device)
+        dst = self._pp_send_buf[: sampled_token_ids.shape[0]]
+        main_stream = torch.cuda.current_stream()
+        with torch.cuda.stream(self._pp_send_stream):
+            # Stage first: sampled_token_ids is returned to the engine and
+            # may be reused before late receivers complete the collective.
+            self._pp_send_stream.wait_stream(main_stream)
+            dst.copy_(sampled_token_ids)
+            torch.distributed.broadcast(dst, src=pp.rank, group=pp.device_group)
 
     def _pp_receive_prev_sampled_token_ids_to_input_batch(self) -> None:
-        """Receive sampled token ids broadcast from last PP stage"""
+        """Receive sampled token ids broadcast from last PP stage.
+
+        Async: the broadcast is posted on a side stream into a
+        double-buffered persistent slot; the main stream waits on the
+        recorded event at the consume point (_prepare_input_ids) instead of
+        blocking here for the full pipeline-drain skew.
+        """
         pp = get_pp_group()
         assert not pp.is_last_rank
         num_reqs = self.input_batch.num_reqs
-        # `prev_sampled_token_ids` is expected to have shape [num_reqs, 1].
-        recv = torch.empty((num_reqs, 1), dtype=torch.int32, device=self.device)
+        if self._pp_recv_bufs is None:
+            self._pp_recv_bufs = [
+                torch.empty(
+                    (self.max_num_reqs, 1),
+                    dtype=torch.int32,
+                    device=self.device,
+                )
+                for _ in range(2)
+            ]
+            self._pp_recv_stream = torch.cuda.Stream(device=self.device)
+            self._pp_recv_event = torch.cuda.Event()
+        # Double-buffer by step parity: the overwrite of slot (k-2) is
+        # ordered after its consume via wait_stream(main_stream) below.
+        recv = self._pp_recv_bufs[self._pp_recv_step % 2][:num_reqs]
+        self._pp_recv_step += 1
         # skip for chunked prefill.
         if not self._is_all_reqs_chunked_prefill():
-            self._pp_recv_work = torch.distributed.broadcast(
-                recv, src=pp.last_rank, group=pp.device_group, async_op=True
-            )
+            main_stream = torch.cuda.current_stream()
+            with torch.cuda.stream(self._pp_recv_stream):
+                self._pp_recv_stream.wait_stream(main_stream)
+                torch.distributed.broadcast(
+                    recv, src=pp.last_rank, group=pp.device_group
+                )
+                self._pp_recv_event.record(self._pp_recv_stream)
+            self._pp_recv_pending = True
         self.input_batch.prev_sampled_token_ids = recv
 
         # construct `prev_req_id_to_index` here so `_prepare_input_ids`
