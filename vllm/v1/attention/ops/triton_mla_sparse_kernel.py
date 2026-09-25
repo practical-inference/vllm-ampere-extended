@@ -105,6 +105,8 @@ def _sparse_mla_compute_tile(
     for start_indice in range(split_start, split_end, BLOCK_N):
         offs_indice = start_indice + tl.arange(0, BLOCK_N)
         mask_indice = offs_indice < split_end
+        # int64: workspace-row indices x stride_kv_token exceed 2**31 at
+        # chunk 2048 x topk 2048 (4.19M rows x 576).
         indices = tl.load(
             indices_ptr
             + cur_q * stride_indices_token
@@ -112,7 +114,7 @@ def _sparse_mla_compute_tile(
             + offs_indice,
             mask=mask_indice,
             other=-1,
-        )
+        ).to(tl.int64)
         mask_kv = (indices >= 0) & (indices < seq_kv)
 
         offs_k = (
@@ -644,7 +646,8 @@ def _dequant_ds_mla_slots_kernel(
         + (slot % cache_block_size) * cache_bytes
     )[:, None]
     scale_ptr = (token_ptr + nope_dim).to(tl.pointer_type(tl.float32))
-    out_row = out_ptr + offs_s[:, None] * dequant_dim
+    # int64: at chunk 2048 x topk 2048, row*dequant_dim exceeds 2**31.
+    out_row = out_ptr + offs_s[:, None].to(tl.int64) * dequant_dim
 
     for tile_idx in tl.static_range(num_tiles):
         offsets = tile_idx * quant_block + tl.arange(0, quant_block)
