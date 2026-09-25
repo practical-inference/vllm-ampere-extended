@@ -152,8 +152,12 @@ def _fp8_paged_mqa_logits_kernel(
     valid = mask_n & (k_offset < context_len) & (k_offset <= q_offset)
     out = tl.where(valid, out, float("-inf"))
 
+    # int64: at MTP 512K (width=2**19) the logits row offset
+    # token_id*stride_l_t exceeds 2**31 in int32 once rows=B*next_n > 4096
+    # and wraps negative -> IMA. Row offsets only; the column offset is
+    # bounded by width and stays int32.
     tl.store(
-        logits_ptr + token_id * stride_l_t + k_offset * stride_l_n,
+        logits_ptr + token_id.to(tl.int64) * stride_l_t + k_offset * stride_l_n,
         out,
         mask=mask_n & (k_offset < context_len),
     )
