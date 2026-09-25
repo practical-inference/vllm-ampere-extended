@@ -8,12 +8,17 @@ import torch
 
 from vllm.config import get_current_vllm_config_or_none
 from vllm.config.cache import CacheDType
+from vllm.logger import init_logger
 from vllm.platforms.interface import DeviceCapability
 from vllm.utils.platform_utils import num_compute_units
 from vllm.v1.attention.backend import (
     AttentionBackend,
     AttentionCGSupport,
+    AttentionLayer,
     MultipleOf,
+)
+from vllm.v1.attention.backends.mla.sparse_utils import (
+    triton_convert_req_index_to_global_index,
 )
 from vllm.v1.attention.backends.mla.xpu_mla_sparse import (
     XPUMLASparseImpl,
@@ -24,10 +29,15 @@ from vllm.v1.attention.ops.mqa_logits_triton import (
     warmup_fp8_mqa_logits_triton,
     warmup_fp8_paged_mqa_logits_triton,
 )
+from vllm.v1.attention.ops.triton_merge_attn_states import (
+    warmup_mask_empty_context,
+)
 from vllm.v1.attention.ops.triton_mla_sparse_kernel import (
     _DIM_QK,
     KV_SPLITS_CANDIDATES,
+    dequant_ds_mla_slots,
     triton_mla_sparse_attention,
+    triton_mla_sparse_attention_fp8_fused,
 )
 
 # V3.2 indexers don't expose `n_head`; GLM-5.1-NVFP4 sets index_n_heads=32.
@@ -36,11 +46,54 @@ from vllm.v1.attention.ops.triton_mla_sparse_kernel import (
 _INDEXER_NUM_HEADS = 64
 _INDEXER_HEAD_DIM = 128
 
+_DS_MLA_CACHE_BYTES = 656
+_DS_MLA_DEQUANT_DIM = 576
+
+# Prefill fused-kernel dispatch: OFF pending SM80 register-feasible design.
+# The prototype fused kernel (_sparse_mla_prefill_fused_kernel) is bit-exact
+# but spills catastrophically on A100 ([BN,512] fp32 dequant tile +
+# [64,512] acc exceed the 128-reg budget: 1120-1328 ptxas spill slots);
+# 100-600 ms at 256 tokens vs 9.8 ms for the 2-pass path. Gluon-style explicit
+# smem staging is the upgrade path. Until then prefill keeps the 2-pass
+# dequant-workspace path and the fix ships on the 2-pass kernels instead.
+_PREFILL_FUSED_MIN_TOKENS = 1 << 30
+
+logger = init_logger(__name__)
+
+# Persistent dequant-gather workspace, keyed by device, grow-only in slots.
+_DS_MLA_DEQUANT_WS: dict[torch.device, torch.Tensor] = {}
+# ponytail: every superseded workspace stays alive for the process lifetime.
+# Captured cudagraphs bake raw addresses of the workspace they were captured
+# with; dropping the old tensor lets the caching allocator reuse that memory
+# (eager grow path) and corrupts later replays (device-side index asserts,
+# garbage attention). Bounded: one tensor per grow event.
+_DS_MLA_DEQUANT_WS_LIVE: list[torch.Tensor] = []
+
+def _get_ds_mla_dequant_workspace(device: torch.device, total_slots: int):
+    ws = _DS_MLA_DEQUANT_WS.get(device)
+    if ws is None or ws.shape[0] < total_slots:
+        ws = torch.empty(
+            (total_slots, 1, _DS_MLA_DEQUANT_DIM),
+            dtype=torch.bfloat16,
+            device=device,
+        )
+        _DS_MLA_DEQUANT_WS_LIVE.append(ws)
+        _DS_MLA_DEQUANT_WS[device] = ws
+    return ws[:total_slots]
+
 
 class TritonMLASparseMetadataBuilder(XPUMLASparseMetadataBuilder):
     # XPU base keeps NEVER (not validated under cudagraph); this subclass
     # claims UNIFORM_BATCH for the CUDA/Triton path.
     _cudagraph_support: ClassVar[AttentionCGSupport] = AttentionCGSupport.UNIFORM_BATCH
+    require_uniform_decodes: ClassVar[bool] = True
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # ponytail: without this, reorder_batch_threshold defaults to None
+        # → decode_threshold=1, so 2-token spec decode is classified as
+        # prefill and takes the wrong attention path.
+        self._init_reorder_batch_threshold(1, supports_spec_as_decode=True)
 
 
 class TritonMLASparseImpl(XPUMLASparseImpl):
@@ -61,6 +114,35 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
             return
         device = self.topk_indices_buffer.device
         topk = self.topk_indices_buffer.shape[-1]
+        # Pre-size the persistent scratch to the worst case here, outside any
+        # capture: a grow-inside-capture allocation is illegal (pool OOM
+        # poisons the capture), and a post-init grow lands the workspace
+        # outside the init memory budget (stages sat at ~97% of physical
+        # memory once the 1024-token prefill workspace materialized). Dequant
+        # slots are driven by prefill: max_num_batched_tokens * topk.
+        cfg = get_current_vllm_config_or_none()
+        if cfg is not None:
+            max_seqs = cfg.scheduler_config.max_num_seqs
+            # Spec-decode verify/decode batches carry (1 + K) tokens per
+            # request; without the factor the first spec capture grows the
+            # workspace (see _DS_MLA_DEQUANT_WS_LIVE for why grows are bad).
+            spec_tokens = (
+                getattr(cfg.speculative_config, "num_speculative_tokens", 0) or 0
+            )
+            decode_tokens = max_seqs * (1 + spec_tokens)
+            _get_ds_mla_dequant_workspace(
+                device,
+                max(decode_tokens, cfg.scheduler_config.max_num_batched_tokens) * topk,
+            )
+            from vllm.v1.attention.ops.mqa_logits_triton import (
+                _get_paged_mqa_logits_scratch,
+            )
+
+            # Paged-mqa logits is decode-only (B * next_n rows, B <=
+            # max_num_seqs); sizing it by the prefill budget would waste 2 GiB.
+            _get_paged_mqa_logits_scratch(
+                device, decode_tokens, cfg.model_config.max_model_len, clean=False
+            )
         q = torch.empty(1, self.num_heads, _DIM_QK, dtype=torch.bfloat16, device=device)
         kv = torch.empty(64, 1, _DIM_QK, dtype=torch.bfloat16, device=device)
         indices = torch.zeros(1, 1, topk, dtype=torch.int32, device=device)
@@ -73,19 +155,40 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
                 num_kv_splits=splits,
                 sm_count=self._sm_count,
             )
-        indexer_num_heads = getattr(indexer, "n_head", _INDEXER_NUM_HEADS)
-        indexer_head_dim = getattr(indexer, "head_dim", _INDEXER_HEAD_DIM)
+        indexer_num_heads = getattr(indexer, "n_head", None)
+        indexer_head_dim = getattr(indexer, "head_dim", None)
+        if indexer_num_heads is None or indexer_head_dim is None:
+            cfg = get_current_vllm_config_or_none()
+            if cfg is not None:
+                hf = cfg.model_config.hf_config
+                indexer_num_heads = indexer_num_heads or getattr(
+                    hf, "index_n_heads", _INDEXER_NUM_HEADS
+                )
+                indexer_head_dim = indexer_head_dim or getattr(
+                    hf, "index_head_dim", _INDEXER_HEAD_DIM
+                )
+            else:
+                indexer_num_heads = indexer_num_heads or _INDEXER_NUM_HEADS
+                indexer_head_dim = indexer_head_dim or _INDEXER_HEAD_DIM
         warmup_fp8_mqa_logits_triton(
             num_heads=indexer_num_heads, head_dim=indexer_head_dim, device=device
         )
         cfg = get_current_vllm_config_or_none()
         if cfg is not None:
-            warmup_fp8_paged_mqa_logits_triton(
-                num_heads=indexer_num_heads,
-                head_dim=indexer_head_dim,
-                block_size=cfg.cache_config.block_size,
-                device=device,
-            )
+            block_size = cfg.cache_config.block_size
+        elif indexer.k_cache is not None:
+            block_size = indexer.k_cache.shape[1]
+        else:
+            block_size = 64
+        warmup_fp8_paged_mqa_logits_triton(
+            num_heads=indexer_num_heads,
+            head_dim=indexer_head_dim,
+            block_size=block_size,
+            device=device,
+        )
+        warmup_mask_empty_context(
+            num_heads=self.num_heads, head_size=self.head_size, device=device
+        )
 
     def _forward_bf16_kv(
         self,
@@ -108,6 +211,106 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
         )
         return output[:, : self.num_heads, :]
 
+    def _forward_fp8_ds_mla_kv(
+        self,
+        q: torch.Tensor,  # [sq, heads, d_qk]
+        kv_c_and_k_pe_cache: torch.Tensor,  # [blocks, block_size, 656] uint8
+        topk_indices: torch.Tensor,  # [sq, topk] global slot IDs
+        attn_metadata: XPUMLASparseMetadata,
+    ) -> torch.Tensor:
+        """Dequant-gather fp8_ds_mla KV into bf16 workspace, then run
+        the existing bf16 sparse MLA attention kernel.
+
+        The workspace is small (num_tokens * topk * 576 bytes) and stays
+        in L2 cache for decode, so the extra write+read is nearly free.
+        """
+        num_tokens = q.shape[0]
+        topk = topk_indices.shape[-1]
+
+        if num_tokens >= _PREFILL_FUSED_MIN_TOKENS:
+            fused_out = triton_mla_sparse_attention_fp8_fused(
+                q,
+                kv_c_and_k_pe_cache.view(torch.uint8),
+                topk_indices,
+                sm_scale=self.softmax_scale,
+            )
+            return fused_out[:, : self.num_heads, :]
+
+        total_slots = num_tokens * topk
+
+        # Flatten topk indices to 1D for the gather kernel
+        flat_indices = topk_indices.reshape(-1).to(torch.int32)
+
+        # Persistent bf16 workspace (grow-only, module-cached, shared across
+        # layers — layers run sequentially on-stream): [total_slots, 1, 576].
+        # A per-call allocation of this size lands in every cudagraph's
+        # private pool (~150 MiB per captured size at topk=2048).
+        workspace = _get_ds_mla_dequant_workspace(q.device, total_slots)
+
+        # Dequant-gather from fp8_ds_mla cache into bf16 workspace
+        u8_cache = kv_c_and_k_pe_cache.view(torch.uint8)
+        ws_rows = workspace.reshape(total_slots, _DS_MLA_DEQUANT_DIM)
+        dequant_ds_mla_slots(
+            ws_rows,
+            u8_cache,
+            flat_indices,
+            cache_block_size=attn_metadata.block_size,
+        )
+
+        # Remap topk indices into workspace positions:
+        # token t, position p -> t * topk + p
+        # Preserve -1 (invalid/padding) entries from the original indices
+        ws_base = torch.arange(
+            num_tokens, device=q.device, dtype=torch.int32
+        ).unsqueeze(1) * topk + torch.arange(
+            topk, device=q.device, dtype=torch.int32
+        ).unsqueeze(0)
+        ws_indices = torch.where(
+            topk_indices >= 0,
+            ws_base,
+            torch.full_like(ws_base, -1),
+        ).view(num_tokens, 1, -1)
+
+        return self._forward_bf16_kv(q, workspace, ws_indices, attn_metadata)
+
+    def forward_mqa(
+        self,
+        q: torch.Tensor | tuple[torch.Tensor, torch.Tensor],
+        kv_c_and_k_pe_cache: torch.Tensor,
+        attn_metadata: XPUMLASparseMetadata,
+        layer: AttentionLayer,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        # NOTE(lucas): for the sparse FlashMLA kernels the kernels want to use
+        # MQA 576/512 approach for both prefill and decode
+
+        # Concatenate q if it's a tuple (ql_nope, q_pe)
+        if isinstance(q, tuple):
+            q = torch.cat(q, dim=-1)
+
+        num_actual_toks = q.shape[0]
+
+        assert self.topk_indices_buffer is not None
+        topk_indices = self.topk_indices_buffer[:num_actual_toks]
+
+        topk_indices_global = triton_convert_req_index_to_global_index(
+            attn_metadata.req_id_per_token[:num_actual_toks],
+            attn_metadata.block_table,
+            topk_indices,
+            BLOCK_SIZE=attn_metadata.block_size,
+            NUM_TOPK_TOKENS=attn_metadata.topk_tokens,
+        )
+
+        if self.kv_cache_dtype == "fp8_ds_mla":
+            attn_out = self._forward_fp8_ds_mla_kv(
+                q, kv_c_and_k_pe_cache, topk_indices_global, attn_metadata
+            )
+        else:
+            attn_out = self._forward_bf16_kv(
+                q, kv_c_and_k_pe_cache, topk_indices_global, attn_metadata
+            )
+
+        return attn_out, None
+
 
 class TritonMLASparseBackend(AttentionBackend):
     supported_dtypes: ClassVar[list[torch.dtype]] = [
@@ -118,6 +321,8 @@ class TritonMLASparseBackend(AttentionBackend):
         "auto",
         "float16",
         "bfloat16",
+        "fp8_ds_mla",
+        "fp8",  # alias for fp8_ds_mla
     ]
 
     @staticmethod
@@ -163,6 +368,8 @@ class TritonMLASparseBackend(AttentionBackend):
         head_size: int,
         cache_dtype_str: str = "auto",
     ) -> tuple[int, ...]:
+        if cache_dtype_str == "fp8_ds_mla":
+            return (num_blocks, block_size, _DS_MLA_CACHE_BYTES)
         return (num_blocks, block_size, head_size)
 
     @classmethod
