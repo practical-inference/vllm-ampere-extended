@@ -124,7 +124,19 @@ class SharedOffloadRegion:
                 # Joiner path — another worker won O_EXCL. Reopen and wait
                 # for the file to reach expected size.
                 self.fd = os.open(self.mmap_path, os.O_RDWR)
-                _wait_for_file_size(self.fd, self.total_size_bytes)
+                try:
+                    _wait_for_file_size(self.fd, self.total_size_bytes)
+                except TimeoutError:
+                    # The creator died before truncating (crash leaves a stub).
+                    # All ranks compute identical total_size_bytes, so truncating
+                    # here is safe even if a slow creator also truncates.
+                    logger.warning(
+                        "mmap file %s never reached expected size; "
+                        "assuming dead creator, taking over",
+                        self.mmap_path,
+                    )
+                    os.ftruncate(self.fd, self.total_size_bytes)
+                    self._creator = True
                 logger.info("Opened existing mmap file %s", self.mmap_path)
             else:
                 # Creator path. We won O_EXCL, so we own the file: any
