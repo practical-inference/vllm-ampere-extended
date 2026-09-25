@@ -32,6 +32,34 @@ _PREFILL_WARMUP_N = 8192
 
 _E4M3FN_BF16_LUT_CACHE: dict[torch.device, torch.Tensor] = {}
 
+# Persistent paged-MQA logits scratch, keyed by (device, max_model_len);
+# grow-only in rows so every capture size reuses one allocation.
+# Superseded scratches stay alive — captured cudagraphs bake their
+# addresses; freeing them lets the allocator reuse the memory and corrupt
+# later replays.
+_PAGED_MQA_LOGITS_SCRATCH: dict[tuple, torch.Tensor] = {}
+_PAGED_MQA_LOGITS_SCRATCH_LIVE: list[torch.Tensor] = []
+
+
+def _get_paged_mqa_logits_scratch(
+    device: torch.device, rows: int, max_model_len: int, clean: bool
+) -> torch.Tensor:
+    # Width key is rounded up to a power of two — the runtime caller passes
+    # the ACTIVE batch max, which grows every decode step of a growing
+    # request; an exact-width key would pin one LIVE buffer per step
+    # (~5 GiB per GPU over a long loop, engine-killing OOM). Bucketing
+    # bounds the cache to one buffer per power-of-two width.
+    key = (device, 1 << max(max_model_len - 1, 1).bit_length())
+    buf = _PAGED_MQA_LOGITS_SCRATCH.get(key)
+    if buf is None or buf.shape[0] < rows:
+        buf = torch.empty((rows, key[1]), dtype=torch.float32, device=device)
+        _PAGED_MQA_LOGITS_SCRATCH_LIVE.append(buf)
+        _PAGED_MQA_LOGITS_SCRATCH[key] = buf
+    logits = buf[:rows]
+    if clean:
+        logits.fill_(float("-inf"))
+    return logits
+
 
 def _get_e4m3fn_bf16_lut(device: torch.device) -> torch.Tensor:
     lut = _E4M3FN_BF16_LUT_CACHE.get(device)
@@ -206,17 +234,14 @@ def fp8_paged_mqa_logits_triton(
     kv_scale = kv_flat[:, k_end:].view(torch.float32)
     q_byte = q.view(torch.uint8)
 
-    if clean_logits:
-        logits = torch.full(
-            (B * next_n, max_model_len),
-            float("-inf"),
-            dtype=torch.float32,
-            device=q.device,
-        )
-    else:
-        logits = torch.empty(
-            (B * next_n, max_model_len), dtype=torch.float32, device=q.device
-        )
+    # Persistent logits scratch: [B*next_n, max_model_len] fp32 is ~128 MiB
+    # at 512K context, and a per-call allocation lands in every cudagraph's
+    # private pool. Cache it (grow-only, created during the eager profile
+    # pass) and reuse across calls; the buffer is scratch — callers consume
+    # it into top-k before the next call.
+    logits = _get_paged_mqa_logits_scratch(
+        q.device, B * next_n, max_model_len, clean_logits
+    )
 
     BLOCK_H = max(16, triton.next_power_of_2(num_heads))
     BLOCK_D = triton.next_power_of_2(head_dim)
