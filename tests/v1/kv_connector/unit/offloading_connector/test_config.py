@@ -320,6 +320,8 @@ def _replicated_layout(
         decode_context_parallel_size=decode_context_parallel_size,
     )
     config.model_config.use_mla = use_mla
+    # PP>1 MLA derivation reads the global layer count; keep it a real int.
+    config.model_config.get_total_num_hidden_layers.return_value = 2
     config.use_v2_model_runner = use_v2_model_runner
     config.parallel_config.distributed_executor_backend = distributed_executor_backend
     config.parallel_config.nnodes = nnodes
