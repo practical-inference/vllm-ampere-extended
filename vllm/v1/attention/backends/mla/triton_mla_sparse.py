@@ -90,8 +90,11 @@ class TritonMLASparseMetadataBuilder(XPUMLASparseMetadataBuilder):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        # ponytail: without this, reorder_batch_threshold defaults to None
-        # → decode_threshold=1, so 2-token spec decode is classified as
+        # XPU base never calls AttentionMetadataBuilder.__init__, so the
+        # shared helper's config reads would fail; backfill it.
+        self.vllm_config = args[2] if len(args) > 2 else kwargs["vllm_config"]
+        # Without this, reorder_batch_threshold defaults to None
+        # -> decode_threshold=1, so 2-token spec decode is classified as
         # prefill and takes the wrong attention path.
         self._init_reorder_batch_threshold(1, supports_spec_as_decode=True)
 
