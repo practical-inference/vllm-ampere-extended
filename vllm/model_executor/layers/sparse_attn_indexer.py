@@ -951,10 +951,15 @@ class SparseAttnIndexer(CustomOp):
             )
 
             pack_dtype = torch.uint8 if use_fp4_cache else current_platform.fp8_dtype()
-            _PACK_SEQ_TRITON_KERNEL.register_warmup(
-                dtype=pack_dtype,
-                pad_value=0 if use_fp4_cache else -float("inf"),
-            )
+            # The fp8 warmup compiles an fp8e4nv pointer type, which Triton
+            # only supports on SM89+; older archs (SM80/SM86) skip the
+            # speculative precompile (the kernel is still compiled on demand
+            # if the fp8 pack branch is ever reached).
+            if pack_dtype == torch.uint8 or current_platform.has_device_capability(89):
+                _PACK_SEQ_TRITON_KERNEL.register_warmup(
+                    dtype=pack_dtype,
+                    pad_value=0 if use_fp4_cache else -float("inf"),
+                )
             _UNPACK_SEQ_TRITON_KERNEL.register_warmup()
 
             if self.dcp_world_size > 1 and current_platform.is_cuda() and has_cutedsl():
