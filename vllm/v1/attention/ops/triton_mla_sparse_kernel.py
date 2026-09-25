@@ -42,7 +42,7 @@ _SPLIT_AUTOTUNE_CONFIGS = [
 KV_SPLITS_CANDIDATES = (1, 2, 4, 8, 16)
 
 _MIN_TOPK_PER_SPLIT = 128  # below this, per-split work is too small to amortize
-_SPLIT_MAX_OCCUPANCY = 4  # skip split when baseline grid fills >=1/4 of SMs
+_SPLIT_TARGET_OCCUPANCY = 4  # target this multiple of SM count in total programs
 
 
 @triton.jit
@@ -407,20 +407,24 @@ def _sparse_mla_merge_kernel(
 def _choose_num_kv_splits(
     num_tokens: int, num_head_groups: int, index_topk: int, sm_count: int
 ) -> int:
-    """Pick a power-of-2 split count that fills the device without dropping
-    per-split work below _MIN_TOPK_PER_SPLIT. Returns 1 when the single-pass
-    grid already reaches ~1/_SPLIT_MAX_OCCUPANCY utilization.
+    """Pick a power-of-2 split count so total programs track
+    ~_SPLIT_TARGET_OCCUPANCY x SM count, independent of batch size.
+
+    Each program serially scans its slot range, so the grid must not shrink
+    as num_tokens grows; always split until each split would hold fewer than
+    _MIN_TOPK_PER_SPLIT slots. Emitted values stay within the set pre-compiled
+    by `_warmup_autotune` (powers of two dividing index_topk).
     """
     baseline = num_tokens * num_head_groups
-    if baseline == 0 or baseline * _SPLIT_MAX_OCCUPANCY >= sm_count:
+    if baseline == 0:
         return 1
-    ideal = triton.next_power_of_2(max(1, index_topk // _MIN_TOPK_PER_SPLIT))
-    max_splits = max(1, sm_count // baseline)
-    max_splits = 1 << (max_splits.bit_length() - 1)  # floor to power of 2
-    num_kv_splits = min(ideal, max_splits)
+    target = max(1, round(_SPLIT_TARGET_OCCUPANCY * sm_count / baseline))
+    num_kv_splits = triton.next_power_of_2(target)
+    cap = max(1, index_topk // _MIN_TOPK_PER_SPLIT)
+    num_kv_splits = min(num_kv_splits, cap)
     while num_kv_splits > 1 and index_topk % num_kv_splits != 0:
         num_kv_splits //= 2
-    return max(1, num_kv_splits)
+    return num_kv_splits
 
 
 def triton_mla_sparse_attention(
@@ -546,5 +550,322 @@ def triton_mla_sparse_attention(
         BLOCK_DV=_BLOCK_DV,
         BLOCK_DV_TILE=_MERGE_BLOCK_DV_TILE,
         num_warps=2,
+    )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# fp8_ds_mla dequant-gather (V3.2 layout: 656 bytes → 576 bf16)
+# ---------------------------------------------------------------------------
+
+_DS_MLA_NOPE_DIM = 512
+_DS_MLA_ROPE_DIM = 64
+_DS_MLA_CACHE_BYTES = 656
+_DS_MLA_DEQUANT_DIM = _DS_MLA_NOPE_DIM + _DS_MLA_ROPE_DIM  # 576
+_DS_MLA_QUANT_BLOCK = 128
+_DS_MLA_NUM_TILES = _DS_MLA_NOPE_DIM // _DS_MLA_QUANT_BLOCK  # 4
+
+
+@triton.jit
+def _fp8_e4m3_to_f32(x_uint8):
+    """Convert fp8_e4m3fn (uint8) to float32 without hardware fp8 support.
+
+    fp8_e4m3fn: 1 sign, 4 exponent (bias 7), 3 mantissa bits.
+    Special cases: 0x00 = +0, 0x7F/0xFF = NaN (e4m3fn has no inf).
+    """
+    sign = (x_uint8 >> 7).to(tl.uint32)  # 0 or 1
+    exp_bits = (x_uint8 & 0x78) >> 3  # 0..15
+    mant_bits = x_uint8 & 0x07  # 0..7
+
+    # Normal value: (-1)^s * 2^(e-7) * (1 + m/8)
+    # fp32 sign bit at position 31
+    sign_f32 = sign << 31
+    f32_exp = (exp_bits.to(tl.int32) - 7 + 127).to(tl.uint32)
+    f32_bits = sign_f32 | (f32_exp << 23) | (mant_bits.to(tl.uint32) << 20)
+
+    # Subnormal (exp=0): value = (-1)^s * 2^(1-7) * (m/8) = (-1)^s * m/512
+    subnorm_val = (mant_bits.to(tl.float32) / 512.0) * (tl.where(sign != 0, -1.0, 1.0))
+
+    is_subnormal = (exp_bits == 0) & (mant_bits != 0)
+    f32_bits = tl.where(is_subnormal, subnorm_val.to(tl.uint32, bitcast=True), f32_bits)
+
+    # Zero (exp=0, mant=0): result is +0 or -0
+    is_zero = (exp_bits == 0) & (mant_bits == 0)
+    f32_bits = tl.where(is_zero, sign_f32, f32_bits)
+
+    # NaN (exp=15, mant=7): both 0x7F and 0xFF are NaN in e4m3fn
+    is_nan = (exp_bits == 15) & (mant_bits == 7)
+    nan_bits = tl.zeros_like(x_uint8).to(tl.uint32) | 0x7FC00000
+    f32_bits = tl.where(is_nan, nan_bits, f32_bits)
+
+    return f32_bits.to(tl.float32, bitcast=True)
+
+
+@triton.jit
+def _dequant_ds_mla_slots_kernel(
+    out_ptr,  # [total_slots, 576] bf16
+    cache_ptr,  # [num_blocks, block_size, 656] uint8
+    indices_ptr,  # [total_slots] int32, global slot IDs
+    total_slots,
+    cache_block_size: tl.constexpr,
+    block_stride: tl.int64,
+    nope_dim: tl.constexpr,  # 512
+    rope_dim: tl.constexpr,  # 64
+    quant_block: tl.constexpr,  # 128
+    num_tiles: tl.constexpr,  # 4
+    dequant_dim: tl.constexpr,  # 576
+    cache_bytes: tl.constexpr,  # 656
+    SLOTS_PER_PROG: tl.constexpr,
+):
+    """Dequantize fp8_ds_mla (V3.2) slots into a flat BF16 workspace.
+
+    Cache layout per token (656 bytes):
+      [0, 512):   512 float8_e4m3 values (NoPE)
+      [512, 528): 4 float32 scale factors (one per 128 fp8 elements)
+      [528, 656): 64 bfloat16 values (RoPE, not quantized)
+
+    Output per token (576 bf16 = 1152 bytes):
+      [0, 512):   dequantized NoPE
+      [512, 576): RoPE (copied directly)
+
+    `SLOTS_PER_PROG` slots per program: one-slot-per-program launches cap at
+    ~200-260 GB/s once the workspace exceeds ~1 GB (2.8x slower than at
+    small footprints); tiling restores ~900-1000 GB/s at every size.
+    """
+    pid = tl.program_id(0)
+    offs_s = pid * SLOTS_PER_PROG + tl.arange(0, SLOTS_PER_PROG)
+    in_bounds = offs_s < total_slots
+    slot_idx = tl.load(indices_ptr + offs_s, mask=in_bounds, other=-1).to(tl.int64)
+    valid = (slot_idx >= 0) & in_bounds
+    slot = tl.maximum(slot_idx, 0)
+    token_ptr = (
+        cache_ptr
+        + (slot // cache_block_size) * block_stride
+        + (slot % cache_block_size) * cache_bytes
+    )[:, None]
+    scale_ptr = (token_ptr + nope_dim).to(tl.pointer_type(tl.float32))
+    out_row = out_ptr + offs_s[:, None] * dequant_dim
+
+    for tile_idx in tl.static_range(num_tiles):
+        offsets = tile_idx * quant_block + tl.arange(0, quant_block)
+        fp8_uint = tl.load(token_ptr + offsets[None, :], mask=valid[:, None], other=0)
+        scale = tl.load(scale_ptr + tile_idx, mask=valid[:, None], other=0.0)
+        dequant = _fp8_e4m3_to_f32(fp8_uint) * scale
+        tl.store(
+            out_row + offsets[None, :],
+            dequant.to(tl.bfloat16),
+            mask=in_bounds[:, None],
+        )
+
+    # RoPE: 64 bf16 values starting at byte offset 528 within each token.
+    rope_src = (token_ptr + nope_dim + num_tiles * 4).to(tl.pointer_type(tl.bfloat16))
+    rope_offs = tl.arange(0, rope_dim)
+    rope = tl.load(rope_src + rope_offs[None, :], mask=valid[:, None], other=0.0)
+    tl.store(out_row + nope_dim + rope_offs[None, :], rope, mask=in_bounds[:, None])
+
+
+def dequant_ds_mla_slots(
+    out: torch.Tensor,  # [total_slots, 576] bf16, pre-allocated
+    cache: torch.Tensor,  # [num_blocks, block_size, 656] uint8
+    indices: torch.Tensor,  # [total_slots] int32, global slot IDs
+    cache_block_size: int,
+) -> None:
+    """Dequantize fp8_ds_mla (V3.2) pages at scattered slot indices.
+
+    Args:
+        out: Pre-allocated BF16 output tensor [total_slots, 576].
+        cache: FP8 KV cache viewed as uint8 [num_blocks, block_size, 656].
+        indices: Global slot IDs [total_slots] int32. Values < 0 are
+            written as zeros (padding).
+        cache_block_size: Block size (tokens per cache block).
+    """
+    total_slots = indices.shape[0]
+    if total_slots == 0:
+        return
+    block_stride = cache.stride(0)
+    slots_per_prog = 8
+    _dequant_ds_mla_slots_kernel[(triton.cdiv(total_slots, slots_per_prog),)](
+        out,
+        cache,
+        indices,
+        total_slots,
+        cache_block_size=cache_block_size,
+        block_stride=block_stride,
+        nope_dim=_DS_MLA_NOPE_DIM,
+        rope_dim=_DS_MLA_ROPE_DIM,
+        quant_block=_DS_MLA_QUANT_BLOCK,
+        num_tiles=_DS_MLA_NUM_TILES,
+        dequant_dim=_DS_MLA_DEQUANT_DIM,
+        cache_bytes=_DS_MLA_CACHE_BYTES,
+        SLOTS_PER_PROG=slots_per_prog,
+        num_warps=4,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fused fp8_ds_mla dequant + sparse attention for prefill chunks
+# ---------------------------------------------------------------------------
+
+
+@triton.jit
+def _sparse_mla_prefill_fused_kernel(
+    q_ptr,  # [num_tokens, h_q, 576] bf16
+    cache_ptr,  # uint8 [num_blocks, block_size, 656]
+    indices_ptr,  # int32 [num_tokens, topk] global slot IDs
+    out_ptr,  # bf16 [num_tokens, h_q, 512]
+    h_q,
+    stride_q_token,
+    stride_q_head,
+    stride_out_token,
+    stride_out_head,
+    stride_indices_token,
+    sm_scale,
+    index_topk: tl.constexpr,
+    cache_block_size: tl.constexpr,
+    block_stride,  # bytes per cache block (int64-safe)
+    BLOCK_H: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+    BLOCK_DMODEL: tl.constexpr,  # 512
+    BLOCK_DPE: tl.constexpr,  # 64
+    BLOCK_DV: tl.constexpr,  # 512
+    QUANT_BLOCK: tl.constexpr,  # 128
+    CACHE_BYTES: tl.constexpr,  # 656
+):
+    """One program per (token, full head set): online-softmax over the token's
+    topk slots, dequantizing each 656B fp8_ds_mla slot in registers.
+
+    Prefill-only (BLOCK_H covers all h_q heads so each cache slot is read
+    exactly once; the 2-pass dequant-to-workspace path is kept for decode).
+    """
+    cur_q = tl.program_id(0)
+    cur_h_tile = tl.program_id(1)
+    offs_h = cur_h_tile * BLOCK_H + tl.arange(0, BLOCK_H)
+    mask_h = offs_h < h_q
+
+    offs_d = tl.arange(0, BLOCK_DMODEL)
+    offs_dpe = tl.arange(0, BLOCK_DPE)
+    offs_tile = tl.arange(0, BLOCK_DMODEL // QUANT_BLOCK)
+    offs_q = tl.arange(0, QUANT_BLOCK)
+    offs_rope = tl.arange(0, BLOCK_DPE)
+
+    q_base = q_ptr + cur_q * stride_q_token + offs_h[:, None] * stride_q_head
+    q_nope = tl.load(q_base + offs_d[None, :], mask=mask_h[:, None], other=0.0)
+    q_pe = tl.load(
+        q_base + BLOCK_DMODEL + offs_dpe[None, :], mask=mask_h[:, None], other=0.0
+    )
+
+    NEG_LARGE = -1.0e30
+    e_max = tl.zeros([BLOCK_H], dtype=tl.float32) + NEG_LARGE
+    e_sum = tl.zeros([BLOCK_H], dtype=tl.float32)
+    acc = tl.zeros([BLOCK_H, BLOCK_DV], dtype=tl.float32)
+
+    idx_base = indices_ptr + cur_q * stride_indices_token
+    for start in range(0, index_topk, BLOCK_N):
+        offs_n = start + tl.arange(0, BLOCK_N)
+        idx = tl.load(idx_base + offs_n, mask=offs_n < index_topk, other=-1)
+        mask_kv = idx >= 0
+        slot = tl.maximum(idx, 0).to(tl.int64)
+        block = slot // cache_block_size
+        pos = slot % cache_block_size
+        tok8 = cache_ptr + (block * block_stride + pos * CACHE_BYTES)[:, None]
+
+        # NoPE: 512 fp8_e4m3 bytes as [BN, 4, 128] tiles, scaled by the 4
+        # per-128 float32 factors loaded as [BN, 4] — a [BN, 512] scale
+        # gather puts 16K outstanding scalar loads per iteration in the
+        # register file and collapses the allocator (measured 1328 spills).
+        fp8_u = tl.load(
+            tok8[:, None, :]
+            + (offs_tile[:, None] * QUANT_BLOCK + offs_q[None, :])[None, :, :],
+            mask=mask_kv[:, None, None],
+            other=0,
+        )
+        scale_ptrs = (tok8 + BLOCK_DMODEL).to(tl.pointer_type(tl.float32))
+        scale = tl.load(
+            scale_ptrs + offs_tile[None, :], mask=mask_kv[:, None], other=0.0
+        )
+        nope = (_fp8_e4m3_to_f32(fp8_u) * scale[:, :, None]).to(tl.bfloat16)
+        nope = tl.reshape(nope, (BLOCK_N, BLOCK_DMODEL))
+
+        # RoPE: 64 raw bfloat16 at byte offset 512 + 4*4 = 528.
+        rope_ptrs = (tok8 + BLOCK_DMODEL + 4 * 4).to(tl.pointer_type(tl.bfloat16))
+        rope = tl.load(rope_ptrs + offs_rope[None, :], mask=mask_kv[:, None], other=0.0)
+
+        qk = tl.dot(q_nope, tl.trans(nope)) + tl.dot(q_pe, tl.trans(rope))
+        qk *= sm_scale
+        qk = tl.where(mask_h[:, None] & mask_kv[None, :], qk, NEG_LARGE)
+
+        n_e_max = tl.maximum(tl.max(qk, 1), e_max)
+        re_scale = tl.exp2(e_max - n_e_max)
+        p = tl.exp2(qk - n_e_max[:, None])
+        acc *= re_scale[:, None]
+        acc += tl.dot(p.to(tl.bfloat16), nope)
+        e_sum = e_sum * re_scale + tl.sum(p, 1)
+        e_max = n_e_max
+
+    e_sum_safe = tl.where(e_sum > 0, e_sum, 1.0)
+    tl.store(
+        out_ptr
+        + cur_q * stride_out_token
+        + offs_h[:, None] * stride_out_head
+        + tl.arange(0, BLOCK_DV)[None, :],
+        (acc / e_sum_safe[:, None]).to(tl.bfloat16),
+        mask=mask_h[:, None],
+    )
+
+
+def triton_mla_sparse_attention_fp8_fused(
+    q: torch.Tensor,  # [num_tokens, h_q, 576] bf16
+    cache: torch.Tensor,  # uint8 [num_blocks, block_size, 656]
+    indices: torch.Tensor,  # int32 [num_tokens, topk] global slot IDs
+    sm_scale: float,
+    block_n: int = 32,
+    block_h: int | None = None,
+    num_warps: int = 8,
+    num_stages: int = 2,
+) -> torch.Tensor:
+    """Fused fp8_ds_mla dequant + sparse attention for prefill-sized batches.
+
+    Args / Returns match `triton_mla_sparse_attention`, but `cache` is the raw
+    fp8_ds_mla uint8 cache and `indices` are global slot IDs. `block_h` sets
+    heads per program (slot re-read multiplier = num_heads/block_h); the
+    default covers all heads in one program.
+    """
+    num_tokens, num_heads_q, dim_qk = q.shape
+    assert dim_qk == _DIM_QK
+    assert cache.shape[-1] == _DS_MLA_CACHE_BYTES
+    assert indices.shape[0] == num_tokens
+    index_topk = indices.shape[1]
+    if block_h is None:
+        block_h = triton.next_power_of_2(num_heads_q)
+
+    out = torch.empty(
+        (num_tokens, num_heads_q, _BLOCK_DV),
+        dtype=torch.bfloat16,
+        device=q.device,
+    )
+    _sparse_mla_prefill_fused_kernel[(num_tokens, triton.cdiv(num_heads_q, block_h))](
+        q,
+        cache,
+        indices,
+        out,
+        num_heads_q,
+        stride_q_token=q.stride(0),
+        stride_q_head=q.stride(1),
+        stride_out_token=out.stride(0),
+        stride_out_head=out.stride(1),
+        stride_indices_token=indices.stride(0),
+        sm_scale=sm_scale * LOG2E,
+        index_topk=index_topk,
+        cache_block_size=cache.shape[1],
+        block_stride=cache.stride(0),
+        BLOCK_H=triton.next_power_of_2(num_heads_q),
+        BLOCK_N=block_n,
+        BLOCK_DMODEL=_BLOCK_DMODEL,
+        BLOCK_DPE=_BLOCK_DPE,
+        BLOCK_DV=_BLOCK_DV,
+        QUANT_BLOCK=_DS_MLA_QUANT_BLOCK,
+        CACHE_BYTES=_DS_MLA_CACHE_BYTES,
+        num_warps=num_warps,
+        num_stages=num_stages,
     )
     return out
