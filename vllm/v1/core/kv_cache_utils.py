@@ -2849,6 +2849,20 @@ def get_kv_cache_configs(
             vllm_config.parallel_config.tensor_parallel_size,
             vllm_config.parallel_config.decode_context_parallel_size,
         )
+    # PP stages hold different layer subsets, so their local per-block byte
+    # counts differ; stamp the max so consumers needing process-identical
+    # geometry (shared offload region) never derive from one stage's view.
+    if len(kv_cache_configs) > 1:
+        global_max_block_bytes = max(
+            (
+                config.kv_cache_tensors[0].size // config.num_blocks
+                if config.num_blocks > 0 and config.kv_cache_tensors
+                else 0
+            )
+            for config in kv_cache_configs
+        )
+        for kv_cache_config in kv_cache_configs:
+            kv_cache_config.global_max_kv_block_bytes = global_max_block_bytes
 
     return kv_cache_configs
 

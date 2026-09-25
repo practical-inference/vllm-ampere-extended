@@ -4,7 +4,6 @@
 
 from typing import TYPE_CHECKING
 
-from vllm.platforms import current_platform
 from vllm.utils.math_utils import round_up
 from vllm.v1.core.kv_cache_utils import (
     resolve_dcp_kv_block_size,
@@ -150,49 +149,22 @@ def build_offloading_config(
         # Scratch filtering must preserve the scheduler/worker allocation stride.
         # Every KVCacheTensor describes placement within the same backing allocation,
         # so its size is the total, not a per-tensor share.
-        if (
-            vllm_config.model_config.use_mla
-            and type(single_group_spec) is MLAAttentionSpec
-            and single_group_spec.page_size_padded is None
-            and current_platform.is_cuda_alike()
-            # Uniform per-layer MLA page accounting only: DSA-style groups
-            # pack extra pages (e.g. indexer) at other strides, which the
-            # global spec cannot describe. Fail closed to the local path.
-            and all(
-                tensor.block_stride == single_group_spec.page_size_bytes
-                for tensor in kv_cache_config.kv_cache_tensors
-            )
-        ):
-            # The shared mmap region geometry must be byte-identical in every
-            # process: local tensor sizes carry per-stage allocator slack that
-            # diverges under PP and desyncs the scheduler and worker views.
-            # Derive exact per-rank bytes from the global MLA page spec, sized
-            # for the largest pipeline stage's share of layers.
-            from vllm.distributed.utils import get_pp_indices
-
-            pp_size = parallel_config.pipeline_parallel_size
-            if pp_size == 1:
-                per_rank_layers = len(kv_cache_config.kv_cache_groups[0].layer_names)
-            else:
-                total_layers = vllm_config.model_config.get_total_num_hidden_layers()
-                per_rank_layers = max(
-                    end - start
-                    for start, end in (
-                        get_pp_indices(total_layers, rank, pp_size)
-                        for rank in range(pp_size)
-                    )
-                )
-            worker_kv_bytes_per_block = (
-                single_group_spec.page_size_bytes * per_rank_layers
-            )
+        if kv_cache_config.global_max_kv_block_bytes > 0:
+            # Stamped by get_kv_cache_configs with the max per-block bytes
+            # across pipeline stages: identical in every process. Deriving
+            # locally desyncs the shared offload region under PP, because
+            # stages project different layer subsets (e.g. DSA indexers on
+            # some stages only) and allocator slack (boot timeout).
+            worker_kv_bytes_per_block = kv_cache_config.global_max_kv_block_bytes
         else:
             total_gpu_kv_bytes = kv_cache_config.kv_cache_tensors[0].size
-            worker_kv_bytes_per_block = total_gpu_kv_bytes // kv_cache_config.num_blocks
+            worker_kv_bytes_per_block = (
+                total_gpu_kv_bytes // kv_cache_config.num_blocks
+            )
     elif kv_cache_config.num_blocks > 0:
         worker_kv_bytes_per_block = sum(
             _group_kv_bytes_per_block(group) for _, group in selected_groups
         )
-
     replicated_layout = (
         vllm_config.model_config.use_mla
         and parallel_config.tensor_parallel_size > 1

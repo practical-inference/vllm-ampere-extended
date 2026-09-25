@@ -1494,6 +1494,13 @@ class KVCacheConfig:
 
     kv_tp_replicas: int = 1
     """Consecutive TP ranks holding identical KV for every layer (1: none)."""
+    global_max_kv_block_bytes: int = 0
+    """Max per-block bytes across all pipeline stages' projected configs.
+
+    PP stages project different layer subsets, so their local per-block byte
+    counts (and allocator slack) differ; consumers that need process-identical
+    geometry (e.g. the shared offload region) must use this stamped value
+    instead of deriving from their own projection. 0 when unstamped."""
 
     @cached_property
     def transfer_group_ids(self) -> tuple[int, ...]:
