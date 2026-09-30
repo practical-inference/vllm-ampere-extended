@@ -4820,6 +4820,7 @@ class GPUModelRunner(
                 device=self.device,
             )
             self._pp_send_stream = torch.cuda.Stream(device=self.device)
+        assert self._pp_send_stream is not None
         dst = self._pp_send_buf[: sampled_token_ids.shape[0]]
         main_stream = torch.cuda.current_stream()
         with torch.cuda.stream(self._pp_send_stream):
@@ -4851,6 +4852,8 @@ class GPUModelRunner(
             ]
             self._pp_recv_stream = torch.cuda.Stream(device=self.device)
             self._pp_recv_event = torch.cuda.Event()
+        assert self._pp_recv_stream is not None
+        assert self._pp_recv_event is not None
         # Double-buffer by step parity: the overwrite of slot (k-2) is
         # ordered after its consume via wait_stream(main_stream) below.
         recv = self._pp_recv_bufs[self._pp_recv_step % 2][:num_reqs]
