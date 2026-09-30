@@ -216,9 +216,12 @@ class Qwen4ExpQSAFlashAttentionImpl(FlashAttentionImpl):
         k_scale = v_scale = None
         if self.kv_cache_dtype in ("fp8", "fp8_e4m3"):
             # The cache is allocated as uint8; reinterpret the e4m3 bytes
-            # (same itemsize, so shape and strides are preserved).
-            key_cache = key_cache.view(torch.float8_e4m3fn)
-            value_cache = value_cache.view(torch.float8_e4m3fn)
+            # (same itemsize, so shape and strides are preserved). Below
+            # SM89 Triton cannot load fp8e4nv pointers, so the uint8 bytes
+            # go to the kernel as-is and are dequantized on load there.
+            if current_platform.get_device_capability() >= (8, 9):
+                key_cache = key_cache.view(torch.float8_e4m3fn)
+                value_cache = value_cache.view(torch.float8_e4m3fn)
             # Host-side per-tensor dequant scales (Python floats), as used by
             # other host-scale backends; folded into the kernel's scales.
             k_scale = layer._k_scale_float
@@ -226,6 +229,7 @@ class Qwen4ExpQSAFlashAttentionImpl(FlashAttentionImpl):
         if query.dtype != torch.bfloat16 or key_cache.dtype not in (
             torch.bfloat16,
             torch.float8_e4m3fn,
+            torch.uint8,
         ):
             raise NotImplementedError(
                 "Qwen4Exp QSA requires BF16 Q and BF16 or FP8-e4m3 K/V"
@@ -427,6 +431,20 @@ class Qwen4ExpQSAAttention(Qwen3NextAttention, AttentionLayerBase):
         if self.layer_name in static_context:
             raise ValueError(f"Duplicate layer name: {self.layer_name}")
         static_context[self.layer_name] = self
+
+    def process_weights_after_loading(self, *args: object, **kwargs: object) -> None:
+        """Sync host scale floats from the loaded _k_scale/_v_scale buffers.
+
+        Checkpoints may ship per-layer KV dequant scales (e.g. leoncca's
+        calibrated model-kvscales shard); load_weights maps them onto the
+        persistent buffers, but nothing else syncs the _float copies the
+        QSA kernel folds into its softmax/output scales.
+        """
+        if self.kv_cache_dtype in ("fp8", "fp8_e4m3"):
+            self._k_scale_float = float(self._k_scale.item())
+            self._v_scale_float = float(self._v_scale.item())
+            self._k_scale_cpu.fill_(self._k_scale_float)
+            self._v_scale_cpu.fill_(self._v_scale_float)
 
     def get_attn_backend(self) -> type[AttentionBackend]:
         return self.attn_backend
