@@ -69,6 +69,7 @@ _DS_MLA_DEQUANT_WS: dict[torch.device, torch.Tensor] = {}
 # garbage attention). Bounded: one tensor per grow event.
 _DS_MLA_DEQUANT_WS_LIVE: list[torch.Tensor] = []
 
+
 def _get_ds_mla_dequant_workspace(device: torch.device, total_slots: int):
     ws = _DS_MLA_DEQUANT_WS.get(device)
     if ws is None or ws.shape[0] < total_slots:
