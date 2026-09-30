@@ -284,8 +284,16 @@ class CudaGraphManager:
             )
             decode_query_lens = sorted(
                 {
-                    num_spec + num_new_sampled_tokens_per_step
-                    for num_spec in dense_schedule[1:]
+                    q_len
+                    for q_len in (
+                        num_spec + num_new_sampled_tokens_per_step
+                        for num_spec in dense_schedule[1:]
+                    )
+                    # dynsd-v2speculator: speculator managers have
+                    # decode_query_len < num_speculative_tokens, so the K=0
+                    # tier is non-positive; round_up on it builds descs with
+                    # negative num_reqs (make_dummy assert at boot).
+                    if q_len >= 1
                 }
             )
         else:
