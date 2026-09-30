@@ -158,9 +158,7 @@ def build_offloading_config(
             worker_kv_bytes_per_block = kv_cache_config.global_max_kv_block_bytes
         else:
             total_gpu_kv_bytes = kv_cache_config.kv_cache_tensors[0].size
-            worker_kv_bytes_per_block = (
-                total_gpu_kv_bytes // kv_cache_config.num_blocks
-            )
+            worker_kv_bytes_per_block = total_gpu_kv_bytes // kv_cache_config.num_blocks
     elif kv_cache_config.num_blocks > 0:
         worker_kv_bytes_per_block = sum(
             _group_kv_bytes_per_block(group) for _, group in selected_groups

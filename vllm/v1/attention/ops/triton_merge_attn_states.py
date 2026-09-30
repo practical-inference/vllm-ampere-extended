@@ -32,6 +32,7 @@ def mask_empty_context(
         query_start_loc: Prefill query cumulative offsets, shape [num_reqs + 1].
         context_start_loc: Chunk context cumulative offsets,
             shape [num_reqs + 1]; an empty chunk has a zero-length span.
+
     """
     num_heads, num_tokens = lse.shape
     num_reqs = query_start_loc.shape[0] - 1
