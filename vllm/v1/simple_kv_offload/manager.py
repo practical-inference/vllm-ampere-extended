@@ -222,6 +222,32 @@ class SimpleCPUOffloadScheduler:
         # LCM) but is NOT assumed to equal it.
         self.fa_block_size: int = self.group_block_sizes[self.fa_gidx]
         assert self.block_size % self.fa_block_size == 0
+        # qsa-kvoffload: make eager-mode inertness visible on hybrid
+        # models. Eager stores skip prefix-cacheable groups whose CPU
+        # manager is not positionally stable (align-mode Mamba), but the
+        # CPU-side joint prefix hit still includes those groups, so hits
+        # can only come from the sparse boundary hand-off path.
+        # lazy_offload=true walks the GPU free queue instead and stores
+        # every hashed block near eviction, including cached Mamba
+        # boundary states, restoring full hits.
+        if not lazy_offload:
+            unstable_groups = [
+                gid
+                for gid in self.prefix_cacheable_group_ids
+                if not self.cpu_coordinator.single_type_managers[
+                    gid
+                ].has_positionally_stable_blocks
+            ]
+            if unstable_groups:
+                logger.warning_once(
+                    "SimpleCPUOffload eager mode does not positionally "
+                    "store group(s) %s (align-mode Mamba); CPU prefix "
+                    "hits require those groups, so hits will be sparse "
+                    "(boundary hand-offs only). Set "
+                    "kv_connector_extra_config {'lazy_offload': true} "
+                    "for full boundary-state coverage.",
+                    unstable_groups,
+                )
         self.cpu_block_pool: BlockPool = self.cpu_coordinator.block_pool
         # GPU block pool reference - bound after scheduler builds kv_cache_manager
         self._gpu_block_pool: BlockPool | None = None

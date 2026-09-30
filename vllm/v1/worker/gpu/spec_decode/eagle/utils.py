@@ -76,6 +76,15 @@ def load_eagle_model(target_model: nn.Module, vllm_config: VllmConfig) -> nn.Mod
     speculative_config = vllm_config.speculative_config
     assert speculative_config is not None
     draft_model_config = speculative_config.draft_model_config
+    # qsa-kvoffload: keep the cumem flag on the draft config so the
+    # connector/expandable_segments check passes in the draft rebuild.
+    # Plain assignment: vllm.config.replace() chokes on ModelConfig
+    # instances whose __dict__ holds post-init non-field attributes.
+    if (
+        vllm_config.model_config.enable_cumem_allocator
+        and not draft_model_config.enable_cumem_allocator
+    ):
+        draft_model_config.enable_cumem_allocator = True
     vllm_config = speculative_config.apply_draft_overrides(vllm_config)
     draft_load_config = get_pp_safe_draft_load_config(
         get_draft_load_config(vllm_config)

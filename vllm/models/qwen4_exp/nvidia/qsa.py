@@ -121,7 +121,14 @@ class Qwen4ExpQSAFlashAttentionBackend(FlashAttentionBackend):
 
     @classmethod
     def supports_kv_connector(cls) -> bool:
-        return False
+        # qsa-kvoffload: SimpleCPUOffloadConnector transfers raw packed
+        # blocks derived from KVCacheTensor placements (block-outermost
+        # here), so the QSA packed cache -- fp8-e4m3 main KV bytes plus
+        # bf16 indexer side caches -- copies bit-exact and the QSA
+        # Triton kernel dequantizes on load. Hybrid (align-Mamba) models
+        # additionally need lazy_offload=true for CPU prefix hits; see
+        # the warning in vllm/v1/simple_kv_offload/manager.py.
+        return True
 
 
 class Qwen4ExpQSAFlashAttentionImpl(FlashAttentionImpl):
