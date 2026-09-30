@@ -39,6 +39,7 @@ from vllm.v1.attention.ops.triton_mla_sparse_kernel import (
     triton_mla_sparse_attention,
     triton_mla_sparse_attention_fp8_fused,
 )
+from vllm.v1.kv_cache_interface import KVCacheSpec
 
 # V3.2 indexers don't expose `n_head`; GLM-5.1-NVFP4 sets index_n_heads=32.
 # Autotune key includes (num_heads, head_dim), so a wrong warmup shape forces
@@ -175,7 +176,9 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
                 indexer_num_heads = indexer_num_heads or _INDEXER_NUM_HEADS
                 indexer_head_dim = indexer_head_dim or _INDEXER_HEAD_DIM
         warmup_fp8_mqa_logits_triton(
-            num_heads=indexer_num_heads, head_dim=indexer_head_dim, device=device
+            num_heads=indexer_num_heads or _INDEXER_NUM_HEADS,
+            head_dim=indexer_head_dim or _INDEXER_HEAD_DIM,
+            device=device,
         )
         cfg = get_current_vllm_config_or_none()
         if cfg is not None:
@@ -185,8 +188,8 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
         else:
             block_size = 64
         warmup_fp8_paged_mqa_logits_triton(
-            num_heads=indexer_num_heads,
-            head_dim=indexer_head_dim,
+            num_heads=indexer_num_heads or _INDEXER_NUM_HEADS,
+            head_dim=indexer_head_dim or _INDEXER_HEAD_DIM,
             block_size=block_size,
             device=device,
         )
@@ -303,6 +306,7 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
             BLOCK_SIZE=attn_metadata.block_size,
             NUM_TOPK_TOKENS=attn_metadata.topk_tokens,
         )
+        assert isinstance(topk_indices_global, torch.Tensor)
 
         if self.kv_cache_dtype == "fp8_ds_mla":
             attn_out = self._forward_fp8_ds_mla_kv(
@@ -334,7 +338,9 @@ class TritonMLASparseBackend(AttentionBackend):
         return "TRITON_MLA_SPARSE"
 
     @staticmethod
-    def get_supported_kernel_block_sizes() -> list[int | MultipleOf]:
+    def get_supported_kernel_block_sizes(
+        kv_cache_spec: "KVCacheSpec | None" = None,
+    ) -> list[int | MultipleOf]:
         # The DSA indexer backend requires block size 64 on CUDA and shares
         # the KV cache group with this backend; the base-class MultipleOf(1)
         # default lets auto-selection settle on 16, which then fails
