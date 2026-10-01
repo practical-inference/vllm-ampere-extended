@@ -574,6 +574,8 @@ def fused_norm_rope(
     # cache-write branches here. Run only norm/RoPE/topk in the kernel (no
     # cache pointers passed) and insert both caches with the CUDA reference
     # ops, which the fused stores were written to match bit-exactly.
+    # ponytail: _f32_to_e4m3_sw can re-fuse these two stores into the kernel
+    # on SM80 too; revisit only if profiling shows 2 CUDA ops/layer matters.
     host_cache_insert = not current_platform.supports_fp8()
     mla_insert = indexer_insert = None
     if host_cache_insert:
