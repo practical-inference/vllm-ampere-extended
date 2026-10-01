@@ -34,6 +34,8 @@ from vllm.v1.attention.ops.triton_merge_attn_states import (
 )
 from vllm.v1.attention.ops.triton_mla_sparse_kernel import (
     _DIM_QK,
+    _DIM_QK_NOPE,
+    _DS_MLA_NOPE_DIM,
     KV_SPLITS_CANDIDATES,
     dequant_ds_mla_slots,
     triton_mla_sparse_attention,
@@ -62,7 +64,7 @@ _PREFILL_FUSED_MIN_TOKENS = 1 << 30
 logger = init_logger(__name__)
 
 # Persistent dequant-gather workspace, keyed by device, grow-only in slots.
-_DS_MLA_DEQUANT_WS: dict[torch.device, torch.Tensor] = {}
+_DS_MLA_DEQUANT_WS: dict[tuple[torch.device, int], torch.Tensor] = {}
 # ponytail: every superseded workspace stays alive for the process lifetime.
 # Captured cudagraphs bake raw addresses of the workspace they were captured
 # with; dropping the old tensor lets the caching allocator reuse that memory
@@ -71,16 +73,18 @@ _DS_MLA_DEQUANT_WS: dict[torch.device, torch.Tensor] = {}
 _DS_MLA_DEQUANT_WS_LIVE: list[torch.Tensor] = []
 
 
-def _get_ds_mla_dequant_workspace(device: torch.device, total_slots: int):
-    ws = _DS_MLA_DEQUANT_WS.get(device)
+def _get_ds_mla_dequant_workspace(
+    device: torch.device, total_slots: int, dequant_dim: int = _DS_MLA_DEQUANT_DIM
+):
+    ws = _DS_MLA_DEQUANT_WS.get((device, dequant_dim))
     if ws is None or ws.shape[0] < total_slots:
         ws = torch.empty(
-            (total_slots, 1, _DS_MLA_DEQUANT_DIM),
+            (total_slots, 1, dequant_dim),
             dtype=torch.bfloat16,
             device=device,
         )
         _DS_MLA_DEQUANT_WS_LIVE.append(ws)
-        _DS_MLA_DEQUANT_WS[device] = ws
+        _DS_MLA_DEQUANT_WS[(device, dequant_dim)] = ws
     return ws[:total_slots]
 
 
@@ -143,6 +147,7 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
             _get_ds_mla_dequant_workspace(
                 device,
                 max(decode_tokens, cfg.scheduler_config.max_num_batched_tokens) * topk,
+                self.head_size,
             )
             from vllm.v1.attention.ops.mqa_logits_triton import (
                 _get_paged_mqa_logits_scratch,
@@ -153,8 +158,9 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
             _get_paged_mqa_logits_scratch(
                 device, decode_tokens, cfg.model_config.max_model_len, clean=False
             )
-        q = torch.empty(1, self.num_heads, _DIM_QK, dtype=torch.bfloat16, device=device)
-        kv = torch.empty(64, 1, _DIM_QK, dtype=torch.bfloat16, device=device)
+        dim_qk = self.head_size
+        q = torch.empty(1, self.num_heads, dim_qk, dtype=torch.bfloat16, device=device)
+        kv = torch.empty(64, 1, dim_qk, dtype=torch.bfloat16, device=device)
         indices = torch.zeros(1, 1, topk, dtype=torch.int32, device=device)
         for splits in KV_SPLITS_CANDIDATES:
             triton_mla_sparse_attention(
@@ -254,19 +260,21 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
         flat_indices = topk_indices.reshape(-1).to(torch.int32)
 
         # Persistent bf16 workspace (grow-only, module-cached, shared across
-        # layers — layers run sequentially on-stream): [total_slots, 1, 576].
+        # layers — layers run sequentially on-stream): [total_slots, 1, d_qk].
         # A per-call allocation of this size lands in every cudagraph's
         # private pool (~150 MiB per captured size at topk=2048).
-        workspace = _get_ds_mla_dequant_workspace(q.device, total_slots)
+        dequant_dim = self.head_size
+        workspace = _get_ds_mla_dequant_workspace(q.device, total_slots, dequant_dim)
 
         # Dequant-gather from fp8_ds_mla cache into bf16 workspace
         u8_cache = kv_c_and_k_pe_cache.view(torch.uint8)
-        ws_rows = workspace.reshape(total_slots, _DS_MLA_DEQUANT_DIM)
+        ws_rows = workspace.reshape(total_slots, dequant_dim)
         dequant_ds_mla_slots(
             ws_rows,
             u8_cache,
             flat_indices,
             cache_block_size=attn_metadata.block_size,
+            rope_dim=dequant_dim - _DS_MLA_NOPE_DIM,
         )
 
         # Remap topk indices into workspace positions:
@@ -309,7 +317,10 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
             attn_metadata.block_table,
             topk_indices,
             BLOCK_SIZE=attn_metadata.block_size,
-            NUM_TOPK_TOKENS=attn_metadata.topk_tokens,
+            # Buffer is padded to the kernel tile width (topk + kpool tail,
+            # rounded); -1 pad slots stay masked in the attention kernel.
+            # Same contract as FLASHMLA_SPARSE._forward_bf16_kv.
+            NUM_TOPK_TOKENS=topk_indices.shape[1],
         )
         assert isinstance(topk_indices_global, torch.Tensor)
 
@@ -389,7 +400,47 @@ class TritonMLASparseBackend(AttentionBackend):
 
     @classmethod
     def get_supported_head_sizes(cls) -> list[int]:
-        return [_DIM_QK]
+        return [_DIM_QK, _DIM_QK_NOPE]
+
+    @classmethod
+    def supports_combination(
+        cls,
+        head_size: int,
+        dtype: torch.dtype,
+        kv_cache_dtype: "CacheDType | None",
+        block_size: int | None,
+        use_mla: bool,
+        has_sink: bool,
+        use_sparse: bool,
+        use_mm_prefix: bool,
+        device_capability: DeviceCapability,
+    ) -> str | None:
+        if head_size == _DIM_QK_NOPE:
+            # 512 is the rope-free NoPE shape (kv_lora_rank=512,
+            # qk_rope_head_dim=0). The fp8_ds_mla dequant path runs it with
+            # rope_dim=0 (128B rope tail in the 656B page stays zeroed).
+            if kv_cache_dtype not in (
+                None,
+                "auto",
+                "bfloat16",
+                "float16",
+                "fp8_ds_mla",
+            ):
+                return (
+                    "TRITON_MLA_SPARSE supports head_size 512 only with "
+                    f"bf16/fp16 kv-cache, got {kv_cache_dtype}"
+                )
+            from vllm.config import get_current_vllm_config
+
+            vllm_config = get_current_vllm_config()
+            if vllm_config.model_config is not None:
+                hf_text_config = vllm_config.model_config.hf_text_config
+                if getattr(hf_text_config, "qk_rope_head_dim", 64) != 0:
+                    return (
+                        "TRITON_MLA_SPARSE supports head_size 512 only for "
+                        "rope-free (NoPE) models"
+                    )
+        return None
 
     @classmethod
     def supports_compute_capability(cls, capability: DeviceCapability) -> bool:
