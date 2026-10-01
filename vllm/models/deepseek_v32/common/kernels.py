@@ -75,6 +75,27 @@ def _fp8_ue8m0_quantize(vals, FP8_MAX: tl.constexpr, USE_FNUZ: tl.constexpr):
 
 
 @triton.jit
+def _f32_to_e4m3_sw(x):
+    """Software f32 -> FP8 E4M3 bits (uint8): RNE, satfinite. Stand-in for
+    cvt.rn.satfinite.e4m3x2.f32 on archs without hw FP8 (SM80), where Triton
+    cannot compile fp8e4nv casts. Input must be finite with |x| <= FP8_MAX,
+    which ue8m0 scaling guarantees.
+    """
+    u = x.to(tl.uint32, bitcast=True)
+    s = ((u >> 24) & 0x80).to(tl.uint8)
+    a = u & 0x7FFFFFFF
+    # Normal path: RNE-round to a 3-bit mantissa (carry folds into exponent).
+    r = a + 0x0007FFFF + ((a >> 20) & 1)
+    normal = (((r >> 23) - 120) << 3) | ((r >> 20) & 7)
+    # Subnormal path: RNE onto the k*2^-9 grid (magic-add rounds to nearest
+    # even integer; a rollup to 8 lands exactly on the smallest normal).
+    y = tl.abs(x) * 512.0
+    sub = (y + 12582912.0) - 12582912.0
+    byte = tl.where(r >= 0x3C800000, normal, sub.to(tl.uint32)) & 0xFF
+    return (byte | s.to(tl.uint32)).to(tl.uint8)
+
+
+@triton.jit
 def _fp8_quant_and_cache_write(
     vals,
     mask,
@@ -563,6 +584,7 @@ def fused_norm_rope(
             ins_idx_slot = slot_mapping
         if indexer_k_cache is not None and ins_idx_slot is not None:
             if index_k_out is None:
+                assert index_k is not None
                 index_k_out = torch.empty_like(index_k)
             indexer_insert = (indexer_k_cache, ins_idx_slot)
         indexer_k_cache = None
@@ -969,10 +991,13 @@ def _fused_q_kernel(
             + index_q_block
         )
         if INDEX_Q_U8:
-            # SM80: fp8 casts don't compile in Triton here; store the rope'd
-            # f32 and let the host quantize (ue8m0 scale folded into weights).
-            tl.store(index_q_offs, index_q)
-            index_q_scale = 1.0
+            # SM80: fp8 casts don't compile in Triton here; same ue8m0 recipe
+            # as _fp8_ue8m0_quantize with a software e4m3 encode (uint8 store
+            # into the fp8 buffer's uint8 view).
+            scale = tl.div_rn(tl.maximum(tl.max(tl.abs(index_q)), 1e-4), FP8_MAX)
+            scale = tl.math.exp2(tl.math.ceil(tl.math.log2(scale)))
+            tl.store(index_q_offs, _f32_to_e4m3_sw(tl.div_rn(index_q, scale)))
+            index_q_scale = scale
         else:
             index_q_fp8, index_q_scale = _fp8_ue8m0_quantize(index_q, FP8_MAX, USE_FNUZ)
             tl.store(index_q_offs, index_q_fp8)
@@ -1079,10 +1104,7 @@ def fused_q(
     # Triton rejects fp8e4nv pointer args on archs without hw FP8 (SM80);
     # pass a uint8 view and let the kernel bitcast the store instead.
     index_q_u8 = not current_platform.supports_fp8()
-    if index_q_u8:
-        index_q_kernel_arg = torch.empty_like(index_q, dtype=torch.float32)
-    else:
-        index_q_kernel_arg = index_q_fp8
+    index_q_kernel_arg = index_q_fp8.view(torch.uint8) if index_q_u8 else index_q_fp8
     if cutedsl_kernel is not None:
         cutedsl_kernel(
             positions,
@@ -1157,12 +1179,6 @@ def fused_q(
         # per-program compute bound (swept 1/2/4/8 — 1 wins or ties everywhere).
         num_warps=1,
     )
-    if index_q_u8:
-        # Mirror _fp8_ue8m0_quantize (ue8m0 power-of-2 scale, satfinite):
-        scale = torch.clamp(index_q_kernel_arg.abs().amax(-1, keepdim=True), min=1e-4)
-        scale = torch.exp2(torch.ceil(torch.log2(scale / _FP8_MAX)))
-        index_q_fp8.copy_(index_q_kernel_arg / scale)
-        index_weights_out *= scale.squeeze(-1)
     return index_q_fp8, index_weights_out, mqa_q
 
 
