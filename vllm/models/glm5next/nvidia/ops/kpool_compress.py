@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import torch
 
+from vllm.models.deepseek_v32.common.kernels import _f32_to_e4m3_sw
+from vllm.platforms import current_platform
 from vllm.triton_utils import tl, triton
 
 # The GLM-5.3-Flash indexer head dimension is fixed at 128.
@@ -65,6 +67,7 @@ def _fwht_quant_kernel(
     sout_ptr,
     n_rows,
     BLOCK_R: tl.constexpr,
+    SW_E4M3: tl.constexpr,
 ):
     """Fused Hadamard-128 rotation + per-row absmax FP8 (ue8m0) quant.
 
@@ -101,6 +104,8 @@ def _fwht_quant_kernel(
     scale = tl.exp2(tl.ceil(tl.log2(absmax * (1.0 / 448.0))))
     y = tl.minimum(tl.maximum(x / scale[:, None], -448.0), 448.0)
 
+    if SW_E4M3:
+        y = _f32_to_e4m3_sw(y)
     tl.store(qout_ptr + rows[:, None] * 128 + offs[None, :], y, mask=rmask[:, None])
     tl.store(sout_ptr + rows, scale, mask=rmask)
 
@@ -128,7 +133,13 @@ def fwht128_quant_fp8(q: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return q_fp8, q_scale
     BLOCK_R = 32
     grid = (triton.cdiv(n_rows, BLOCK_R),)
-    _fwht_quant_kernel[grid](q, q_fp8, q_scale, n_rows, BLOCK_R=BLOCK_R, num_warps=2)
+    # SM80: Triton rejects fp8e4nv pointers/casts; software-encode e4m3 and
+    # pass a uint8 view (same pattern as deepseek_v32 fused_q's INDEX_Q_U8).
+    sw_e4m3 = not current_platform.supports_fp8()
+    qout = q_fp8.view(torch.uint8) if sw_e4m3 else q_fp8
+    _fwht_quant_kernel[grid](
+        q, qout, q_scale, n_rows, BLOCK_R=BLOCK_R, SW_E4M3=sw_e4m3, num_warps=2
+    )
     return q_fp8, q_scale
 
 
@@ -160,6 +171,7 @@ def _kpool_softmax_rotate_write_cache_kernel(
     HAS_WRITE_MASK: tl.constexpr,
     RETURN_COMPRESSED: tl.constexpr,
     WRITE_CACHE: tl.constexpr,
+    SW_E4M3: tl.constexpr,
     BLOCK_D: tl.constexpr,
 ):
     """One program per pool. softmax(slot_score+ape)-weighted sum of slot_k ->
@@ -229,6 +241,8 @@ def _kpool_softmax_rotate_write_cache_kernel(
         scale = absmax * fp8_max_inv
     quantized = x / scale
     quantized = tl.minimum(tl.maximum(quantized, -fp8_max), fp8_max)
+    if SW_E4M3:
+        quantized = _f32_to_e4m3_sw(quantized)
 
     if WRITE_CACHE:
         loc = tl.load(loc_ptr + row, mask=do_write, other=0)
@@ -341,6 +355,13 @@ def kpool_compress_and_write_cache(
         compressed_k = buf_fp8
         compressed_scale = buf_fp32
 
+    # SM80: fp8e4nv pointers don't compile; pass uint8 views and let the
+    # kernel software-encode (see fwht128_quant_fp8 for the same pattern).
+    sw_e4m3 = not current_platform.supports_fp8()
+    if sw_e4m3:
+        buf_fp8 = buf_fp8.view(torch.uint8)
+        compressed_k = compressed_k.view(torch.uint8)
+
     _kpool_softmax_rotate_write_cache_kernel[(slot_k.shape[0],)](
         buf_fp8,
         buf_fp32,
@@ -365,6 +386,7 @@ def kpool_compress_and_write_cache(
         HAS_WRITE_MASK=has_write_mask,
         RETURN_COMPRESSED=return_compressed,
         WRITE_CACHE=write_cache,
+        SW_E4M3=sw_e4m3,
         BLOCK_D=triton.next_power_of_2(head_dim),
     )
 
@@ -484,6 +506,7 @@ def _kpool_decode_update_batched_kernel(
     HEAD_DIM: tl.constexpr,
     S_OFFSET_NBYTES_IN_PAGE: tl.constexpr,
     ROUND_SCALE: tl.constexpr,
+    SW_E4M3: tl.constexpr,
     BLOCK_D: tl.constexpr,
 ):
     """One program per request; iterates its NEXT_N verify tokens in order.
@@ -594,6 +617,8 @@ def _kpool_decode_update_batched_kernel(
             else:
                 scale = absmax * fp8_max_inv
             quantized = tl.minimum(tl.maximum(x / scale, -fp8_max), fp8_max)
+            if SW_E4M3:
+                quantized = _f32_to_e4m3_sw(quantized)
 
             loc = cache_loc.to(tl.int64)
             loc_page_index = loc // PAGE_SIZE
@@ -690,6 +715,9 @@ def kpool_decode_update_and_maybe_write_cache_batched(
     buf = kv_cache
     buf_fp8 = buf.view(torch.float8_e4m3fn)
     buf_fp32 = buf.view(torch.float32)
+    sw_e4m3 = not current_platform.supports_fp8()
+    if sw_e4m3:
+        buf_fp8 = buf_fp8.view(torch.uint8)
 
     # The kernel indexes the int tensors as ``req * next_n + t`` (row-major),
     # so they must be contiguous. Callers pass either a view of a contiguous
@@ -724,6 +752,7 @@ def kpool_decode_update_and_maybe_write_cache_batched(
         HEAD_DIM=head_dim,
         S_OFFSET_NBYTES_IN_PAGE=page_size * head_dim,
         ROUND_SCALE=round_scale,
+        SW_E4M3=sw_e4m3,
         BLOCK_D=triton.next_power_of_2(head_dim),
     )
 
