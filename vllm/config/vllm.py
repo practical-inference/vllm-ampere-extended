@@ -599,6 +599,12 @@ class VllmConfig:
             # V1 Model Runner does not fully support async scheduling with PP.
             if pp_size <= 1:
                 return 2
+        # ponytail: spec decode + PP batch queue is broken — the queue
+        # schedules decode steps before the previous step's bonus token
+        # is processed, producing wrong input_ids. Disable the queue
+        # (size=1) so each step completes before the next is scheduled.
+        if pp_size > 1 and self.speculative_config is not None:
+            return 1
         return pp_size
 
     @property
