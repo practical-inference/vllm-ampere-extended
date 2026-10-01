@@ -14,6 +14,8 @@ _BLOCK_DMODEL = 512
 _BLOCK_DPE = 64
 _BLOCK_DV = 512
 _DIM_QK = _BLOCK_DMODEL + _BLOCK_DPE  # 576
+# GLM-5.3-Flash (glm5_next) DSA-MLA is rope-free: dim_qk == kv_lora_rank.
+_DIM_QK_NOPE = _BLOCK_DMODEL  # 512
 
 _BLOCK_H = 16
 # Smallest BLOCK_N the autotune sweep offers; only used for the topk-divisibility
@@ -73,9 +75,7 @@ def _sparse_mla_compute_tile(
     """Shared stage-1 body: load Q, run the sparse online-softmax loop over
     `[split_start, split_end)` of the topk axis, return accumulators."""
     offs_d = tl.arange(0, BLOCK_DMODEL)
-    offs_dpe = BLOCK_DMODEL + tl.arange(0, BLOCK_DPE)
     offs_dv = tl.arange(0, BLOCK_DV)
-    mask_dpe = offs_dpe < BLOCK_DMODEL + BLOCK_DPE
 
     q = tl.load(
         q_buffer
@@ -85,14 +85,16 @@ def _sparse_mla_compute_tile(
         mask=mask_h[:, None],
         other=0.0,
     )
-    qpe = tl.load(
-        q_buffer
-        + cur_q * stride_q_token
-        + cur_head[:, None] * stride_q_head
-        + offs_dpe[None, :],
-        mask=(mask_h[:, None]) & (mask_dpe[None, :]),
-        other=0.0,
-    )
+    if BLOCK_DPE > 0:
+        offs_dpe = BLOCK_DMODEL + tl.arange(0, BLOCK_DPE)
+        qpe = tl.load(
+            q_buffer
+            + cur_q * stride_q_token
+            + cur_head[:, None] * stride_q_head
+            + offs_dpe[None, :],
+            mask=mask_h[:, None],
+            other=0.0,
+        )
 
     # Finite sentinel (not -inf) — when an entire BLOCK_N tile is masked,
     # `-inf - -inf = NaN` poisons the softmax; `sentinel - sentinel = 0`
@@ -125,17 +127,18 @@ def _sparse_mla_compute_tile(
         k = tl.load(k_buffer + offs_k, mask=mask_kv[None, :], other=0.0)
         qk = tl.dot(q, k.to(q.dtype))
 
-        offs_kpe = (
-            indices[None, :] * stride_kv_token
-            + cur_kv_head_id * stride_kv_head
-            + offs_dpe[:, None]
-        )
-        kpe = tl.load(
-            k_buffer + offs_kpe,
-            mask=(mask_kv[None, :]) & (mask_dpe[:, None]),
-            other=0.0,
-        )
-        qk += tl.dot(qpe, kpe.to(q.dtype))
+        if BLOCK_DPE > 0:
+            offs_kpe = (
+                indices[None, :] * stride_kv_token
+                + cur_kv_head_id * stride_kv_head
+                + offs_dpe[:, None]
+            )
+            kpe = tl.load(
+                k_buffer + offs_kpe,
+                mask=mask_kv[None, :],
+                other=0.0,
+            )
+            qk += tl.dot(qpe, kpe.to(q.dtype))
 
         qk *= sm_scale
         qk = tl.where((mask_h[:, None]) & (mask_kv[None, :]), qk, NEG_LARGE)
@@ -452,11 +455,12 @@ def triton_mla_sparse_attention(
 
     """
     num_tokens, num_heads_q, dim_qk = q.shape
-    assert dim_qk == _DIM_QK, (
-        f"sparse MLA kernel requires dim_qk={_DIM_QK} (DeepSeek-V3.2 / GLM-5), "
-        f"got {dim_qk}"
+    assert dim_qk in (_DIM_QK, _DIM_QK_NOPE), (
+        f"sparse MLA kernel requires dim_qk={_DIM_QK} (DeepSeek-V3.2 / GLM-5) "
+        f"or {_DIM_QK_NOPE} (rope-free, kv_lora_rank=512), got {dim_qk}"
     )
-    assert kv.shape[1] == 1 and kv.shape[2] == _DIM_QK
+    block_dpe = dim_qk - _BLOCK_DMODEL
+    assert kv.shape[1] == 1 and kv.shape[2] == dim_qk
     index_topk = indices.shape[2]
     assert index_topk % _MIN_BLOCK_N == 0, (
         f"topk ({index_topk}) must be a multiple of the smallest autotune "
@@ -501,7 +505,7 @@ def triton_mla_sparse_attention(
             BLOCK_H=_BLOCK_H,
             BLOCK_DV=_BLOCK_DV,
             BLOCK_DMODEL=_BLOCK_DMODEL,
-            BLOCK_DPE=_BLOCK_DPE,
+            BLOCK_DPE=block_dpe,
         )
         return out
 
@@ -534,7 +538,7 @@ def triton_mla_sparse_attention(
         BLOCK_H=_BLOCK_H,
         BLOCK_DV=_BLOCK_DV,
         BLOCK_DMODEL=_BLOCK_DMODEL,
-        BLOCK_DPE=_BLOCK_DPE,
+        BLOCK_DPE=block_dpe,
         LOGE2=LOGE2,
     )
 
@@ -662,10 +666,14 @@ def _dequant_ds_mla_slots_kernel(
         )
 
     # RoPE: 64 bf16 values starting at byte offset 528 within each token.
-    rope_src = (token_ptr + nope_dim + num_tiles * 4).to(tl.pointer_type(tl.bfloat16))
-    rope_offs = tl.arange(0, rope_dim)
-    rope = tl.load(rope_src + rope_offs[None, :], mask=valid[:, None], other=0.0)
-    tl.store(out_row + nope_dim + rope_offs[None, :], rope, mask=in_bounds[:, None])
+    # rope_dim == 0 for NoPE models (writer zero-fills the 128B tail).
+    if rope_dim > 0:
+        rope_src = (token_ptr + nope_dim + num_tiles * 4).to(
+            tl.pointer_type(tl.bfloat16)
+        )
+        rope_offs = tl.arange(0, rope_dim)
+        rope = tl.load(rope_src + rope_offs[None, :], mask=valid[:, None], other=0.0)
+        tl.store(out_row + nope_dim + rope_offs[None, :], rope, mask=in_bounds[:, None])
 
 
 def dequant_ds_mla_slots(
@@ -673,15 +681,17 @@ def dequant_ds_mla_slots(
     cache: torch.Tensor,  # [num_blocks, block_size, 656] uint8
     indices: torch.Tensor,  # [total_slots] int32, global slot IDs
     cache_block_size: int,
+    rope_dim: int = _DS_MLA_ROPE_DIM,
 ) -> None:
     """Dequantize fp8_ds_mla (V3.2) pages at scattered slot indices.
 
     Args:
-        out: Pre-allocated BF16 output tensor [total_slots, 576].
+        out: Pre-allocated BF16 output tensor [total_slots, 512 + rope_dim].
         cache: FP8 KV cache viewed as uint8 [num_blocks, block_size, 656].
         indices: Global slot IDs [total_slots] int32. Values < 0 are
             written as zeros (padding).
         cache_block_size: Block size (tokens per cache block).
+        rope_dim: RoPE elements per token; 0 for NoPE models.
 
     """
     total_slots = indices.shape[0]
@@ -697,10 +707,10 @@ def dequant_ds_mla_slots(
         cache_block_size=cache_block_size,
         block_stride=block_stride,
         nope_dim=_DS_MLA_NOPE_DIM,
-        rope_dim=_DS_MLA_ROPE_DIM,
+        rope_dim=rope_dim,
         quant_block=_DS_MLA_QUANT_BLOCK,
         num_tiles=_DS_MLA_NUM_TILES,
-        dequant_dim=_DS_MLA_DEQUANT_DIM,
+        dequant_dim=_DS_MLA_NOPE_DIM + rope_dim,
         cache_bytes=_DS_MLA_CACHE_BYTES,
         SLOTS_PER_PROG=slots_per_prog,
         num_warps=4,
