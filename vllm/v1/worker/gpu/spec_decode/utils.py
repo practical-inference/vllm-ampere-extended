@@ -42,11 +42,13 @@ class DraftTokensHandler:
     ) -> None:
         self.req_ids = input_batch.req_ids
         self.num_draft_tokens = draft_tokens.shape[1]
-        if not input_batch.has_structured_output_reqs:
-            # No draft token validation needs to be performed by
-            # the scheduler for this batch.
-            self.draft_tokens_np = None
-            return
+        # ponytail: always transfer drafts. The structured-output-only fast
+        # path left draft_tokens_np=None, so with async scheduling disabled
+        # post_step's take_draft_token_ids() returned -1 placeholders that
+        # the scheduler scheduled as real drafts (1 query row, 2 logits
+        # rows -> prepare_inputs assert, dead PP worker). A tiny pinned-D2H
+        # per spec step is cheaper than that. Upgrade: gate on async
+        # scheduling once upstream fixes the placeholder contract.
 
         # For spec decoding + structured outputs, we must transfer the
         # draft tokens back to the scheduler for grammar validation.
