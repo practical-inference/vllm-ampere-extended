@@ -1203,7 +1203,10 @@ class MLAAttention(nn.Module, AttentionLayerBase):
     def _use_sparse_mha(self, attn_metadata: "MLACommonMetadata") -> bool:
         if self.hisparse_cache is not None:
             return False
-        prefill = attn_metadata.prefill
+        # Sparse backends whose metadata carries no prefill classification
+        # (e.g. TritonMLASparse's XPU-style metadata) only implement the MQA
+        # path, so the MHA shortcut never applies to them.
+        prefill = getattr(attn_metadata, "prefill", None)
         if prefill is None:
             return False
         use_masked_mha = (
