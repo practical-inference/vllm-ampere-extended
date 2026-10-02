@@ -288,11 +288,14 @@ def rope_quant_insert(
     if store_fp8:
         assert fp8_scale is not None and fp8_scale.numel() == 1
         assert fp8_scale.dtype == torch.float32
+    # SM80 Triton rejects fp8e4nv arithmetic casts; software-encode e4m3 and
+    # view the cache as uint8 so no fp8e4nv type reaches the IR.
+    sw_e4m3 = store_fp8 and not current_platform.supports_fp8()
     _rope_plain_insert_kernel[(num_tokens,)](
         latent,
         positions,
         cos_sin_cache,
-        kv_cache,
+        kv_cache.view(torch.uint8) if sw_e4m3 else kv_cache,
         slot_mapping,
         fp8_scale if store_fp8 else None,
         COS_STRIDE=cos_sin_cache.stride(0),
@@ -301,6 +304,7 @@ def rope_quant_insert(
         CACHE_BLOCK=kv_cache.shape[1],
         COMPRESS_RATIO=compress_ratio,
         STORE_FP8=store_fp8,
+        SW_E4M3=sw_e4m3,
         num_warps=4,
         **launch_kwargs,
     )
@@ -487,6 +491,7 @@ def _rope_plain_insert_kernel(
     CACHE_BLOCK: tl.constexpr,
     COMPRESS_RATIO: tl.constexpr,
     STORE_FP8: tl.constexpr,
+    SW_E4M3: tl.constexpr,
 ):
     t = tl.program_id(0)
     slot = tl.load(cache_slots + t)
@@ -513,6 +518,8 @@ def _rope_plain_insert_kernel(
     )
     if STORE_FP8:
         scaled = row.to(tl.float32) * (1.0 / tl.load(fp8_scale))
-        tl.store(dst + d, tl.clamp(scaled, -448.0, 448.0).to(tl.float8e4nv))
+        clamped = tl.clamp(scaled, -448.0, 448.0)
+        packed = _f32_to_e4m3_sw(clamped) if SW_E4M3 else clamped.to(tl.float8e4nv)
+        tl.store(dst + d, packed)
     else:
         tl.store(dst + d, row)
