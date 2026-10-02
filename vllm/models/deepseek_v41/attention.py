@@ -38,6 +38,9 @@ if TYPE_CHECKING:
     from vllm.model_executor.layers.rocm_paged_mxfp4_indexer import (
         RocmSparseMQAIndexer,
     )
+    from vllm.models.deepseek_v41.nvidia.indexer_sm80 import (
+        DeepseekV4TritonMQAIndexer,
+    )
     from vllm.v1.attention.backends.mla.sparse_swa import (
         DeepseekSparseSWAMetadata,
     )
@@ -1241,9 +1244,9 @@ class DeepseekV4Indexer(nn.Module):
     """
 
     # The scoring layers; a platform subclass swaps in its own.
-    mqa_cls: ClassVar[type["SparseMQAIndexer | RocmSparseMQAIndexer"]] = (
-        SparseMQAIndexer
-    )
+    mqa_cls: ClassVar[
+        type["SparseMQAIndexer | RocmSparseMQAIndexer | DeepseekV4TritonMQAIndexer"]
+    ] = SparseMQAIndexer
     attn_cls: ClassVar[type[SparseAttnIndexer]] = SparseAttnIndexer
 
     def __init__(
@@ -1333,7 +1336,12 @@ class DeepseekV4Indexer(nn.Module):
             and candidate_block_buffer is not None
             and not candidate_write
         )
-        self.indexer_op: SparseAttnIndexer | SparseMQAIndexer | RocmSparseMQAIndexer
+        self.indexer_op: (
+            SparseAttnIndexer
+            | SparseMQAIndexer
+            | RocmSparseMQAIndexer
+            | DeepseekV4TritonMQAIndexer
+        )
         if use_sparse_logits:
             if not self.use_fp4_kv:
                 raise ValueError(
