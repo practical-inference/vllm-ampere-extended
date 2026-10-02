@@ -5,6 +5,7 @@
 import torch
 
 from vllm.models.deepseek_v4.common.ops.fused_indexer_q import _fp32x2_to_fp4x2
+from vllm.models.deepseek_v32.common.kernels import _f32_to_e4m3_sw
 from vllm.platforms import current_platform
 from vllm.triton_utils import tl, triton
 
@@ -260,6 +261,11 @@ def rope_quant_insert(
         assert kernel is not None, (
             f"unsupported paged KV record width {kv_cache.shape[-1]}"
         )
+        kernel_kwargs = {"SANITIZE_CACHE_NANS": _ON_GFX950}
+        if kernel is _rope_quant_insert_kernel:
+            # SM80 Triton rejects fp8e4nv arithmetic casts; software-encode
+            # e4m3. The wider records are SM100-only and keep the hw cast.
+            kernel_kwargs["SW_E4M3"] = not current_platform.supports_fp8()
         kernel[(num_tokens,)](
             latent,
             positions,
@@ -270,8 +276,8 @@ def rope_quant_insert(
             CACHE_STRIDE=kv_cache.stride(0),
             CACHE_BLOCK=kv_cache.shape[1],
             COMPRESS_RATIO=compress_ratio,
-            SANITIZE_CACHE_NANS=_ON_GFX950,
             num_warps=4,
+            **kernel_kwargs,
             **launch_kwargs,
         )
         return
@@ -312,6 +318,7 @@ def _rope_quant_insert_kernel(
     CACHE_BLOCK: tl.constexpr,
     COMPRESS_RATIO: tl.constexpr,
     SANITIZE_CACHE_NANS: tl.constexpr,
+    SW_E4M3: tl.constexpr,
 ):
     t = tl.program_id(0)
     slot = tl.load(cache_slots + t)
@@ -330,8 +337,13 @@ def _rope_quant_insert_kernel(
     amax = tl.maximum(tl.max(tl.abs(quant), 1), 1e-4)
     exponent = tl.ceil(tl.log2(amax * (1.0 / 448.0)))
     scaled = quant * tl.reshape(tl.exp2(-exponent), (8, 1))
-    fp8 = tl.clamp(scaled, -448.0, 448.0).to(tl.float8e4nv)
-    packed = tl.reshape(fp8.to(tl.uint8, bitcast=True), (512,))
+    clamped = tl.clamp(scaled, -448.0, 448.0)
+    if SW_E4M3:
+        packed = tl.reshape(_f32_to_e4m3_sw(clamped), (512,))
+    else:
+        packed = tl.reshape(
+            clamped.to(tl.float8e4nv).to(tl.uint8, bitcast=True), (512,)
+        )
     tl.store(values + d, packed, d < 448)
     s = tl.arange(0, 8)
     max_encoded: tl.constexpr = 254.0 if SANITIZE_CACHE_NANS else 255.0

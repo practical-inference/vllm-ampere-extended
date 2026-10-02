@@ -318,7 +318,11 @@ class DeepseekCompressor(nn.Module):
                 head_dim=self.head_dim,
                 compress_ratio=self.compress_ratio,
             )
-            if current_platform.is_cuda() and self.head_dim == 512:
+            if (
+                current_platform.is_cuda()
+                and current_platform.supports_fp8()
+                and self.head_dim == 512
+            ):
                 from vllm.models.deepseek_v4.nvidia.ops.sparse_attn_compress_cutedsl import (  # noqa: E501
                     _SPARSE_ATTN_COMPRESS_C128_BLOCK8_KERNEL,
                     _SPARSE_ATTN_COMPRESS_NORM_ROPE_STORE_C4_KERNEL,
@@ -442,9 +446,14 @@ class DeepseekCompressor(nn.Module):
         )
 
         # cutedsl (head=512) accepts the full-cache flags; triton (indexer/AMD)
-        # does not, so the two callables have different signatures.
+        # does not, so the two callables have different signatures. SM80 lacks
+        # hw FP8 and the cutedsl kernels, so it takes the triton path.
         compress_norm_rope_store_fn: Any
-        if current_platform.is_cuda() and self.head_dim == 512:
+        if (
+            current_platform.is_cuda()
+            and current_platform.supports_fp8()
+            and self.head_dim == 512
+        ):
             from .nvidia.ops.sparse_attn_compress_cutedsl import (
                 _SPARSE_ATTN_COMPRESSOR_CUTEDSL_KERNEL,
             )
