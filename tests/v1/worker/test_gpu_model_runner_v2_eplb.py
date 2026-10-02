@@ -243,7 +243,8 @@ def test_v2_sample_tokens_propagates_k0_and_hides_stale_drafts(monkeypatch):
         )
     )
     runner.prompt_logprobs_worker = SimpleNamespace(
-        compute_prompt_logprobs=Mock(return_value={})
+        compute_prompt_token_id_logprobs=Mock(return_value={}),
+        compute_prompt_logprobs=Mock(return_value={}),
     )
     runner.model = SimpleNamespace(compute_logits=Mock())
     runner.req_states = SimpleNamespace(
