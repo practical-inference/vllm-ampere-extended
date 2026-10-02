@@ -568,6 +568,8 @@ def triton_mla_sparse_attention(
 _DS_MLA_NOPE_DIM = 512
 _DS_MLA_ROPE_DIM = 64
 _DS_MLA_CACHE_BYTES = 656
+# NoPE models (qk_rope_head_dim=0) drop the 128B zeroed rope tail from the page.
+_DS_MLA_CACHE_BYTES_NOPE = 528
 _DS_MLA_DEQUANT_DIM = _DS_MLA_NOPE_DIM + _DS_MLA_ROPE_DIM  # 576
 _DS_MLA_QUANT_BLOCK = 128
 _DS_MLA_NUM_TILES = _DS_MLA_NOPE_DIM // _DS_MLA_QUANT_BLOCK  # 4
@@ -714,6 +716,95 @@ def dequant_ds_mla_slots(
         cache_bytes=_DS_MLA_CACHE_BYTES,
         SLOTS_PER_PROG=slots_per_prog,
         num_warps=4,
+    )
+
+
+# ---------------------------------------------------------------------------
+# fp8_ds_mla NoPE compact-page writer (528 bytes: 512 fp8 + 4 f32 scales)
+# ---------------------------------------------------------------------------
+
+
+@triton.jit
+def _f32_to_e4m3_sw(x):
+    """Software f32 -> FP8 E4M3 bits (uint8): RNE, satfinite. Stand-in for
+    cvt.rn.satfinite.e4m3x2.f32 on archs without hw FP8 (SM80), where Triton
+    cannot compile fp8e4nv casts. Input must be finite with |x| <= FP8_MAX.
+
+    Copy of deepseek_v32/common/kernels.py::_f32_to_e4m3_sw; importing that
+    module would run the deepseek_v32 package __init__ (full model chain)
+    and cycle back through mla_attention -> this module.
+    """
+    u = x.to(tl.uint32, bitcast=True)
+    s = ((u >> 24) & 0x80).to(tl.uint8)
+    a = u & 0x7FFFFFFF
+    # Normal path: RNE-round to a 3-bit mantissa (carry folds into exponent).
+    r = a + 0x0007FFFF + ((a >> 20) & 1)
+    normal = (((r >> 23) - 120) << 3) | ((r >> 20) & 7)
+    # Subnormal path: RNE onto the k*2^-9 grid (magic-add rounds to nearest
+    # even integer; a rollup to 8 lands exactly on the smallest normal).
+    y = tl.abs(x) * 512.0
+    sub = (y + 12582912.0) - 12582912.0
+    byte = tl.where(r >= 0x3C800000, normal, sub.to(tl.uint32)) & 0xFF
+    return (byte | s.to(tl.uint32)).to(tl.uint8)
+
+
+@triton.jit
+def _write_nope_ds_mla_slots_kernel(
+    kv_c_ptr,  # [num_tokens, nope_dim] bf16
+    cache_ptr,  # [num_blocks, block_size, 528] uint8
+    slots_ptr,  # [num_tokens] int64, -1 = padding
+    token_stride,
+    block_stride,  # bytes per cache block (int64-safe)
+    entry_stride,  # bytes per token slot
+    block_size,
+    nope_dim: tl.constexpr,  # 512
+    quant_block: tl.constexpr,  # 128
+    num_tiles: tl.constexpr,  # 4
+):
+    """Bit-compatible with concat_and_cache_ds_mla_kernel's NoPE path:
+    per-128 power-of-two scale (max_abs/448 clamped to 1e-4, exp2(ceil(log2)))
+    and cvt.rn.satfinite.e4m3 of value/scale. The rope tail is simply absent
+    from the 528B page, so nothing reads or writes it."""
+    tok = tl.program_id(0)
+    slot = tl.load(slots_ptr + tok)
+    if slot < 0:
+        return
+    offs_t = tl.arange(0, num_tiles)
+    offs = offs_t[:, None] * quant_block + tl.arange(0, quant_block)[None, :]
+    v = tl.load(kv_c_ptr + tok.to(tl.int64) * token_stride + offs).to(tl.float32)
+    max_abs = tl.max(tl.abs(v), axis=1)
+    scale = tl.math.exp2(tl.ceil(tl.math.log2(tl.maximum(max_abs / 448.0, 1e-4))))
+    q = _f32_to_e4m3_sw(v / scale[:, None])
+    dst = (
+        cache_ptr
+        + (slot // block_size) * block_stride
+        + (slot % block_size) * entry_stride
+    )
+    tl.store(dst + offs, q)
+    tl.store(dst.to(tl.pointer_type(tl.float32)) + nope_dim // 4 + offs_t, scale)
+
+
+def write_nope_ds_mla_slots(
+    kv_c: torch.Tensor,  # [num_tokens, 512] bf16
+    cache: torch.Tensor,  # uint8 [num_blocks, block_size, 528]
+    slots: torch.Tensor,  # [num_tokens] int64
+) -> None:
+    """Write NoPE latents into fp8_ds_mla compact (528B) pages."""
+    num_tokens = slots.shape[0]
+    if num_tokens == 0:
+        return
+    _write_nope_ds_mla_slots_kernel[(num_tokens,)](
+        kv_c,
+        cache,
+        slots,
+        token_stride=kv_c.stride(0),
+        block_stride=cache.stride(0),
+        entry_stride=cache.stride(1),
+        block_size=cache.shape[1],
+        nope_dim=_DS_MLA_NOPE_DIM,
+        quant_block=_DS_MLA_QUANT_BLOCK,
+        num_tiles=_DS_MLA_NUM_TILES,
+        num_warps=1,
     )
 
 
