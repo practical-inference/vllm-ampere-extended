@@ -482,6 +482,7 @@ def test_propose_k0_runs_prefill_without_draft_decode(monkeypatch):
         seq_lens_cpu_upper_bound=torch.ones(2, dtype=torch.int32),
         idx_mapping=torch.arange(2),
         has_prefill=False,
+        decode_graph_eligible=False,
     )
     output = speculator.propose(
         input_batch,
