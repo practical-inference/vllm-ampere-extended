@@ -92,6 +92,7 @@ from vllm.models.deepseek_v41.nvidia.flashinfer_sparse import (
     DeepseekV4FlashInferSM120Attention,
 )
 from vllm.models.deepseek_v41.nvidia.flashmla import DeepseekV4FlashMLAAttention
+from vllm.models.deepseek_v41.nvidia.triton_sparse import DeepseekV4TritonAttention
 from vllm.platforms import current_platform
 from vllm.sequence import IntermediateTensors
 from vllm.utils.math_utils import cdiv
@@ -224,6 +225,10 @@ def _select_dsv4_attn_cls(vllm_config: VllmConfig) -> type[DeepseekV4Attention]:
     ):
         return DeepseekV4FlashMLAAttention
 
+    if device_capability is not None and device_capability.major == 8:
+        # SM80 (A100) has neither FlashMLA (SM90+) nor DeepGEMM: route to the
+        # Triton dequant-gather + Triton sparse-attention path.
+        return DeepseekV4TritonAttention
     if device_capability is not None and device_capability.major == 12:
         return DeepseekV4FlashInferSM120Attention
     # Mega attention is the SM100 default: it fuses Q RoPE, sparse attention,
