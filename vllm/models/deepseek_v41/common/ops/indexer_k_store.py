@@ -15,6 +15,7 @@ group-boundary tokens ``(position + 1) % compress_ratio == 0`` produce a key.
 
 import torch
 
+from vllm.models.deepseek_v32.common.kernels import _f32_to_e4m3_sw
 from vllm.platforms import current_platform
 from vllm.triton_utils import tl, triton
 
@@ -114,6 +115,9 @@ def indexer_k_norm_rope_store(
         SHUFFLE=shuffle,
         BLOCK_TILE_SIZE=_BLOCK_TILE_SIZE,
         HEAD_TILE_SIZE=_HEAD_TILE_SIZE,
+        # SM80 Triton rejects fp8e4nv arithmetic casts; software-encode
+        # e4m3. SM89+ keeps the hw cast.
+        SW_E4M3=not current_platform.supports_fp8(),
         num_warps=1,
         **launch_kwargs,
     )
@@ -142,6 +146,7 @@ def _indexer_k_norm_rope_quant_store_kernel(
     SHUFFLE: tl.constexpr,
     BLOCK_TILE_SIZE: tl.constexpr,
     HEAD_TILE_SIZE: tl.constexpr,
+    SW_E4M3: tl.constexpr,
 ):
     token_idx = tl.program_id(0)
 
@@ -243,7 +248,10 @@ def _indexer_k_norm_rope_quant_store_kernel(
         exponent = tl.ceil(tl.log2(absmax * INV_FP8_MAX))
         inv_scale = tl.exp2(-exponent)
         x_clamped = tl.clamp(result_bf16 * inv_scale, -FP8_MAX, FP8_MAX)
-        x_uint8 = x_clamped.to(tl.float8e4nv).to(tl.uint8, bitcast=True)
+        if SW_E4M3:
+            x_uint8 = _f32_to_e4m3_sw(x_clamped)
+        else:
+            x_uint8 = x_clamped.to(tl.float8e4nv).to(tl.uint8, bitcast=True)
         if SHUFFLE:
             tiled = (
                 block // HEAD_TILE_SIZE * BLOCK_TILE_SIZE * HEAD_TILE_SIZE

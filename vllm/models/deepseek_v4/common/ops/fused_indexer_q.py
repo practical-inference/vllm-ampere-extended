@@ -12,12 +12,31 @@ from vllm.model_executor.warmup.jit_warmup_triton_helper import (
     TritonWarmupTensor,
     VllmTritonJitKernel,
 )
+from vllm.models.deepseek_v32.common.kernels import _f32_to_e4m3_sw
 from vllm.platforms import current_platform
 from vllm.triton_utils import tl, triton
 from vllm.utils.import_utils import has_cutedsl
 
 # MXFP4: 32 elements per block, packed 2 nibbles per byte, ue8m0 block scale.
 MXFP4_BLOCK_SIZE = 32
+
+
+@triton.jit
+def _quant_q_e4m3(
+    x,
+    scale,
+    FP8_MAX: tl.constexpr,
+    USE_FNUZ: tl.constexpr,
+    SW_E4M3: tl.constexpr,
+):
+    """One quantized FP8 Q value. Archs without hw FP8 (SM80) cannot compile
+    fp8e4nv casts or take fp8e4nv pointers, so they software-encode e4m3 bits
+    into a uint8 (stored through the fp8 buffer's uint8 view)."""
+    if SW_E4M3:
+        q = _f32_to_e4m3_sw(tl.clamp(tl.div_rn(x, scale), -FP8_MAX, FP8_MAX))
+    else:
+        q = tl.div_rn(x, scale).to(tl.float8e4b8 if USE_FNUZ else tl.float8e4nv)
+    return q
 
 
 @triton.jit
@@ -115,6 +134,7 @@ class FusedIndexerQRopeQuantTritonKernel(
         FP8_MAX: tl.constexpr = 448.0,
         USE_FNUZ: tl.constexpr = False,
         USE_EXPLICIT_FMA: tl.constexpr = False,
+        SW_E4M3: tl.constexpr = False,
     ):
         # Layout matches the unfused reference (DeepseekV4ScalingRotaryEmbedding
         # + per_token_group_quant_fp8): GPT-J interleaved RoPE applied to the
@@ -164,8 +184,8 @@ class FusedIndexerQRopeQuantTritonKernel(
         index_q_scale = tl.math.exp2(tl.math.ceil(tl.math.log2(index_q_scale)))
 
         # Store quantized values to index_q_fp8. FNUZ (e4m3fnuz) on gfx942, OCP
-        # (e4m3fn) elsewhere -- matches the K cache.
-        fp8_dtype = tl.float8e4b8 if USE_FNUZ else tl.float8e4nv
+        # (e4m3fn) elsewhere -- matches the K cache. On SM80 the helper emits
+        # software e4m3 uint8 bits through the buffer's uint8 view.
         fp8_base_ptr = (
             index_q_fp8_ptr
             + tok_idx * index_q_fp8_stride0
@@ -174,16 +194,16 @@ class FusedIndexerQRopeQuantTritonKernel(
         if INDEX_Q_NOPE_DIM > 0:
             tl.store(
                 fp8_base_ptr + nope_offset,
-                tl.div_rn(x_nope, index_q_scale).to(fp8_dtype),
+                _quant_q_e4m3(x_nope, index_q_scale, FP8_MAX, USE_FNUZ, SW_E4M3),
             )
         fp8_rot_base = fp8_base_ptr + INDEX_Q_NOPE_DIM
         tl.store(
             fp8_rot_base + half_offset * 2,
-            tl.div_rn(r_even, index_q_scale).to(fp8_dtype),
+            _quant_q_e4m3(r_even, index_q_scale, FP8_MAX, USE_FNUZ, SW_E4M3),
         )
         tl.store(
             fp8_rot_base + half_offset * 2 + 1,
-            tl.div_rn(r_odd, index_q_scale).to(fp8_dtype),
+            _quant_q_e4m3(r_odd, index_q_scale, FP8_MAX, USE_FNUZ, SW_E4M3),
         )
 
         # FP8 weight-fold contract:
@@ -261,7 +281,10 @@ class FusedIndexerQRopeQuantTritonKernel(
             index_weights_softmax_scale=1.0,
             index_weights_head_scale=1.0,
             index_q_fp8=TritonWarmupTensor(
-                current_platform.fp8_dtype(),
+                # Matches the __call__ view: SM80 launches through a uint8.
+                torch.uint8
+                if not current_platform.supports_fp8()
+                else current_platform.fp8_dtype(),
                 shape=(1, compile_key.num_heads, compile_key.index_q_head_dim),
                 strides=(q_stride0, compile_key.index_q_head_dim, 1),
             ),
@@ -290,6 +313,11 @@ class FusedIndexerQRopeQuantTritonKernel(
     ) -> LaunchSpec:
         num_tokens = positions.shape[0]
         num_index_q_heads = index_q.shape[1]
+        # SM80: Triton rejects fp8e4nv pointer args there; pass the fp8
+        # buffer's uint8 view and software-encode the stores instead.
+        sw_e4m3 = not current_platform.supports_fp8()
+        if sw_e4m3 and isinstance(index_q_fp8, torch.Tensor):
+            index_q_fp8 = index_q_fp8.view(torch.uint8)
         return (num_tokens, num_index_q_heads), dict(
             pos_ptr=positions,
             index_q_stride0=index_q.stride(0),
@@ -297,6 +325,7 @@ class FusedIndexerQRopeQuantTritonKernel(
             index_q_cos_sin_ptr=index_q_cos_sin_cache,
             index_q_cos_sin_stride=index_q_cos_sin_cache.stride(0),
             INDEX_Q_HALF_ROT_DIM=index_q_cos_sin_cache.shape[-1] // 2,
+            index_q_fp8_ptr=index_q_fp8,
             index_q_fp8_stride0=index_q_fp8.stride(0),
             index_q_fp8_stride1=index_q_fp8.stride(1),
             INDEX_Q_HEAD_DIM=index_q.shape[2],
@@ -305,6 +334,7 @@ class FusedIndexerQRopeQuantTritonKernel(
             FP8_MAX=fp8_max,
             USE_FNUZ=use_fnuz,
             USE_EXPLICIT_FMA=current_platform.is_rocm(),
+            SW_E4M3=sw_e4m3,
             num_warps=1,
         )
 
@@ -671,7 +701,9 @@ def fused_indexer_q_rope_quant(
     use_fnuz = fp8_dtype == torch.float8_e4m3fnuz
     fp8_max = 224.0 if use_fnuz else 448.0
     index_q_fp8 = torch.empty_like(index_q, dtype=fp8_dtype)
-    if has_cutedsl():
+    # The CuTe kernel emits cvt.e4m3x2.f32 (sm_89+); fall back to the Triton
+    # kernel (software e4m3 on SM80) on GPUs without hw FP8.
+    if has_cutedsl() and current_platform.supports_fp8():
         # lazily import, otherwise some tests fail due to CUDA driver init failure.
         from vllm.models.deepseek_v4.nvidia.ops.fused_indexer_q_cutedsl import (
             _INDEXER_Q_FP8_KERNEL,
