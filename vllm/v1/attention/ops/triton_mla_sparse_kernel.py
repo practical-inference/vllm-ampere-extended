@@ -337,6 +337,7 @@ def _sparse_mla_kernel_split(
 def _sparse_mla_merge_kernel(
     mid_out_ptr,
     out_ptr,
+    sink_ptr,
     h_q,
     stride_mid_token,
     stride_mid_head,
@@ -348,6 +349,7 @@ def _sparse_mla_merge_kernel(
     BLOCK_H: tl.constexpr,
     BLOCK_DV: tl.constexpr,
     BLOCK_DV_TILE: tl.constexpr,
+    HAS_SINK: tl.constexpr = False,
 ):
     """Stage 2: N-way online-softmax merge of per-split `(out, lse)` tiles.
 
@@ -398,6 +400,13 @@ def _sparse_mla_merge_kernel(
         e_max = n_e_max
 
     e_sum_safe = tl.where(e_sum > 0, e_sum, 1.0)
+    if HAS_SINK:
+        # DeepGEMM/FlashMLA attn_sink: out *= 1/(1+exp(sink - lse)) per head.
+        # Online-merge form: e_sum == exp(lse - e_max), so the denominator
+        # gain is exp(sink - e_max) (no log needed). lse stays finite via the
+        # -1e30 e_max sentinel, so -inf sinks contribute exactly 0, never NaN.
+        sink = tl.load(sink_ptr + cur_head, mask=mask_h, other=-float("inf"))
+        e_sum_safe = e_sum_safe + tl.exp(sink - e_max)
     tl.store(
         out_ptr
         + cur_q * stride_out_token
@@ -439,6 +448,7 @@ def triton_mla_sparse_attention(
     sm_scale: float,
     num_kv_splits: int | None = None,
     sm_count: int | None = None,
+    attn_sink: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Sparse MLA attention over topk indices.
 
@@ -449,6 +459,8 @@ def triton_mla_sparse_attention(
         sm_scale:  softmax scale
         num_kv_splits: override auto-heuristic; None/0 = auto, 1 = force single-pass.
         sm_count:  cached device SM count for the split heuristic.
+        attn_sink: optional fp32 [padded_heads >= num_heads_q] per-head attention
+            sinks (DeepSeek semantics: out *= 1/(1+exp(sink - lse))). -inf = no-op.
 
     Returns:
         out:   [num_tokens, num_heads_q, _BLOCK_DV] bf16
@@ -461,6 +473,12 @@ def triton_mla_sparse_attention(
     )
     block_dpe = dim_qk - _BLOCK_DMODEL
     assert kv.shape[1] == 1 and kv.shape[2] == dim_qk
+    if attn_sink is not None:
+        assert (
+            attn_sink.dtype == torch.float32
+            and attn_sink.ndim == 1
+            and attn_sink.numel() >= num_heads_q
+        )
     index_topk = indices.shape[2]
     assert index_topk % _MIN_BLOCK_N == 0, (
         f"topk ({index_topk}) must be a multiple of the smallest autotune "
@@ -483,7 +501,7 @@ def triton_mla_sparse_attention(
         device=q.device,
     )
 
-    if num_kv_splits == 1:
+    if num_kv_splits == 1 and attn_sink is None:
         _sparse_mla_kernel_final[(num_tokens, num_head_groups)](
             q_buffer=q,
             k_buffer=kv,
@@ -545,6 +563,7 @@ def triton_mla_sparse_attention(
     _sparse_mla_merge_kernel[(num_tokens, num_heads_q, _NUM_MERGE_DV_TILES)](
         mid_out_ptr=mid_out,
         out_ptr=out,
+        sink_ptr=(out if attn_sink is None else attn_sink.contiguous()),
         h_q=num_heads_q,
         stride_mid_token=mid_out.stride(0),
         stride_mid_head=mid_out.stride(1),
@@ -556,6 +575,7 @@ def triton_mla_sparse_attention(
         BLOCK_H=_MERGE_BLOCK_H,
         BLOCK_DV=_BLOCK_DV,
         BLOCK_DV_TILE=_MERGE_BLOCK_DV_TILE,
+        HAS_SINK=attn_sink is not None,
         num_warps=2,
     )
     return out
@@ -625,6 +645,7 @@ def _dequant_ds_mla_slots_kernel(
     dequant_dim: tl.constexpr,  # 576
     cache_bytes: tl.constexpr,  # 656
     SLOTS_PER_PROG: tl.constexpr,
+    segregated_scale: tl.constexpr = False,
 ):
     """Dequantize fp8_ds_mla (V3.2) slots into a flat BF16 workspace.
 
@@ -632,6 +653,13 @@ def _dequant_ds_mla_slots_kernel(
       [0, 512):   512 float8_e4m3 values (NoPE)
       [512, 528): 4 float32 scale factors (one per 128 fp8 elements)
       [528, 656): 64 bfloat16 values (RoPE, not quantized)
+
+    With ``segregated_scale`` (DeepSeek-V4 legacy 584B record, per-page
+    regions instead of per-token): data region [0, bs*576) holds per-token
+    [nope fp8][rope bf16] (no interleaved scales); scale region
+    [bs*576, bs*584) holds per-token (num_tiles + 1) uint8 UE8M0 bytes,
+    scale = 2^(byte - 127). ``cache_bytes`` is the per-token data stride
+    (576) and ``nope_dim`` the fp8-byte count (448) there.
 
     Output per token (576 bf16 = 1152 bytes):
       [0, 512):   dequantized NoPE
@@ -647,19 +675,30 @@ def _dequant_ds_mla_slots_kernel(
     slot_idx = tl.load(indices_ptr + offs_s, mask=in_bounds, other=-1).to(tl.int64)
     valid = (slot_idx >= 0) & in_bounds
     slot = tl.maximum(slot_idx, 0)
-    token_ptr = (
-        cache_ptr
-        + (slot // cache_block_size) * block_stride
-        + (slot % cache_block_size) * cache_bytes
-    )[:, None]
-    scale_ptr = (token_ptr + nope_dim).to(tl.pointer_type(tl.float32))
+    block = slot // cache_block_size
+    pos = slot % cache_block_size
+    token_ptr = (cache_ptr + block * block_stride + pos * cache_bytes)[:, None]
+    if segregated_scale:
+        scale_ptr = (
+            cache_ptr
+            + block * block_stride
+            + cache_block_size * cache_bytes
+            + pos * (num_tiles + 1)
+        )[:, None]
+    else:
+        scale_ptr = (token_ptr + nope_dim).to(tl.pointer_type(tl.float32))
     # int64: at chunk 2048 x topk 2048, row*dequant_dim exceeds 2**31.
     out_row = out_ptr + offs_s[:, None].to(tl.int64) * dequant_dim
 
     for tile_idx in tl.static_range(num_tiles):
         offsets = tile_idx * quant_block + tl.arange(0, quant_block)
         fp8_uint = tl.load(token_ptr + offsets[None, :], mask=valid[:, None], other=0)
-        scale = tl.load(scale_ptr + tile_idx, mask=valid[:, None], other=0.0)
+        if segregated_scale:
+            # UE8M0: scale = 2^(stored_value - 127)
+            s_byte = tl.load(scale_ptr + tile_idx, mask=valid[:, None], other=0)
+            scale = tl.exp2(s_byte.to(tl.float32) - 127.0)
+        else:
+            scale = tl.load(scale_ptr + tile_idx, mask=valid[:, None], other=0.0)
         dequant = _fp8_e4m3_to_f32(fp8_uint) * scale
         tl.store(
             out_row + offsets[None, :],
@@ -667,39 +706,50 @@ def _dequant_ds_mla_slots_kernel(
             mask=in_bounds[:, None],
         )
 
-    # RoPE: 64 bf16 values starting at byte offset 528 within each token.
+    # RoPE: rope_dim bf16 values; V3.2 puts them after the fp32 scale
+    # interleaved in the token, the V4 record right after the fp8 bytes.
     # rope_dim == 0 for NoPE models (writer zero-fills the 128B tail).
     if rope_dim > 0:
-        rope_src = (token_ptr + nope_dim + num_tiles * 4).to(
-            tl.pointer_type(tl.bfloat16)
-        )
+        rope_off = nope_dim if segregated_scale else nope_dim + num_tiles * 4
+        rope_src = (token_ptr + rope_off).to(tl.pointer_type(tl.bfloat16))
         rope_offs = tl.arange(0, rope_dim)
         rope = tl.load(rope_src + rope_offs[None, :], mask=valid[:, None], other=0.0)
         tl.store(out_row + nope_dim + rope_offs[None, :], rope, mask=in_bounds[:, None])
 
 
 def dequant_ds_mla_slots(
-    out: torch.Tensor,  # [total_slots, 576] bf16, pre-allocated
-    cache: torch.Tensor,  # [num_blocks, block_size, 656] uint8
+    out: torch.Tensor,  # [total_slots, nope_dim + rope_dim] bf16, pre-allocated
+    cache: torch.Tensor,  # [num_blocks, block_size, cache_bytes] uint8
     indices: torch.Tensor,  # [total_slots] int32, global slot IDs
     cache_block_size: int,
     rope_dim: int = _DS_MLA_ROPE_DIM,
+    nope_dim: int = _DS_MLA_NOPE_DIM,
+    quant_block: int = _DS_MLA_QUANT_BLOCK,
+    segregated_scale: bool = False,
 ) -> None:
     """Dequantize fp8_ds_mla (V3.2) pages at scattered slot indices.
 
     Args:
-        out: Pre-allocated BF16 output tensor [total_slots, 512 + rope_dim].
-        cache: FP8 KV cache viewed as uint8 [num_blocks, block_size, 656].
+        out: Pre-allocated BF16 output tensor [total_slots, nope_dim + rope_dim].
+        cache: FP8 KV cache viewed as uint8 [num_blocks, block_size, bytes].
         indices: Global slot IDs [total_slots] int32. Values < 0 are
             written as zeros (padding).
         cache_block_size: Block size (tokens per cache block).
         rope_dim: RoPE elements per token; 0 for NoPE models.
+        nope_dim: Quantized (fp8) dims per token; 448 for the V4 legacy record.
+        quant_block: Dims per scale factor; 64 for the V4 legacy record.
+        segregated_scale: DeepSeek-V4 legacy 584B record — per-page data and
+            UE8M0 scale regions instead of per-token interleaved fp32 scales.
 
     """
     total_slots = indices.shape[0]
     if total_slots == 0:
         return
     block_stride = cache.stride(0)
+    num_tiles = nope_dim // quant_block
+    # V4 record: the per-token data stride is fp8 bytes + bf16 rope bytes;
+    # V3.2 pages keep all three regions inside each token entry.
+    cache_bytes = nope_dim + rope_dim * 2 if segregated_scale else cache.stride(1)
     slots_per_prog = 8
     _dequant_ds_mla_slots_kernel[(triton.cdiv(total_slots, slots_per_prog),)](
         out,
@@ -708,13 +758,14 @@ def dequant_ds_mla_slots(
         total_slots,
         cache_block_size=cache_block_size,
         block_stride=block_stride,
-        nope_dim=_DS_MLA_NOPE_DIM,
+        nope_dim=nope_dim,
         rope_dim=rope_dim,
-        quant_block=_DS_MLA_QUANT_BLOCK,
-        num_tiles=_DS_MLA_NUM_TILES,
-        dequant_dim=_DS_MLA_NOPE_DIM + rope_dim,
-        cache_bytes=_DS_MLA_CACHE_BYTES,
+        quant_block=quant_block,
+        num_tiles=num_tiles,
+        dequant_dim=nope_dim + rope_dim,
+        cache_bytes=cache_bytes,
         SLOTS_PER_PROG=slots_per_prog,
+        segregated_scale=segregated_scale,
         num_warps=4,
     )
 
