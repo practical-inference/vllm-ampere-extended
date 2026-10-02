@@ -35,11 +35,13 @@ from vllm.v1.attention.ops.triton_merge_attn_states import (
 from vllm.v1.attention.ops.triton_mla_sparse_kernel import (
     _DIM_QK,
     _DIM_QK_NOPE,
+    _DS_MLA_CACHE_BYTES_NOPE,
     _DS_MLA_NOPE_DIM,
     KV_SPLITS_CANDIDATES,
     dequant_ds_mla_slots,
     triton_mla_sparse_attention,
     triton_mla_sparse_attention_fp8_fused,
+    write_nope_ds_mla_slots,
 )
 from vllm.v1.kv_cache_interface import KVCacheSpec
 
@@ -120,6 +122,38 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
         # This impl shares the top-k indices buffer via SharedTopkIndicesBuffer
         # but does not participate in sparse-MLA index groups.
         pass
+
+    def do_kv_cache_update(
+        self,
+        kv_c_normed: torch.Tensor,
+        k_pe: torch.Tensor,
+        kv_cache: torch.Tensor,
+        slot_mapping: torch.Tensor,
+        kv_cache_dtype: str,
+        k_scale: torch.Tensor,
+    ) -> None:
+        if kv_cache.numel() == 0:
+            return
+        if kv_cache_dtype == "fp8_ds_mla" and kv_cache.shape[-1] == (
+            _DS_MLA_CACHE_BYTES_NOPE
+        ):
+            # NoPE compact 528B pages: the CUDA ds_mla writer hard-requires
+            # the 656B page (it zero-fills the rope tail), so write the
+            # NoPE part with the bit-compatible Triton kernel instead.
+            write_nope_ds_mla_slots(
+                kv_c_normed,
+                kv_cache.view(torch.uint8),
+                slot_mapping.flatten(),
+            )
+            return
+        super().do_kv_cache_update(
+            kv_c_normed,
+            k_pe,
+            kv_cache,
+            slot_mapping,
+            kv_cache_dtype,
+            k_scale,
+        )
 
     def _warmup_autotune(self, indexer) -> None:
         """Prime `@triton.autotune` caches at init so the first request
@@ -395,6 +429,8 @@ class TritonMLASparseBackend(AttentionBackend):
         cache_dtype_str: str = "auto",
     ) -> tuple[int, ...]:
         if cache_dtype_str == "fp8_ds_mla":
+            if head_size == _DIM_QK_NOPE:
+                return (num_blocks, block_size, _DS_MLA_CACHE_BYTES_NOPE)
             return (num_blocks, block_size, _DS_MLA_CACHE_BYTES)
         return (num_blocks, block_size, head_size)
 
