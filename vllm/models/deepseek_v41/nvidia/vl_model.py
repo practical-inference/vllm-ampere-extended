@@ -132,6 +132,17 @@ class DeepseekV41ForCausalLM(
 
     supports_encoder_tp_data = True
 
+    # Quant configs receive packed_modules_mapping from the top-level model
+    # class; this class composes (not inherits) the LLM class, so forward it
+    # explicitly to keep fused-module quant matching (e.g. INC) working.
+    packed_modules_mapping = DeepseekV41LLMForCausalLM.packed_modules_mapping
+
+    # Likewise forward a class-level mapper so the quant config's layer-name
+    # renames (e.g. ".shared_experts.w2" -> ".shared_experts.down_proj")
+    # match the parameter names built at load time. The per-instance
+    # hf_to_vllm_mapper built in __init__ still drives actual weight loading.
+    hf_to_vllm_mapper = _make_deepseek_v4_weights_mapper("fp4")
+
     # The MoE router needs raw token ids to detect image-span tokens
     # (all carrying image_token_id, see common/mm_preprocess.py) and apply
     # bias_vl.

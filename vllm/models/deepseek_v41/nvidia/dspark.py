@@ -55,6 +55,7 @@ from ..common.mm_preprocess import IMAGE_SENTINEL_BASE_ID
 from .model import (
     DeepseekV4DecoderLayer,
     DeepseekV4Model,
+    DeepseekV41LLMForCausalLM,
     _linear_scale_param_name,
     _use_sequence_parallel,
     make_deepseek_v4_expert_params_mapping,
@@ -97,12 +98,14 @@ class DSparkDeepseekV4Model(nn.Module):
             prefix=maybe_prefix(prefix, "embed_tokens"),
         )
 
+        # Unquantized: the checkpoint ships main_proj in bf16 (AutoRound
+        # extra_config "mtp.0.main_proj" bits=16).
         self.main_proj = ReplicatedLinear(
             config.hidden_size * len(self.target_layer_ids),
             config.hidden_size,
             bias=False,
             return_bias=False,
-            quant_config=vllm_config.quant_config,
+            quant_config=None,
             prefix=maybe_prefix(prefix, "main_proj"),
         )
         self.main_norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
@@ -123,6 +126,11 @@ class DSparkDeepseekV4Model(nn.Module):
             [
                 DeepseekV4DecoderLayer(
                     current_vllm_config,
+                    # Prefix doubles as quant-metadata layer_name and as the
+                    # self/derived cache prefix in attention (kv-source index
+                    # swap), so it must keep the layers.<idx> shape. The
+                    # checkpoint's mtp.{i} bf16 exclusions are mirrored to
+                    # layers.{40+i} in the model config's extra_config.
                     prefix=maybe_prefix(prefix, f"layers.{self.num_hidden_layers + i}"),
                     topk_indices_buffer=self.topk_indices_buffer,
                     run_gemm_rs=run_gemm_rs,
@@ -282,6 +290,10 @@ class DSparkDeepseekV4ForCausalLM(nn.Module):
     has_own_lm_head = False
     # Full-vocab draft: draft ids are target ids, no remapping needed.
     draft_id_to_target_id = None
+    # Needed so configure_quant_config injects it into the draft's fresh quant
+    # config, letting INC's extra_config resolve fused modules (e.g.
+    # fused_wqa_wkv -> wq_a/wkv) to their bf16 exclusions.
+    packed_modules_mapping = DeepseekV41LLMForCausalLM.packed_modules_mapping
 
     def __init__(self, *, vllm_config: VllmConfig, prefix: str = "") -> None:
         super().__init__()
@@ -548,4 +560,6 @@ class DSparkDeepseekV4ForCausalLM(nn.Module):
             head_prefixes
         ):
             return f"model.{rest}"
+        # Module-tree path: the draft layers ModuleList registers at
+        # model.layers.{i}; only the quant-metadata prefix says mtp.{i}.
         return f"model.layers.{stage}.{rest}"
