@@ -34,6 +34,7 @@ chunk-by-chunk while an n-gram at position ``p`` needs the token ids at
   cache for the rest.
 """
 
+import os
 import weakref
 
 import numpy as np
@@ -602,11 +603,14 @@ def _engram_lookup_kernel(
     QUANT_BLOCK: tl.constexpr,
     BLOCK_R: tl.constexpr,
     GRID,
+    INT4: tl.constexpr = False,
 ):
-    """Gather fp8 rows, apply their ue8m0 block scales, write bf16.
+    """Gather rows, apply their per-block scales, write bf16.
 
     Only this rank's heads are read; padded heads write zeros for all-gather.
-    `weight`/`scales` may address pinned host memory through UVA.
+    ``weight``/``scales`` may address pinned host memory through UVA. With
+    ``INT4`` the rows are two signed 4-bit values per byte (low nibble first)
+    and the scales are fp16; otherwise rows are fp8 with ue8m0 scales.
     """
     cols = tl.arange(0, DIM)
     scale_cols = cols // QUANT_BLOCK
@@ -623,21 +627,35 @@ def _engram_lookup_kernel(
         owned = valid & (head < TOTAL_HEADS)
         owned &= (index >= vocab_start) & (index < vocab_end)
         local = tl.where(owned, index - vocab_start, 0)
-        values = tl.load(
-            weight + local[:, None] * DIM + cols[None, :],
-            mask=owned[:, None],
-            other=0.0,
-        )
-        scale = tl.load(
-            scales + local[:, None] * (DIM // QUANT_BLOCK) + scale_cols[None, :],
-            mask=owned[:, None],
-            other=0,
-        )
-        # ue8m0 is a power of two, so its byte *is* the fp32 exponent field.
-        scale = (scale.to(tl.int32) << 23).to(tl.float32, bitcast=True)
+        if INT4:
+            packed = tl.load(
+                weight + local[:, None] * (DIM // 2) + (cols // 2)[None, :],
+                mask=owned[:, None],
+                other=0,
+            )
+            nib = (packed.to(tl.int32) >> ((cols % 2) * 4)[None, :]) & 0xF
+            values = tl.where(nib > 7, nib - 16, nib).to(tl.float32)
+            scale = tl.load(
+                scales + local[:, None] * (DIM // QUANT_BLOCK) + scale_cols[None, :],
+                mask=owned[:, None],
+                other=0.0,
+            ).to(tl.float32)
+        else:
+            values = tl.load(
+                weight + local[:, None] * DIM + cols[None, :],
+                mask=owned[:, None],
+                other=0.0,
+            ).to(tl.float32)
+            scale = tl.load(
+                scales + local[:, None] * (DIM // QUANT_BLOCK) + scale_cols[None, :],
+                mask=owned[:, None],
+                other=0,
+            )
+            # ue8m0 is a power of two, so its byte *is* the fp32 exponent field.
+            scale = (scale.to(tl.int32) << 23).to(tl.float32, bitcast=True)
         tl.store(
             out + rows[:, None] * DIM + cols[None, :],
-            (values.to(tl.float32) * scale).to(tl.bfloat16),
+            (values * scale).to(tl.bfloat16),
             mask=valid[:, None],
         )
 
@@ -660,6 +678,7 @@ class ParallelEngramEmbedding(nn.Module):
         self.num_embeddings = num_embeddings
         self.dim = dim
         self.block_size = block_size
+        self.int4 = os.environ.get("DSV41_ENGRAM_DTYPE", "").lower() == "int4"
         self.n_hash_cols = len(head_sizes)
         self.tp_size = get_tensor_model_parallel_world_size()
         num_shards, head_rank = self._get_shard_info()
@@ -693,6 +712,15 @@ class ParallelEngramEmbedding(nn.Module):
         return self.tp_size, get_tensor_model_parallel_rank()
 
     def _allocate_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.int4:
+            return (
+                torch.empty(self.part_num_embeddings, self.dim // 2, dtype=torch.uint8),
+                torch.empty(
+                    self.part_num_embeddings,
+                    self.dim // self.block_size,
+                    dtype=torch.float16,
+                ),
+            )
         return (
             torch.empty(self.part_num_embeddings, self.dim, dtype=torch.float8_e4m3fn),
             torch.empty(
@@ -712,6 +740,9 @@ class ParallelEngramEmbedding(nn.Module):
         """
         rows = indices.shape[0] * self.part_n_hash_cols
         if not rows:
+            return
+        if os.environ.get("DSV41_ZERO_ENGRAM") == "1":
+            out.zero_()
             return
         weight, scales = self._storage()
         # The table dwarfs TLB reach, so a persistent grid near the SM count
@@ -735,6 +766,7 @@ class ParallelEngramEmbedding(nn.Module):
             QUANT_BLOCK=self.block_size,
             BLOCK_R=16,
             GRID=grid,
+            INT4=self.int4,
         )
 
     def forward(self, indices: torch.Tensor) -> torch.Tensor:

@@ -164,13 +164,27 @@ class DPSharedEngramStorage:
     """Registered host weights shared by a node-local DP group with one writer."""
 
     def __init__(
-        self, num_rows: int, dim: int, block_size: int, group: GroupCoordinator
+        self,
+        num_rows: int,
+        dim: int,
+        block_size: int,
+        group: GroupCoordinator,
+        int4: bool = False,
     ) -> None:
         self.group = group
-        weight_bytes = num_rows * dim
-        storage = self._allocate(weight_bytes + weight_bytes // block_size)
-        self.weight = storage[:weight_bytes].view(torch.float8_e4m3fn).view(-1, dim)
-        self.weight_scale_inv = storage[weight_bytes:].view(-1, dim // block_size)
+        weight_width = dim // 2 if int4 else dim
+        scale_bytes = num_rows * (dim // block_size) * (2 if int4 else 1)
+        weight_bytes = num_rows * weight_width
+        storage = self._allocate(weight_bytes + scale_bytes)
+        weight = storage[:weight_bytes]
+        scales = storage[weight_bytes:]
+        if int4:
+            weight = weight.view(torch.uint8)
+            scales = scales.view(torch.float16)
+        else:
+            weight = weight.view(torch.float8_e4m3fn)
+        self.weight = weight.view(-1, weight_width)
+        self.weight_scale_inv = scales.view(-1, dim // block_size)
         self._views: tuple[torch.Tensor, torch.Tensor] | None = None
 
     def _allocate(self, num_bytes: int) -> torch.Tensor:
@@ -304,13 +318,20 @@ class ParallelEngramEmbedding(BaseParallelEngramEmbedding):
             # Constant dummy values avoid randomizing huge CPU lookup tables.
             set_weight_attrs(self.weight, {"dummy_weight_value": 1.0})
             # The ue8m0 encoding of scale 1.0 is exponent byte 127.
-            set_weight_attrs(self.weight_scale_inv, {"dummy_weight_value": 127})
+            set_weight_attrs(
+                self.weight_scale_inv,
+                {"dummy_weight_value": 1.0 if self.int4 else 127},
+            )
+            row_bytes = self.dim // 2 + 2 * self.dim // self.block_size
             logger.info(
-                "Engram table offloaded to pinned host memory: %d rows x %d, "
+                "Engram table offloaded to pinned host memory: %d rows x %d (%s), "
                 "%.2f GiB %s",
                 self.part_num_embeddings,
                 dim,
-                self.part_num_embeddings * (dim + dim // block_size) / 1024**3,
+                "int4" if self.int4 else "fp8",
+                self.part_num_embeddings
+                * (row_bytes if self.int4 else dim + dim // block_size)
+                / 1024**3,
                 "shared across DP replicas" if dp_shared_memory else "per rank",
             )
 
@@ -324,37 +345,51 @@ class ParallelEngramEmbedding(BaseParallelEngramEmbedding):
             group = get_engram_dp_group()
             assert group is not None
             storage = DPSharedEngramStorage(
-                self.part_num_embeddings, self.dim, self.block_size, group
+                self.part_num_embeddings,
+                self.dim,
+                self.block_size,
+                group,
+                self.int4,
             )
             self._shared_memory = storage
             self._weight_loader = storage.load_weight
             return storage.weight, storage.weight_scale_inv
         if not self.cpu_offload:
             return super()._allocate_weights()
+        weight_width = self.dim // 2 if self.int4 else self.dim
+        weight_bytes = self.part_num_embeddings * weight_width
+        scale_bytes = (
+            self.part_num_embeddings
+            * (self.dim // self.block_size)
+            * (2 if self.int4 else 1)
+        )
+        scale_dtype = torch.float16 if self.int4 else torch.uint8
         if self.use_thp:
-            weight_bytes = self.part_num_embeddings * self.dim
-            packed = _allocate_huge_page_storage(
-                weight_bytes + weight_bytes // self.block_size
-            )
+            packed = _allocate_huge_page_storage(weight_bytes + scale_bytes)
             if packed is not None:
                 self._packed = packed
+                weight, scales = packed[:weight_bytes], packed[weight_bytes:]
+                if self.int4:
+                    weight = weight.view(torch.uint8)
+                else:
+                    weight = weight.view(torch.float8_e4m3fn)
                 return (
-                    packed[:weight_bytes].view(torch.float8_e4m3fn).view(-1, self.dim),
-                    packed[weight_bytes:].view(-1, self.dim // self.block_size),
+                    weight.view(-1, weight_width),
+                    scales.view(scale_dtype).view(-1, self.dim // self.block_size),
                 )
         # Model initialization may be inside a CUDA device context.
         return (
             torch.empty(
                 self.part_num_embeddings,
-                self.dim,
-                dtype=torch.float8_e4m3fn,
+                weight_width,
+                dtype=torch.uint8 if self.int4 else torch.float8_e4m3fn,
                 device="cpu",
                 pin_memory=True,
             ),
             torch.empty(
                 self.part_num_embeddings,
                 self.dim // self.block_size,
-                dtype=torch.uint8,
+                dtype=scale_dtype,
                 device="cpu",
                 pin_memory=True,
             ),
