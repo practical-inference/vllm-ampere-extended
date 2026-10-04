@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 import dataclasses
+import json
 from importlib.util import find_spec
 from typing import TYPE_CHECKING, Any, cast
 
@@ -138,6 +139,13 @@ class SpecDecodeBaseProposer:
             self.speculative_config.use_heterogeneous_vocab
         )
         self.vocab_mapping: VocabMapping | None = None
+
+        self.draft_vocab_block_mask: torch.Tensor | None = None
+        if self.speculative_config.draft_vocab_mask is not None:
+            self.draft_vocab_block_mask = self._load_draft_vocab_mask(
+                self.speculative_config.draft_vocab_mask,
+                vllm_config.model_config.get_vocab_size(),
+            )
 
         self.max_batch_size = vllm_config.scheduler_config.max_num_seqs
         self.max_num_tokens = vllm_config.scheduler_config.max_num_batched_tokens
@@ -435,6 +443,43 @@ class SpecDecodeBaseProposer:
 
         self.cudagraph_dispatcher.initialize_cudagraph_keys(eagle_cudagraph_mode)
 
+    def _load_draft_vocab_mask(self, mask_path: str, vocab_size: int) -> torch.Tensor:
+        """Load the allowed-token list and return an inverted (block) mask."""
+        with open(mask_path) as f:
+            token_ids = json.load(f)
+        if not isinstance(token_ids, list) or not token_ids:
+            raise ValueError(
+                f"draft_vocab_mask {mask_path} must be a non-empty JSON "
+                "list of token IDs"
+            )
+        ids = torch.tensor(token_ids, dtype=torch.long)
+        if (
+            ids.numel() != len(set(token_ids))
+            or ids.min() < 0
+            or ids.max() >= vocab_size
+        ):
+            raise ValueError(
+                f"draft_vocab_mask {mask_path} contains invalid token IDs "
+                f"for vocab_size={vocab_size}"
+            )
+        allowed = torch.zeros(vocab_size, dtype=torch.bool)
+        allowed[ids] = True
+        logger.info(
+            "Draft vocab mask %s: %d/%d tokens allowed (%.1f%%)",
+            mask_path,
+            len(token_ids),
+            vocab_size,
+            100.0 * len(token_ids) / vocab_size,
+        )
+        return ~allowed
+
+    def _constrain_draft_vocab(self, logits: torch.Tensor) -> torch.Tensor:
+        if self.draft_vocab_block_mask is None:
+            return logits
+        if self.draft_vocab_block_mask.device != logits.device:
+            self.draft_vocab_block_mask = self.draft_vocab_block_mask.to(logits.device)
+        return logits.masked_fill(self.draft_vocab_block_mask, float("-inf"))
+
     def _greedy_sample(self, hidden_states: torch.Tensor) -> torch.Tensor:
         """Greedy-sample draft tokens from hidden states."""
         if self.use_local_argmax_reduction:
@@ -443,9 +488,12 @@ class SpecDecodeBaseProposer:
             logits = self.model.compute_logits(hidden_states)
             assert self.vocab_mapping is not None
             logits = self.vocab_mapping.constrain_draft_logits(logits)
+            logits = self._constrain_draft_vocab(logits)
             draft_token_ids = logits.argmax(dim=-1)
             return self.vocab_mapping.map_draft_to_target_ids(draft_token_ids)
-        return self.model.compute_logits(hidden_states).argmax(dim=-1)
+        return self._constrain_draft_vocab(
+            self.model.compute_logits(hidden_states)
+        ).argmax(dim=-1)
 
     def _sample_from_logits(
         self,
@@ -483,6 +531,7 @@ class SpecDecodeBaseProposer:
         if not self._enable_probabilistic_draft_probs or sampling_metadata.all_greedy:
             return self._greedy_sample(hidden_states), None
         logits = self.model.compute_logits(hidden_states)
+        logits = self._constrain_draft_vocab(logits)
         if self.use_heterogeneous_vocab:
             assert self.vocab_mapping is not None
             logits = self.vocab_mapping.constrain_draft_logits(logits)

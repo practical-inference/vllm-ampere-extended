@@ -467,6 +467,12 @@ class SpeculativeConfig:
     draft logits to shared tokens only (TLI algorithm). Requires
     method='draft_model'."""
 
+    draft_vocab_mask: str | None = None
+    """Path to a JSON file containing a list of token IDs the draft may
+    propose. Draft logits are masked to these tokens before sampling; the
+    target still verifies every token, so output correctness is unaffected.
+    Incompatible with use_local_argmax_reduction."""
+
     # Ngram proposer configuration
     prompt_lookup_max: int | None = Field(default=None, ge=1)
     """Maximum size of ngram token window when using Ngram proposer, required
@@ -1608,6 +1614,13 @@ class SpeculativeConfig:
                 "Adaptive verification estimates per-position acceptance from "
                 "the draft logits, which use_local_argmax_reduction never "
                 "materializes. Disable one of them."
+            )
+
+        if self.draft_vocab_mask is not None and self.use_local_argmax_reduction:
+            raise ValueError(
+                "draft_vocab_mask constrains draft logits, which "
+                "use_local_argmax_reduction never materializes. Disable "
+                "one of them."
             )
 
         if self.method == "dflash":
