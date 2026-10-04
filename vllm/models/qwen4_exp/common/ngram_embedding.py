@@ -382,7 +382,7 @@ def _lookup_ple_embedding_from_pinned_kernel(
     values = tl.load(
         weight_ptr + local_idx * embedding_dim + offsets,
         mask=load_mask,
-        other=0.0,
+        other=0,
     )
     tl.store(
         output_ptr + row_id * embedding_dim + offsets,
@@ -471,10 +471,15 @@ class Qwen4ExpPLEPinnedHostEmbedding(Qwen4ExpPLEEmbedding):
 
         flat_ids = input_ids.reshape(-1).long()
         if flat_ids.numel():
+            weight, out = self._uva_weight, output
+            if weight.dtype in (torch.float8_e4m3fn, torch.float8_e5m2):
+                # sm80 Triton has no fp8 type; copy raw bytes and let the
+                # caller's dequantize reinterpret them.
+                weight, out = weight.view(torch.uint8), output.view(torch.uint8)
             _lookup_ple_embedding_from_pinned_kernel[(flat_ids.numel(),)](
-                self._uva_weight,
+                weight,
                 flat_ids,
-                output,
+                out,
                 self.embedding_dim,
                 self.shard_indices.org_vocab_start_index,
                 self.shard_indices.org_vocab_end_index,
