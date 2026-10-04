@@ -12,11 +12,13 @@ metadata flow (chunk plan, index combine, topk mapping) and replaces every
 kernel call with gather-to-workspace + Triton attention.
 """
 
+import os
 from typing import TYPE_CHECKING, cast
 
 import torch
 
 from vllm.forward_context import get_forward_context
+from vllm.logger import init_logger
 from vllm.models.deepseek_v41.common.ops import (
     combine_topk_swa_indices,
     compute_global_topk_indices_and_lens,
@@ -42,6 +44,8 @@ if TYPE_CHECKING:
         QuantizedActivation,
     )
     from vllm.v1.attention.backends.mla.sparse_swa import DeepseekSparseSWAMetadata
+
+logger = init_logger(__name__)
 
 # DeepSeek-V4 legacy 584B fp8 record: 448 e4m3 NoPE + 64 raw bf16 RoPE,
 # 7 UE8M0 scales per 64 dims plus one pad byte (the segregated-scale
@@ -504,13 +508,15 @@ class DeepseekV4TritonAttention(DeepseekV4FlashMLAAttention):
         swa_lens = swa_metadata.decode_swa_lens
         assert swa_indices is not None and swa_lens is not None
         num_tokens = num_decode_tokens
+        # decode_swa_indices is [T, 1, W]; flattening to [T, W] is required so
+        # the torch.where below matches the [T, W] mask instead of broadcasting
+        # to [T, T, W] (exact by accident at T=1, corrupts the gather beyond).
+        swa_indices = swa_indices.view(num_tokens, -1)
+        swa_lens = swa_lens.view(num_tokens)
         width_swa = swa_indices.shape[-1]
         width_topk = 0 if global_indices is None else global_indices.shape[-1]
         topk = width_swa + width_topk
-        assert topk % _MIN_TOPK_WIDTH == 0, (
-            f"decode gather width W+K ({topk}) must be a multiple of "
-            f"{_MIN_TOPK_WIDTH} for the Triton sparse attention kernel"
-        )
+        assert topk > 0
 
         # Workspace rows [T*W) are the SWA gather (token-major), rows
         # [T*W, T*(W+K)) the compressed gather; the attention indices point
@@ -549,6 +555,25 @@ class DeepseekV4TritonAttention(DeepseekV4FlashMLAAttention):
         ids = _decode_ws_ids(
             num_tokens, width_swa, width_topk, swa_lens, topk_lens, device
         )
+        if os.environ.get("DSV41_DEBUG") == "1":
+            _dbg_n = getattr(self, "_dbg_n", 0)
+            self._dbg_n = _dbg_n + 1
+            if _dbg_n % 8 == 1:
+                logger.info(
+                    "DBG decode n=%d T=%d W=%d K=%d swa_lens[:4]=%s "
+                    "topk_lens[:4]=%s ids0=%s swa_slots0=%s gidx0=%s",
+                    _dbg_n,
+                    num_tokens,
+                    width_swa,
+                    width_topk,
+                    swa_lens[:4].tolist(),
+                    -1
+                    if topk_lens is None
+                    else topk_lens[: min(4, topk_lens.shape[0])].tolist(),
+                    ids[0, 0, :12].tolist(),
+                    swa_slots[0, : min(4, width_swa)].tolist(),
+                    -1 if global_indices is None else global_indices[0, :8].tolist(),
+                )
         # ponytail: two-pass (gather to bf16 workspace, then attend); a
         # single-pass zero-copy kernel dequantizing slots in registers (like
         # _sparse_mla_prefill_fused_kernel, extended with the topk union and
@@ -556,8 +581,46 @@ class DeepseekV4TritonAttention(DeepseekV4FlashMLAAttention):
         attn = triton_mla_sparse_attention(
             q=q,
             kv=ws.view(-1, 1, q.shape[-1]),
-            indices=ids.unsqueeze(1),
+            indices=ids,
             sm_scale=self.scale,
             attn_sink=self.attn_sink,
+            num_kv_splits=(1 if os.environ.get("DSV41_FORCE_SPLITS1") == "1" else None),
         )
+        if os.environ.get("DSV41_DEBUG") == "1":
+            _dbg_m = getattr(self, "_dbg_m", 0)
+            self._dbg_m = _dbg_m + 1
+            if _dbg_m % 8 == 1:
+                with torch.no_grad():
+                    kk = ws.view(-1, q.shape[-1]).float()[ids.long().clamp(min=0)]
+                    kk = kk.masked_fill((ids < 0).unsqueeze(-1), 0.0)
+                    s = (
+                        torch.einsum("thd,tjd->thj", q.float(), kk.squeeze(1).float())
+                        * self.scale
+                    )
+                    s = s.masked_fill(ids < 0, float("-inf"))
+                    if self.attn_sink is not None:
+                        sink_col = self.attn_sink[: q.shape[1]].float().view(1, -1, 1)
+                        s = torch.cat([s, sink_col.expand(s.shape[0], -1, -1)], dim=-1)
+                        kk = torch.cat(
+                            [kk, kk.new_zeros(*kk.shape[:-2], 1, kk.shape[-1])], -2
+                        )
+                    p = s.softmax(-1).nan_to_num()
+                    ref = torch.einsum("thj,tjd->thd", p, kk.float().squeeze(1))
+                    err = (attn.float() - ref).abs()
+                    valid = ids >= 0
+                    nvalid = int(valid[0, 0].sum().item())
+                    logger.info(
+                        "DBG attnref n=%d splits=%s ws_norm=%.3f q_norm=%.3f "
+                        "out_norm=%.3f ref_norm=%.3f max_err=%.4f nvalid=%d "
+                        "lse_max=%.2f",
+                        _dbg_m,
+                        os.environ.get("DSV41_FORCE_SPLITS1", "auto"),
+                        ws.float().norm(dim=-1).mean().item(),
+                        q.float().norm(dim=-1).mean().item(),
+                        attn.float().norm(dim=-1).mean().item(),
+                        ref.norm(dim=-1).mean().item(),
+                        err.max().item(),
+                        nvalid,
+                        s[0].max().item(),
+                    )
         output.copy_(attn)
