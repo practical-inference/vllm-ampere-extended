@@ -225,6 +225,11 @@ class SparseIndexerTopk(torch.nn.Module):
         if not self._cooperative_constraints(logits, topk_tokens, num_rows):
             return "cooperative"
         if self._is_cuda and topk_tokens in (512, 1024, 2048):
+            # SM80 GPU5 sweep (topk=512): persistent radix wins below ~6M
+            # logits elements (8 rows @128K: 40 vs 86us; 16 rows @256K: 64
+            # vs 90us); per_row wins beyond it (32 rows @512K: 152 vs 257us).
+            if num_rows >= 16 and num_rows * logits.shape[1] >= 6_000_000:
+                return "per_row"
             return "persistent"
         return "per_row"
 
