@@ -91,6 +91,10 @@ class INCConfigParser:
                 return False
             if name in self._config.extra_config:
                 return True
+            if any(
+                name.endswith(f".{cfg_key}") for cfg_key in self._config.extra_config
+            ):
+                return True
             for pattern in self._config.extra_config:
                 if not isinstance(pattern, str) or not any(
                     c in REGEX_SPECIAL_CHARS for c in pattern
@@ -113,8 +117,14 @@ class INCConfigParser:
                     self._config.sym if quantized else True,
                 )
 
-            if name in self._config.extra_config:
-                cfg = self._config.extra_config[name]
+            cfg_key = name if name in self._config.extra_config else None
+            if cfg_key is None:
+                cfg_key = next(
+                    (k for k in self._config.extra_config if name.endswith(f".{k}")),
+                    None,
+                )
+            if cfg_key is not None:
+                cfg = self._config.extra_config[cfg_key]
                 return (
                     cfg.get("bits", self._config.weight_bits if quantized else 16),
                     self._normalize_group_size(
@@ -168,10 +178,23 @@ class INCConfigParser:
                 if layer_name.endswith(f".{cfg_key}"):
                     return get_config(cfg_key)
 
+        def in_block(name: str, block: str) -> bool:
+            """True if *block* (dot-separated HF module path) appears as a
+            contiguous component run of *name*. AutoRound block names refer
+            to HF module-tree blocks (e.g. "layers", "mtp") and must match
+            at any nesting depth: vLLM prefixes layer names with "model." /
+            "language_model.", so startswith() would leave all unquantized."""
+            block_parts = block.split(".")
+            parts = name.split(".")
+            n = len(block_parts)
+            return any(
+                parts[i : i + n] == block_parts for i in range(len(parts) - n + 1)
+            )
+
         quantized = not isinstance(layer, ParallelLMHead)
         if self._config.block_name_to_quantize:
             quantized = any(
-                layer_name.startswith(name)
+                in_block(layer_name, name)
                 for name in self._config.block_name_to_quantize
             )
 
