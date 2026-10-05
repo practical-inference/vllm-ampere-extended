@@ -274,13 +274,17 @@ void persistent_topk(const torch::stable::Tensor& logits,
   STD_TORCH_CHECK(output.size(0) == num_rows && output.size(1) == k,
                   "output size mismatch");
   STD_TORCH_CHECK(
-      k == 128 || k == 512 || k == 1024 || k == 2048,
-      "persistent_topk supports k=128, k=512, k=1024, or k=2048, got k=", k);
+      k == 64 || k == 128 || k == 512 || k == 1024 || k == 2048,
+      "persistent_topk supports k=64, k=128, k=512, k=1024, or k=2048, got k=",
+      k);
 
   const torch::stable::accelerator::DeviceGuard device_guard(
       logits.get_device_index());
 
-  if (k == 128) {
+  if (k == 64) {
+    launch_persistent_topk<64>(logits, lengths, output, workspace,
+                               max_seq_len);
+  } else if (k == 128) {
     launch_persistent_topk<128>(logits, lengths, output, workspace,
                                 max_seq_len);
   } else if (k == 512) {

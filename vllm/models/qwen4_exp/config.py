@@ -161,12 +161,12 @@ class Qwen4ExpTextConfig(Qwen3NextConfig):
                 "indexer_budget must be divisible by indexer_compress_ratio"
             )
         block_topk = values["indexer_budget"] // values["indexer_compress_ratio"]
-        if block_topk not in (128, 512, 2048):
-            # ponytail: dev-only topk-512 accuracy arm allows 128; drop from
+        if block_topk not in (64, 128, 512, 2048):
+            # ponytail: dev-only topk-512 accuracy arm allows 128/64; drop from
             # any upstream change unless the arm passes its accuracy gates.
             raise ValueError(
                 "QSA requires indexer_budget / indexer_compress_ratio "
-                f"to be 128, 512 or 2048, got {block_topk}"
+                f"to be 64, 128, 512 or 2048, got {block_topk}"
             )
         rotary_dim = int(self.head_dim * self.partial_rotary_factor)
         if rotary_dim > values["indexer_head_dim"]:
