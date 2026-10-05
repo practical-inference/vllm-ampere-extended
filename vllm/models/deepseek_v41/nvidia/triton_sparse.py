@@ -55,6 +55,11 @@ _V4_ROPE_DIM = 64
 _V4_QUANT_BLOCK = 64
 # Smallest topk width triton_mla_sparse_attention's autotune sweep offers.
 _MIN_TOPK_WIDTH = 16
+# Token sub-chunk for the prefill attention call; bounds the fp32 split-KV
+# scratch (num_tokens x heads x 513 x 4B). 0 = no split. DSpark leaves ~300
+# MiB eager headroom once the KV pool claims the boot remainder, so big
+# contexts need e.g. 2048 (~269 MiB scratch).
+_PREFILL_ATTN_CHUNK = int(os.environ.get("DSV41_PREFILL_ATTN_CHUNK", "0"))
 
 
 def _paged_slot_ids(
@@ -465,14 +470,19 @@ class DeepseekV4TritonAttention(DeepseekV4FlashMLAAttention):
             ws_indices = self._combine_to_ws_ids(
                 combined_indices, combined_lens, chunk_M, chunk_N, chunk_size
             )
-            attn = triton_mla_sparse_attention(
-                q=q[query_start:query_end],
-                kv=kv.view(-1, 1, q.shape[-1]),
-                indices=ws_indices,
-                sm_scale=self.scale,
-                attn_sink=self.attn_sink,
-            )
-            output[query_start:query_end].copy_(attn)
+            kv_flat = kv.view(-1, 1, q.shape[-1])
+            step = _PREFILL_ATTN_CHUNK
+            n_tok = query_end - query_start
+            for s in range(0, n_tok, step if step > 0 else n_tok):
+                e = min(s + (step if step > 0 else n_tok), n_tok)
+                attn = triton_mla_sparse_attention(
+                    q=q[query_start + s : query_start + e],
+                    kv=kv_flat,
+                    indices=ws_indices[s:e],
+                    sm_scale=self.scale,
+                    attn_sink=self.attn_sink,
+                )
+                output[query_start + s : query_start + e].copy_(attn)
 
     def _forward_decode(
         self,
