@@ -1507,6 +1507,21 @@ def test_workspace_topk(test_config: dict, top_k: int, backend: str) -> None:
 
 
 @pytest.mark.skipif(not current_platform.is_cuda(), reason="This test requires CUDA")
+@pytest.mark.parametrize("top_k", [64, 128])
+@torch.inference_mode()
+def test_persistent_topk_small_k(top_k: int) -> None:
+    """Small k (QSA 512/256-token reads at ratio 4) must match the
+    reference across trivial (<k), decode, 32K radix-threshold, large."""
+    run_large_context_topk_test(
+        batch_size=4,
+        seq_lens=[100, 2048, 32768, 100000],
+        top_k=top_k,
+        data_type="random",
+        backend="persistent_topk",
+    )
+
+
+@pytest.mark.skipif(not current_platform.is_cuda(), reason="This test requires CUDA")
 @torch.inference_mode()
 def test_persistent_topk_reused_group_after_short_row() -> None:
     """A short row must not advance a group's radix histogram ring."""
