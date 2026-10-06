@@ -502,8 +502,17 @@ class Qwen4ExpQSAAttention(Qwen3NextAttention, AttentionLayerBase):
         # One launch does the indexer prepare, the main QK-norm/RoPE/gate and
         # the main K/V cache write (see QSAIndexer.forward); otherwise all of
         # them take the separate kernels.
+        # ponytail: the fused prepare kernel stores fp8e4nv directly — Triton
+        # cannot lower that on SM80, where the fp8 KV cache is a uint8 emu
+        # buffer written by reshape_and_cache. Keep the separate-kernel path
+        # there; revisit if the fused kernel grows a byte-store mode.
         self.use_fused_qsa_prepare = (
-            self.use_fused_qk_norm_rope_gate and self.indexer.use_fused_pre_indexer
+            self.use_fused_qk_norm_rope_gate
+            and self.indexer.use_fused_pre_indexer
+            and not (
+                self.kv_cache_dtype in ("fp8", "fp8_e4m3")
+                and current_platform.get_device_capability() < (8, 9)
+            )
         )
         self.fuse_indexer_projection = vllm_config.lora_config is None
         if self.fuse_indexer_projection:
