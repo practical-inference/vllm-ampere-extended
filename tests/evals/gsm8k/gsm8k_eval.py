@@ -129,6 +129,7 @@ async def call_vllm_chat_api(
         "temperature": temperature,
         "max_tokens": max_tokens,
         "stop": stop,
+        "chat_template_kwargs": {"enable_thinking": False},
     }
     if seed is not None:
         data["seed"] = seed
@@ -369,8 +370,21 @@ def main() -> None:
         help="Timeout for each request, including time waiting for a connection",
     )
     parser.add_argument("--save-results", type=str, help="Save results to JSON file")
+    parser.add_argument(
+        "--use-chat",
+        action="store_true",
+        help="Use chat completions (required for instruction-tuned models)",
+    )
+    parser.add_argument("--model", type=str, default=None, help="Model id for chat")
 
     args = parser.parse_args()
+
+    model = args.model
+    if args.use_chat and model is None:
+        import urllib.request
+
+        with urllib.request.urlopen(f"{args.host}:{args.port}/v1/models") as r:
+            model = json.load(r)["data"][0]["id"]
 
     result = evaluate_gsm8k(
         num_questions=args.num_questions,
@@ -382,6 +396,8 @@ def main() -> None:
         seed=args.seed,
         max_concurrency=args.max_concurrency,
         request_timeout_seconds=args.request_timeout_seconds,
+        use_chat_completions=args.use_chat,
+        model=model,
     )
 
     # Print results to terminal
