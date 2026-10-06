@@ -220,6 +220,7 @@ def evaluate_gsm8k(
     request_timeout_seconds: float = 600,
     gen_prefix: str = "",
     max_concurrency: int | None = None,
+    save_outputs_path: str | None = None,
 ) -> dict[str, float | int]:
     """Evaluate GSM8K accuracy using vLLM serve endpoint.
 
@@ -271,7 +272,24 @@ def evaluate_gsm8k(
         async with aiohttp.ClientSession(
             timeout=timeout, connector=connector
         ) as session:
-            tasks = [get_answer(session, i) for i in range(num_questions)]
+            # Gate dispatch on the concurrency limit: all tasks are created
+            # up-front and ClientTimeout(total) starts when session.post() is
+            # entered, so without this semaphore every request's budget
+            # includes its connector-queue wait and the tail of a long run
+            # expires before it is ever served.
+            sem = (
+                asyncio.Semaphore(max_concurrency)
+                if max_concurrency is not None
+                else None
+            )
+
+            async def gated(i: int) -> tuple[str, int]:
+                if sem is None:
+                    return await get_answer(session, i)
+                async with sem:
+                    return await get_answer(session, i)
+
+            tasks = [gated(i) for i in range(num_questions)]
             await tqdm.gather(*tasks, desc="Evaluating")
 
         return states, output_tokens
@@ -281,6 +299,26 @@ def evaluate_gsm8k(
     tic = time.perf_counter()
     states, output_tokens = asyncio.run(run_async_evaluation())
     latency = time.perf_counter() - tic
+
+    if save_outputs_path:
+        with open(save_outputs_path, "w") as f:
+            for i, (state, tokens, label) in enumerate(
+                zip(states, output_tokens, labels)
+            ):
+                pred = get_answer_value(state)
+                f.write(
+                    json.dumps(
+                        {
+                            "index": i,
+                            "label": label,
+                            "pred": pred,
+                            "valid": pred != INVALID,
+                            "output_tokens": tokens,
+                            "output": state,
+                        }
+                    )
+                    + "\n"
+                )
 
     return _score_gsm8k(states, output_tokens, labels, num_shots, max_tokens, latency)
 
@@ -371,6 +409,11 @@ def main() -> None:
     )
     parser.add_argument("--save-results", type=str, help="Save results to JSON file")
     parser.add_argument(
+        "--save-outputs",
+        type=str,
+        help="Save per-question outputs (index/label/pred/valid/output) as JSONL",
+    )
+    parser.add_argument(
         "--use-chat",
         action="store_true",
         help="Use chat completions (required for instruction-tuned models)",
@@ -398,6 +441,7 @@ def main() -> None:
         request_timeout_seconds=args.request_timeout_seconds,
         use_chat_completions=args.use_chat,
         model=model,
+        save_outputs_path=args.save_outputs,
     )
 
     # Print results to terminal
