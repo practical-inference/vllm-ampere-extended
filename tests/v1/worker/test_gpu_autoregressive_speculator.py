@@ -85,6 +85,7 @@ def test_pcp_draft_metadata_keeps_graph_padding_in_decode(cg_mode):
     speculator.max_model_len = speculator.draft_max_seq_len = 32
     speculator.draft_is_prefilling = torch.zeros(4, dtype=torch.bool)
     speculator.input_buffers = SimpleNamespace(
+        positions=torch.arange(4, dtype=torch.int64),
         query_start_loc=torch.tensor([0, 1, 2, 2, 2], dtype=torch.int32),
         seq_lens=torch.tensor([11, 21, 0, 0], dtype=torch.int32),
     )
@@ -377,19 +378,22 @@ def test_run_model_reuses_tensor_return_for_mtp(monkeypatch):
     (
         "method_name",
         "cg_mode",
+        "num_speculative_steps",
         "expected_eager_calls",
         "expected_graph_replays",
     ),
     [
-        ("_multi_step_decode", CUDAGraphMode.NONE, 3, 0),
-        ("_multi_step_decode", CUDAGraphMode.FULL, 0, 3),
-        ("_fused_multi_step_decode", CUDAGraphMode.NONE, 3, 0),
-        ("_fused_multi_step_decode", CUDAGraphMode.FULL, 0, 1),
+        ("_multi_step_decode", CUDAGraphMode.NONE, 4, 3, 0),
+        ("_multi_step_decode", CUDAGraphMode.FULL, 4, 0, 3),
+        ("_fused_multi_step_decode", CUDAGraphMode.NONE, 4, 3, 0),
+        ("_fused_multi_step_decode", CUDAGraphMode.FULL, 4, 0, 1),
+        ("_multi_step_decode", CUDAGraphMode.FULL, 3, 0, 2),
     ],
 )
 def test_multi_step_decode_replays_captured_graph_as_expected(
     method_name,
     cg_mode,
+    num_speculative_steps,
     expected_eager_calls,
     expected_graph_replays,
 ):
@@ -419,6 +423,7 @@ def test_multi_step_decode_replays_captured_graph_as_expected(
         batch_desc=batch_desc,
         seq_lens_cpu_upper_bound=None,
         num_tokens_across_dp=None,
+        num_speculative_steps=num_speculative_steps,
     )
 
     assert generate_draft.call_count == expected_eager_calls
@@ -499,7 +504,10 @@ def test_propose_k0_runs_prefill_without_draft_decode(monkeypatch):
         num_speculative_tokens=0,
     )
 
-    assert output.shape == (2, 0)
+    # Dynamic-K contract: K=0 still runs the draft prefill (KV sync) but
+    # returns the full-width buffer with every draft column masked to -1.
+    assert output.shape == (2, 2)
+    assert torch.equal(output, torch.full((2, 2), -1, dtype=torch.int64))
     speculator._prefill.assert_called_once()
     speculator.on_prefill_begin.assert_called_once_with(2)
     speculator.on_prefill_end.assert_called_once_with(2)
