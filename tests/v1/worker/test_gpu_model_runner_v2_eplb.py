@@ -192,7 +192,7 @@ def test_v2_sample_tokens_runs_eplb_on_non_last_pp_rank(monkeypatch):
         routed_experts=None,
         cudagraph_stats=None,
         num_tokens_across_dp=None,
-        num_spec_tokens_to_schedule=None,
+        num_spec_tokens_to_schedule=0,
     )
     runner.req_states = SimpleNamespace()
 
@@ -267,7 +267,9 @@ def test_v2_sample_tokens_propagates_k0_and_hides_stale_drafts(monkeypatch):
     )
     runner.speculator = SimpleNamespace(
         supports_mm_inputs=False,
-        propose=Mock(return_value=torch.empty((2, 0), dtype=torch.int64)),
+        # Dynamic-K contract: the speculator returns a full-width buffer;
+        # stale columns beyond num_spec_tokens are masked with -1 at store.
+        propose=Mock(return_value=torch.empty((2, 2), dtype=torch.int64)),
     )
     runner.adaptive_verification = None
     runner.draft_tokens_handler = SimpleNamespace(set_draft_tokens=Mock())
@@ -281,3 +283,7 @@ def test_v2_sample_tokens_propagates_k0_and_hides_stale_drafts(monkeypatch):
     assert runner.speculator.propose.call_args.kwargs["num_speculative_tokens"] == 0
     handled_drafts = runner.draft_tokens_handler.set_draft_tokens.call_args.args[1]
     assert handled_drafts.shape == (2, 0)
+    # K=0 masks every stale draft column in the persistent buffer.
+    assert torch.equal(
+        runner.req_states.draft_tokens, torch.full((2, 2), -1, dtype=torch.int64)
+    )
