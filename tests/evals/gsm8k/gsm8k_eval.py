@@ -499,7 +499,6 @@ def main() -> None:
         action="store_true",
         help="Use chat completions (required for instruction-tuned models)",
     )
-    parser.add_argument("--model", type=str, default=None, help="Model id for chat")
 
     args = parser.parse_args()
     temperature = args.temperature
