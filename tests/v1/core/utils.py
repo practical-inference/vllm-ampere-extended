@@ -84,6 +84,7 @@ def create_scheduler(
     scheduling_policy: SchedulerPolicy = "fcfs",
     diffusion_canvas_length: int | None = None,
     scheduler_cls: type[Scheduler] | None = None,
+    kv_cache_valve_threshold: float = 0.0,
 ) -> Scheduler | AsyncScheduler:
     """Create scheduler under test.
 
@@ -132,6 +133,7 @@ def create_scheduler(
         is_encoder_decoder=model_config.is_encoder_decoder,
         # Ensure admission/preemption mechanics are deterministic
         watermark=0.0,
+        kv_cache_valve_threshold=kv_cache_valve_threshold,
         policy=scheduling_policy,
     )
     # Cache config, optionally force APC
