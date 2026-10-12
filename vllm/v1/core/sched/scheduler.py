@@ -631,6 +631,23 @@ class Scheduler(SchedulerInterface):
 
         self.kv_cache_manager.new_step_starts()
 
+        # Proactive KV valve: preempt from the tail before allocation failure
+        # turns a full pool into continuous preempt/restore churn. One victim
+        # per step keeps preemption episodic.
+        if (
+            self.scheduler_config.kv_cache_valve_threshold > 0.0
+            and self.kv_cache_manager.usage
+            >= self.scheduler_config.kv_cache_valve_threshold
+            and len(self.running) > 1
+        ):
+            victim = self.running.pop()
+            self._preempt_request(
+                victim,
+                scheduled_timestamp,
+                drop_stale_output=self.requires_kv_delivery,
+            )
+            preempted_reqs.append(victim)
+
         # DP prefill balancing: on a throttled (non-cadence-aligned) step, defer
         # all prefill compute unless saturated.
         defer_prefills = (
