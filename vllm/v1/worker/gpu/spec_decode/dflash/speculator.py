@@ -361,7 +361,7 @@ class DFlashSpeculator(DraftModelSpeculator):
         temperature: torch.Tensor,
         # [max_num_reqs]
         seeds: torch.Tensor,
-        dp_sync: DPSyncState | None = None,
+        dp_sync_state: DPSyncState | None = None,
         dummy_run: bool = False,
         skip_attn_for_dummy_run: bool = False,
         mm_inputs: tuple[list[torch.Tensor], torch.Tensor] | None = None,
@@ -457,8 +457,10 @@ class DFlashSpeculator(DraftModelSpeculator):
             )
 
         batch_sync, num_batch_tokens = (
-            self._build_uniform_batch_dp_sync(dp_sync, num_reqs, self.num_query_per_req)
-            if dp_sync is not None
+            self._build_uniform_batch_dp_sync(
+                dp_sync_state, num_reqs, self.num_query_per_req
+            )
+            if dp_sync_state is not None
             else (None, num_query_tokens)
         )
         # Every DFlash step has exactly num_query_per_req tokens, so we can use FULL CGs
@@ -470,7 +472,7 @@ class DFlashSpeculator(DraftModelSpeculator):
             dp_size=self.dp_size,
             dp_rank=self.dp_rank,
             need_eager=is_profile,
-            dp_sync=batch_sync,
+            dp_sync_state=batch_sync,
         )
         num_tokens_padded = batch_desc.num_tokens
         num_tokens_across_dp = (

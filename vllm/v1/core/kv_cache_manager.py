@@ -206,6 +206,7 @@ class KVCacheManager:
         # admitting waiting/preempted requests, to avoid frequent preemptions.
         assert watermark >= 0.0, "watermark must be non-negative"
         self.watermark_blocks = int(watermark * kv_cache_config.num_blocks)
+        self._admission_fail_count = 0
         self.kv_cache_event_metadata = tuple(
             (
                 get_kv_cache_spec_kind(group.kv_cache_spec).value,
@@ -232,6 +233,35 @@ class KVCacheManager:
 
         """
         return self.block_pool.get_usage()
+
+    def _log_admission_failure(
+        self,
+        request: Request,
+        num_blocks_to_allocate: int,
+        watermark_blocks: int,
+        reserved_blocks: int,
+        full_fit: bool,
+    ) -> None:
+        self._admission_fail_count += 1
+        if self._admission_fail_count != 1 and self._admission_fail_count % 50 != 0:
+            return
+        free_blocks = self.block_pool.get_num_free_blocks()
+        logger.warning(
+            "KV admission failed (%s, occurrence #%d): req=%s prompt=%d tokens "
+            "needs %d blocks (alloc=%d + watermark=%d) but only %d free "
+            "(%d reserved for in-flight) of %d pool blocks (usage=%.1f%%)",
+            "full-sequence gate" if full_fit else "chunk allocation",
+            self._admission_fail_count,
+            request.request_id,
+            request.num_tokens,
+            num_blocks_to_allocate + watermark_blocks,
+            num_blocks_to_allocate,
+            watermark_blocks,
+            free_blocks,
+            reserved_blocks,
+            self.kv_cache_config.num_blocks,
+            self.usage * 100,
+        )
 
     def make_prefix_cache_stats(self) -> PrefixCacheStats | None:
         """Get (and reset) the prefix cache stats.
@@ -536,6 +566,13 @@ class KVCacheManager:
             )
             required_blocks = num_blocks_to_allocate + watermark_blocks
             if required_blocks > self.block_pool.get_num_free_blocks():
+                self._log_admission_failure(
+                    request,
+                    num_blocks_to_allocate,
+                    watermark_blocks,
+                    reserved_blocks,
+                    full_fit=True,
+                )
                 return None
 
         num_tokens_main_model = total_computed_tokens + num_new_tokens
@@ -575,6 +612,13 @@ class KVCacheManager:
         available_blocks = self.block_pool.get_num_free_blocks() - reserved_blocks
         required_blocks = num_blocks_to_allocate + watermark_blocks
         if required_blocks > available_blocks:
+            self._log_admission_failure(
+                request,
+                num_blocks_to_allocate,
+                watermark_blocks,
+                reserved_blocks,
+                full_fit=False,
+            )
             # Cannot allocate new blocks
             return None
 
