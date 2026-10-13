@@ -94,7 +94,7 @@ async def call_vllm_api(
     """Call vLLM's OpenAI-compatible completions endpoint.
 
     Returns:
-        Tuple of (response_text, completion_tokens)
+        Tuple of (response_text, completion_tokens, finish_reason)
 
     """
     data = {
@@ -112,10 +112,11 @@ async def call_vllm_api(
             result = await response.json()
             text = result["choices"][0]["text"]
             completion_tokens = result.get("usage", {}).get("completion_tokens", 0)
-            return text, completion_tokens
+            finish_reason = result["choices"][0].get("finish_reason", "")
+            return text, completion_tokens, finish_reason
     except Exception as e:
         print(f"Error calling vLLM API ({type(e).__name__}): {e}")
-        return "", 0
+        return "", 0, ""
 
 
 async def call_vllm_chat_api(
@@ -139,8 +140,9 @@ async def call_vllm_chat_api(
     uses its served model when ``model`` is omitted).
 
     Returns:
-        Tuple of (final answer content, completion_tokens). Reasoning returned
-        separately by a reasoning parser is not part of the answer.
+        Tuple of (final answer content, completion_tokens, finish_reason).
+        Reasoning returned separately by a reasoning parser is not part of
+        the answer.
 
     """
     data = {
@@ -168,10 +170,11 @@ async def call_vllm_chat_api(
             result = await response.json()
             text = result["choices"][0]["message"]["content"] or ""
             completion_tokens = result.get("usage", {}).get("completion_tokens", 0)
-            return text, completion_tokens
+            finish_reason = result["choices"][0].get("finish_reason", "")
+            return text, completion_tokens, finish_reason
     except Exception as e:
         print(f"Error calling vLLM chat API ({type(e).__name__}): {e}")
-        return "", 0
+        return "", 0, ""
 
 
 def _build_gsm8k_prompts(
@@ -212,6 +215,7 @@ def _score_gsm8k(
     num_shots: int,
     max_tokens: int,
     latency: float,
+    finish_reasons: list[str] | None = None,
 ) -> dict[str, float | int]:
     """Score GSM8K responses and return a results dict."""
     num_questions = len(labels)
@@ -221,7 +225,7 @@ def _score_gsm8k(
     total_output_tokens = sum(output_tokens)
     tokens_per_second = total_output_tokens / latency if latency > 0 else 0.0
 
-    return {
+    results: dict[str, float | int] = {
         "accuracy": accuracy,
         "invalid_rate": invalid_rate,
         "latency": latency,
@@ -233,6 +237,16 @@ def _score_gsm8k(
         "max_tokens": max_tokens,
         "timestamp": time.time(),
     }
+    if output_tokens:
+        results["max_output_tokens"] = max(output_tokens)
+    if finish_reasons:
+        # finish_reason == "length" means the response hit the max_tokens cap
+        # mid-generation: the answer (if any) was cut off, so accuracy and
+        # invalid_rate are measurement artifacts for those samples.
+        truncated = sum(1 for fr in finish_reasons if fr == "length")
+        results["truncated_count"] = truncated
+        results["truncated_rate"] = truncated / num_questions if num_questions else 0.0
+    return results
 
 
 def evaluate_gsm8k(
@@ -279,12 +293,13 @@ def evaluate_gsm8k(
     async def run_async_evaluation():
         states: list[str] = [""] * num_questions
         output_tokens: list[int] = [0] * num_questions
+        finish_reasons: list[str] = [""] * num_questions
 
         async def get_answer(session: aiohttp.ClientSession, i: int) -> tuple[str, int]:
             if use_chat_completions:
                 # No stop strings: the chat template delimits the turn, and they
                 # would also cut off reasoning.
-                answer, tokens = await call_vllm_chat_api(
+                answer, tokens, finish = await call_vllm_chat_api(
                     session=session,
                     model=model,
                     prompt=prompts[i],
@@ -298,7 +313,7 @@ def evaluate_gsm8k(
                     chat_template_kwargs=chat_template_kwargs,
                 )
             else:
-                answer, tokens = await call_vllm_api(
+                answer, tokens, finish = await call_vllm_api(
                     session=session,
                     prompt=prompts[i],
                     temperature=temperature,
@@ -311,6 +326,7 @@ def evaluate_gsm8k(
                 )
             states[i] = answer
             output_tokens[i] = tokens
+            finish_reasons[i] = finish
             return answer, tokens
 
         timeout = aiohttp.ClientTimeout(total=request_timeout_seconds)
@@ -342,12 +358,12 @@ def evaluate_gsm8k(
             tasks = [gated(i) for i in range(num_questions)]
             await tqdm.gather(*tasks, desc="Evaluating")
 
-        return states, output_tokens
+        return states, output_tokens, finish_reasons
 
     print(f"Running GSM8K evaluation: {num_questions} questions, {num_shots}-shot")
 
     tic = time.perf_counter()
-    states, output_tokens = asyncio.run(run_async_evaluation())
+    states, output_tokens, finish_reasons = asyncio.run(run_async_evaluation())
     latency = time.perf_counter() - tic
 
     if save_outputs_path:
@@ -364,13 +380,16 @@ def evaluate_gsm8k(
                             "pred": pred,
                             "valid": pred != INVALID,
                             "output_tokens": tokens,
+                            "finish_reason": finish_reasons[i],
                             "output": state,
                         }
                     )
                     + "\n"
                 )
 
-    return _score_gsm8k(states, output_tokens, labels, num_shots, max_tokens, latency)
+    return _score_gsm8k(
+        states, output_tokens, labels, num_shots, max_tokens, latency, finish_reasons
+    )
 
 
 def evaluate_gsm8k_offline(
@@ -420,8 +439,11 @@ def evaluate_gsm8k_offline(
 
     states = [o.outputs[0].text for o in outputs]
     output_tokens = [len(o.outputs[0].token_ids) for o in outputs]
+    finish_reasons = [o.outputs[0].finish_reason or "" for o in outputs]
 
-    return _score_gsm8k(states, output_tokens, labels, num_shots, max_tokens, latency)
+    return _score_gsm8k(
+        states, output_tokens, labels, num_shots, max_tokens, latency, finish_reasons
+    )
 
 
 def main() -> None:
