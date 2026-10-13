@@ -335,13 +335,9 @@ def _fp8_mqa_logits_kernel(
     ks = tl.load(ks_ptr + m)
     ke = tl.load(ke_ptr + m)
     if (n_start >= ke) | (n_start + BLOCK_N <= ks):
-        # When `clean_logits=False` the caller skipped the -inf pre-fill, so
-        # write -inf here for the early-exit tile.
-        tl.store(
-            logits_row + offs_n * stride_l_n,
-            tl.full([BLOCK_N], float("-inf"), dtype=tl.float32),
-            mask=mask_n,
-        )
+        # No valid logits in this tile. With the left-justified output the
+        # consumers read exactly the `[0, ke - ks)` span, which only
+        # overlapping tiles cover, so nothing to write here.
         return
 
     offs_h = tl.arange(0, BLOCK_H)
@@ -377,10 +373,12 @@ def _fp8_mqa_logits_kernel(
     valid = mask_n & (offs_n >= ks) & (offs_n < ke)
     out = tl.where(valid, out, float("-inf"))
 
+    # Left-justified compressed layout (matches the DeepGEMM 26/09/30
+    # wrappers): row i's `[ks, ke)` window starts at column 0.
     tl.store(
-        logits_row + offs_n * stride_l_n,
+        logits_row + (offs_n - ks) * stride_l_n,
         out,
-        mask=mask_n,
+        mask=valid,
     )
 
 
@@ -401,7 +399,8 @@ def fp8_mqa_logits_triton(
         cu_seqlen_ks: [M] int32
         cu_seqlen_ke: [M] int32
         clean_logits: when False, skip the -inf pre-fill of the output
-            (indexer top-k reads only `[ks, ke)` per row). Matches DeepGEMM.
+            (consumers read the left-justified `[0, ke - ks)` span per row).
+            Matches DeepGEMM.
 
     Returns:
         logits:       [M, N] float32

@@ -22,50 +22,32 @@ def _is_sm120() -> bool:
     return current_platform.get_device_capability() == (12, 0)
 
 
+@triton.jit
+def _maybe_dequant(tile):
+    if tile.dtype == tl.uint8:
+        # e4m3 bytes below sm_89 (no Triton fp8e4nv pointer type): sign to bit
+        # 15, exp+mantissa to bits 13..7 gives the fp16 of x * 2^-8. Exact for
+        # every finite code; the two NaN codes decode to +-480 after the host
+        # scale instead of NaN.
+        code = tile.to(tl.uint16)
+        bits = ((code & 0x80) << 8) | ((code & 0x7F) << 7)
+        return bits.to(tl.float16, bitcast=True)
+    elif tile.dtype == tl.float8e4nv:
+        return tile.to(tl.float16)
+    else:
+        return tile
+
+
+@lru_cache(maxsize=1)
+def _is_sm80() -> bool:
+    """True on sm_80 (A100/A30): selects the wide FP8 byte-decode tiles."""
+    return current_platform.get_device_capability() == (8, 0)
+
+
 @lru_cache(maxsize=1)
 def _is_sm90() -> bool:
     """True on sm_90 (H100/H200/H20): selects the sm_90 tuning table."""
     return current_platform.get_device_capability() == (9, 0)
-
-
-@lru_cache(maxsize=1)
-def _needs_fp8_emulation() -> bool:
-    """True below SM89: Triton cannot load fp8e4nv pointers on this arch."""
-    return current_platform.get_device_capability() < (8, 9)
-
-
-@triton.jit
-def _fp8_e4m3_to_f32(x_uint8):
-    """fp8_e4m3fn (uint8) -> float32 without hardware fp8 support (SM80).
-
-    Ported verbatim from the proven GLM-5.3 fp8_ds_mla dequant
-    (vllm-triton-sparse triton_mla_sparse_kernel.py). e4m3fn: 1 sign,
-    4 exponent (bias 7), 3 mantissa; 0x7F/0xFF are NaN, no infinities.
-    """
-    sign = (x_uint8 >> 7).to(tl.uint32)  # 0 or 1
-    exp_bits = (x_uint8 & 0x78) >> 3  # 0..15
-    mant_bits = x_uint8 & 0x07  # 0..7
-
-    # Normal value: (-1)^s * 2^(e-7) * (1 + m/8) -> fp32 bits
-    sign_f32 = sign << 31
-    f32_exp = (exp_bits.to(tl.int32) - 7 + 127).to(tl.uint32)
-    f32_bits = sign_f32 | (f32_exp << 23) | (mant_bits.to(tl.uint32) << 20)
-
-    # Subnormal (exp=0): value = (-1)^s * 2^(1-7) * (m/8) = (-1)^s * m/512
-    subnorm_val = (mant_bits.to(tl.float32) / 512.0) * tl.where(sign != 0, -1.0, 1.0)
-    is_subnormal = (exp_bits == 0) & (mant_bits != 0)
-    f32_bits = tl.where(is_subnormal, subnorm_val.to(tl.uint32, bitcast=True), f32_bits)
-
-    # Zero (exp=0, mant=0): result is +0 or -0
-    is_zero = (exp_bits == 0) & (mant_bits == 0)
-    f32_bits = tl.where(is_zero, sign_f32, f32_bits)
-
-    # NaN (exp=15, mant=7): both 0x7F and 0xFF are NaN in e4m3fn
-    is_nan = (exp_bits == 15) & (mant_bits == 7)
-    nan_bits = tl.zeros_like(x_uint8).to(tl.uint32) | 0x7FC00000
-    f32_bits = tl.where(is_nan, nan_bits, f32_bits)
-
-    return f32_bits.to(tl.float32, bitcast=True)
 
 
 @triton.jit(do_not_specialize=["num_rows", "num_requests"])
@@ -109,8 +91,6 @@ def _qsa_sparse_paged_gqa_splitk_kernel(
     NUM_TILES: tl.constexpr,
     BLOCK_M: tl.constexpr,
     BLOCK_N: tl.constexpr,
-    IS_FP8: tl.constexpr,
-    FP8_EMU: tl.constexpr,
 ) -> None:
     row = tl.program_id(0)
     kv_head = tl.program_id(1)
@@ -182,6 +162,9 @@ def _qsa_sparse_paged_gqa_splitk_kernel(
             mask=valid[None, :],
             other=0,
         )
+        # e4m3 -> Q dtype is exact; keep the QK dot in Q's dtype (fp8 QK
+        # measured slower here and less accurate).
+        keys = _maybe_dequant(keys).to(query.dtype)
         values = tl.load(
             v_cache_ptr
             + safe_page[:, None] * stride_v_block
@@ -191,14 +174,10 @@ def _qsa_sparse_paged_gqa_splitk_kernel(
             mask=valid[:, None],
             other=0,
         )
-        if IS_FP8:
-            # e4m3 -> Q dtype is exact; keep the QK dot in Q's dtype (fp8 QK
-            # measured slower here and less accurate). Below SM89 the cache
-            # arrives as raw uint8 and is bit-unpacked here.
-            if FP8_EMU:
-                keys = _fp8_e4m3_to_f32(keys).to(query.dtype)
-            else:
-                keys = keys.to(query.dtype)
+        # Dequant V to fp16 (not bf16) for the PV dot: P <= 1 (online
+        # softmax) so fp16 has the range, its wider mantissa is more
+        # accurate, and the fp8->fp16 upcast with an fp16 PV dot is faster.
+        values = _maybe_dequant(values)
         scores = tl.dot(query, keys)
         # Scaling scores avoids re-quantizing a scaled query to BF16; for fp8
         # caches the K dequant scale is already folded into softmax_scale on the
@@ -210,14 +189,6 @@ def _qsa_sparse_paged_gqa_splitk_kernel(
         probabilities = tl.where(
             valid[None, :], tl.math.exp2(scores - next_max[:, None]), 0.0
         )
-        if IS_FP8:
-            # Dequant V to fp16 (not bf16) for the PV dot: P <= 1 (online
-            # softmax) so fp16 has the range, its wider mantissa is more
-            # accurate, and the fp8->fp16 upcast with an fp16 PV dot is faster.
-            if FP8_EMU:
-                values = _fp8_e4m3_to_f32(values).to(tl.float16)
-            else:
-                values = values.to(tl.float16)
         accumulator = tl.dot(
             probabilities.to(values.dtype),
             values,
@@ -633,6 +604,10 @@ def _select_config(
         BLOCK_N, target_splits, num_warps = 64, 4, 2
     else:
         BLOCK_N, target_splits, num_warps = 64, 1, 2
+    if is_fp8 and _is_sm80():
+        # Wider tiles measured faster for the byte-decode path on A100;
+        # unmeasured on sm_86, which keeps the table's tiles.
+        BLOCK_N, num_warps = 128, 4
     num_tiles = triton.cdiv(num_columns, BLOCK_N)
     # Never more splits than tiles, never empty.
     num_splits = min(target_splits, num_tiles)
@@ -655,7 +630,9 @@ def qsa_sparse_paged_attention(
 ) -> torch.Tensor:
     """Run sparse GQA directly over paged BF16 or FP8-e4m3 K/V caches.
 
-    With fp8 caches, k_scale/v_scale are the layer's per-tensor dequant scales
+    An fp8 cache is a native e4m3 view on sm_89+ and the raw uint8 storage
+    below sm_89 (no Triton fp8e4nv pointer type there); the kernel dequantizes
+    either on load. k_scale/v_scale are the layer's per-tensor dequant scales
     as host floats (e.g. layer._k_scale_float/_v_scale_float): k_scale is
     pre-multiplied into the softmax scale and v_scale becomes the kernel's
     output scale, so the kernel needs no device scale buffers.
@@ -684,16 +661,21 @@ def qsa_sparse_paged_attention(
     assert head_dim >= 16 and (head_dim & (head_dim - 1)) == 0
     assert q.dtype == torch.bfloat16
     assert k_cache.dtype == v_cache.dtype
-    fp8_emu = k_cache.dtype == torch.uint8 and _needs_fp8_emulation()
-    is_fp8 = k_cache.dtype == torch.float8_e4m3fn or fp8_emu
+    is_fp8 = k_cache.dtype != torch.bfloat16
     if is_fp8:
         assert k_scale is not None and v_scale is not None
         # Host pre-multiply: fold the K dequant scale into the attention scale
         # and pass V's dequant scale as the kernel's output scale.
         softmax_scale = (head_dim**-0.5) * float(k_scale)
         output_scale = float(v_scale)
+        if k_cache.dtype == torch.uint8:
+            # _maybe_dequant's byte decode yields x * 2^-8; fold 2^8 into the
+            # scales so the decode needs no multiply.
+            softmax_scale *= 256.0
+            output_scale *= 256.0
+        else:
+            assert k_cache.dtype == torch.float8_e4m3fn
     else:
-        assert k_cache.dtype == torch.bfloat16
         softmax_scale = head_dim**-0.5
         output_scale = 1.0
     assert logical_indices.dtype == block_table.dtype == torch.int32
@@ -780,8 +762,6 @@ def qsa_sparse_paged_attention(
         NUM_TILES=num_tiles,
         BLOCK_M=block_m,
         BLOCK_N=block_n,
-        IS_FP8=is_fp8,
-        FP8_EMU=fp8_emu,
         num_warps=partial_warps,
         num_stages=2,
     )
@@ -818,13 +798,15 @@ def warmup_qsa_sparse_paged_attention(
     """Compile every production-reachable split-K/merge specialization."""
     head_dim = kv_cache.shape[-1] // 2
     key_cache, value_cache = kv_cache.transpose(1, 2).split(head_dim, dim=-1)
-    # An fp8 cache is allocated as uint8 and viewed as e4m3 at attention time.
+    # An fp8 cache is allocated as uint8 storage; warm the dtype the impl hands
+    # over: an e4m3 view on sm_89+, the raw bytes below.
     is_fp8 = kv_cache.dtype == torch.uint8
-    fp8_emu = is_fp8 and _needs_fp8_emulation()
-    if fp8_emu:
-        cache_dtype = torch.uint8
-    else:
-        cache_dtype = torch.float8_e4m3fn if is_fp8 else key_cache.dtype
+    fp8_dtype = (
+        torch.float8_e4m3fn
+        if current_platform.has_device_capability(89)
+        else torch.uint8
+    )
+    cache_dtype = fp8_dtype if is_fp8 else key_cache.dtype
     num_kv_heads = key_cache.shape[2]
     group_size = num_query_heads // num_kv_heads
     block_m = triton.next_power_of_2(group_size)
@@ -928,8 +910,6 @@ def warmup_qsa_sparse_paged_attention(
             NUM_TILES=num_tiles,
             BLOCK_M=block_m,
             BLOCK_N=block_n,
-            IS_FP8=is_fp8,
-            FP8_EMU=fp8_emu,
             num_warps=warps,
             num_stages=2,
             grid=(num_rows, num_kv_heads, num_splits),
