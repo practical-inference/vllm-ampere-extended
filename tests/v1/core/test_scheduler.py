@@ -1471,6 +1471,64 @@ def test_preempt_during_execution():
     assert requests[1].output_token_ids[0] == 42
 
 
+def test_kv_cache_valve_preempts_proactively():
+    # The valve fires on usage alone — no allocation failure needed. The
+    # reactive path only preempts once growth fails; the valve restores slack
+    # first, keeping preemption episodic instead of continuous at a full pool
+    # (2026-10-11 wedge: preempt/restore churn at 100% KV).
+    scheduler = create_scheduler(
+        max_num_batched_tokens=100,
+        block_size=16,
+        num_blocks=31,  # 30 usable -> 480 tokens
+        enable_prefix_caching=False,
+        kv_cache_valve_threshold=0.3,
+    )
+    requests = create_requests(num_requests=2, num_tokens=80, block_size=16)
+
+    scheduler.add_request(requests[0])
+    scheduler_output0 = scheduler.schedule()
+    assert len(scheduler_output0.num_scheduled_tokens) == 1
+    scheduler.add_request(requests[1])
+    scheduler_output1 = scheduler.schedule()
+    # Both admitted: 10/30 blocks = 33% usage, above the valve threshold.
+    assert len(scheduler.running) == 2
+
+    def sampled(req: Request, index: int) -> ModelRunnerOutput:
+        return ModelRunnerOutput(
+            req_ids=[req.request_id],
+            req_id_to_index={req.request_id: index},
+            sampled_token_ids=[[0]],
+            logprobs=None,
+            prompt_logprobs_dict={},
+            pooler_output=[],
+        )
+
+    scheduler.update_from_output(scheduler_output0, sampled(requests[0], 0))
+    scheduler.update_from_output(
+        scheduler_output1,
+        ModelRunnerOutput(
+            req_ids=[requests[0].request_id, requests[1].request_id],
+            req_id_to_index={
+                requests[0].request_id: 0,
+                requests[1].request_id: 1,
+            },
+            sampled_token_ids=[[0], [0]],
+            logprobs=None,
+            prompt_logprobs_dict={},
+            pooler_output=[],
+        ),
+    )
+
+    # Next step: the valve preempts the tail request before anything fails,
+    # and the survivor is still scheduled normally.
+    scheduler_output2 = scheduler.schedule()
+    assert requests[1].status == RequestStatus.PREEMPTED
+    assert len(scheduler.running) == 1
+    assert scheduler.running[0] == requests[0]
+    assert len(scheduler_output2.num_scheduled_tokens) == 1
+    assert requests[0].request_id in scheduler_output2.num_scheduled_tokens
+
+
 def test_pending_hisparse_reclamation_defers_preemption(monkeypatch):
     """Pending reclamation must stall rather than preempt its owning request."""
     scheduler = create_scheduler(enable_prefix_caching=False)
