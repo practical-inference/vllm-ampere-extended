@@ -17,6 +17,8 @@ import torch
 from vllm.models.deepseek_v32.common.kernels import _f32_to_e4m3_sw
 from vllm.platforms import current_platform
 from vllm.triton_utils import tl, triton
+from vllm.utils.deep_gemm import mqa_logits_use_mx_scales
+from vllm.v1.attention.ops.common import pack_ue8m0_x4
 
 # The GLM-5.3-Flash indexer head dimension is fixed at 128.
 INDEX_HEAD_DIM = 128
@@ -168,6 +170,7 @@ def _kpool_softmax_rotate_write_cache_kernel(
     HEAD_DIM: tl.constexpr,
     S_OFFSET_NBYTES_IN_PAGE: tl.constexpr,
     ROUND_SCALE: tl.constexpr,
+    MX_SCALE: tl.constexpr,
     HAS_WRITE_MASK: tl.constexpr,
     RETURN_COMPRESSED: tl.constexpr,
     WRITE_CACHE: tl.constexpr,
@@ -259,7 +262,14 @@ def _kpool_softmax_rotate_write_cache_kernel(
             + loc_token_offset_in_page
         )
         tl.store(buf_fp8_ptr + out_k_offsets, quantized, mask=mask)
-        tl.store(buf_fp32_ptr + out_s_offset, scale, mask=do_write)
+        if MX_SCALE:
+            tl.store(
+                buf_fp32_ptr.to(tl.pointer_type(tl.int32)) + out_s_offset,
+                pack_ue8m0_x4(scale),
+                mask=do_write,
+            )
+        else:
+            tl.store(buf_fp32_ptr + out_s_offset, scale, mask=do_write)
 
     if RETURN_COMPRESSED:
         tl.store(
@@ -338,6 +348,7 @@ def kpool_compress_and_write_cache(
 
     buf_fp8 = buf.view(torch.float8_e4m3fn)
     buf_fp32 = buf.view(torch.float32)
+    mx_scale = write_cache and mqa_logits_use_mx_scales()
     # bytes per page (last dim of kv_cache) viewed as uint8
     buf_numel_per_page = buf.stride(0)
     s_offset_nbytes_in_page = page_size * head_dim
@@ -382,7 +393,9 @@ def kpool_compress_and_write_cache(
         POOL_SIZE=slot_k.shape[1],
         HEAD_DIM=head_dim,
         S_OFFSET_NBYTES_IN_PAGE=s_offset_nbytes_in_page,
-        ROUND_SCALE=round_scale,
+        # MX scales need power-of-two scales.
+        ROUND_SCALE=round_scale or mx_scale,
+        MX_SCALE=mx_scale,
         HAS_WRITE_MASK=has_write_mask,
         RETURN_COMPRESSED=return_compressed,
         WRITE_CACHE=write_cache,
@@ -502,6 +515,7 @@ def _kpool_decode_update_batched_kernel(
     S_OFFSET_NBYTES_IN_PAGE: tl.constexpr,
     ROUND_SCALE: tl.constexpr,
     SW_E4M3: tl.constexpr,
+    MX_SCALE: tl.constexpr,
     BLOCK_D: tl.constexpr,
 ):
     """One program per request; iterates its NEXT_N verify tokens in order.
@@ -629,7 +643,13 @@ def _kpool_decode_update_batched_kernel(
                 + loc_token_offset_in_page
             )
             tl.store(buf_fp8_ptr + out_k_offsets, quantized, mask=dim_mask)
-            tl.store(buf_fp32_ptr + out_s_offset, scale)
+            if MX_SCALE:
+                tl.store(
+                    buf_fp32_ptr.to(tl.pointer_type(tl.int32)) + out_s_offset,
+                    pack_ue8m0_x4(scale),
+                )
+            else:
+                tl.store(buf_fp32_ptr + out_s_offset, scale)
 
         # Stash the current token AFTER any completion read so the completion
         # uses prior stashes (and the current token's own key/score via
@@ -746,8 +766,10 @@ def kpool_decode_update_and_maybe_write_cache_batched(
         KPOOL_HEAD=tail_kv_cache.stride(1),
         HEAD_DIM=head_dim,
         S_OFFSET_NBYTES_IN_PAGE=page_size * head_dim,
-        ROUND_SCALE=round_scale,
+        # MX scales need power-of-two scales.
+        ROUND_SCALE=round_scale or mqa_logits_use_mx_scales(),
         SW_E4M3=sw_e4m3,
+        MX_SCALE=mqa_logits_use_mx_scales(),
         BLOCK_D=triton.next_power_of_2(head_dim),
     )
 

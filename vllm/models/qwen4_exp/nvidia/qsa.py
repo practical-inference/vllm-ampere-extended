@@ -304,11 +304,10 @@ class Qwen4ExpQSAFlashAttentionImpl(FlashAttentionImpl):
         key_cache, value_cache = kv_cache.transpose(1, 2).split(self.head_size, dim=-1)
         k_scale = v_scale = None
         if self.kv_cache_dtype in ("fp8", "fp8_e4m3"):
-            # The cache is allocated as uint8; reinterpret the e4m3 bytes
-            # (same itemsize, so shape and strides are preserved). Below
-            # SM89 Triton cannot load fp8e4nv pointers, so the uint8 bytes
-            # go to the kernel as-is and are dequantized on load there.
-            if current_platform.get_device_capability() >= (8, 9):
+            # The cache is allocated as uint8; on sm_89+ reinterpret the e4m3
+            # bytes (same itemsize, so shape and strides are preserved). Below
+            # sm_89 the kernel byte-decodes the raw uint8 storage instead.
+            if current_platform.has_device_capability(89):
                 key_cache = key_cache.view(torch.float8_e4m3fn)
                 value_cache = value_cache.view(torch.float8_e4m3fn)
             # Host-side per-tensor dequant scales (Python floats), as used by
@@ -503,17 +502,14 @@ class Qwen4ExpQSAAttention(Qwen3NextAttention, AttentionLayerBase):
         )
         # One launch does the indexer prepare, the main QK-norm/RoPE/gate and
         # the main K/V cache write (see QSAIndexer.forward); otherwise all of
-        # them take the separate kernels.
-        # ponytail: the fused prepare kernel stores fp8e4nv directly — Triton
-        # cannot lower that on SM80, where the fp8 KV cache is a uint8 emu
-        # buffer written by reshape_and_cache. Keep the separate-kernel path
-        # there; revisit if the fused kernel grows a byte-store mode.
+        # them take the separate kernels. The fused writer receives an fp8
+        # pointer, which Triton cannot lower below sm_89.
         self.use_fused_qsa_prepare = (
             self.use_fused_qk_norm_rope_gate
             and self.indexer.use_fused_pre_indexer
-            and not (
-                self.kv_cache_dtype in ("fp8", "fp8_e4m3")
-                and current_platform.get_device_capability() < (8, 9)
+            and (
+                self.kv_cache_torch_dtype != torch.uint8
+                or current_platform.has_device_capability(89)
             )
         )
         self.fuse_indexer_projection = vllm_config.lora_config is None
