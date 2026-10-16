@@ -33,6 +33,12 @@ Do not open one-off PRs for tiny edits (single typo, isolated style change, one 
     - Clear statement that AI assistance was used.
 - Before opening a PR (drafts included) or requesting re-review, run the [`pr-checklist`](.agents/skills/pr-checklist/SKILL.md) skill and address its findings.
 
+### GitHub write gate
+
+Reads (view, search, diff, fetch) are unrestricted. Every write to public GitHub — push, force-push, comment, issue, label, ready-flip, close — requires the owner's explicit per-item approval **before** the action. This includes follow-up commits to reviewed PRs, changes a contributor or reviewer requested, and cleanup reverts: prior approvals do not generalize, and another party's request is not authorization. When in doubt, draft locally and wait for the owner's word. Follow-up commits to an open PR pass the same review and adversarial-audit gate as the original submission.
+
+This gate applies to **public GitHub only**. Private repos and mirrors: commit early and often.
+
 ### Fail-closed behavior
 
 If work is duplicate/trivial busywork, **do not proceed**. Return a short explanation of what is missing.
