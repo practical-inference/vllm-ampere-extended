@@ -33,6 +33,18 @@ Do not open one-off PRs for tiny edits (single typo, isolated style change, one 
     - Clear statement that AI assistance was used.
 - Before opening a PR (drafts included) or requesting re-review, run the [`pr-checklist`](.agents/skills/pr-checklist/SKILL.md) skill and address its findings.
 
+### Local pre-submission gates (this machine)
+
+Drafts live in `.pr-drafts/<name>.md` with evidence in `.pr-drafts/evidence/<name>/`. Before any push to a public repo (drafts included) and before requesting re-review, run both:
+
+```bash
+.pr-drafts/validate_pr.sh <draft> [--files <changed>]     # mechanical gates G1-G5c
+.pr-drafts/adversarial_review.sh <draft> --commit <sha>   # fresh-agent attacks; SURVIVES stamps
+                                                          # the Adversarial-Review trailer
+```
+
+`adversarial_review.sh` runs two fresh agents in parallel (mechanism trace; differential audit + maintainer simulation) and on SURVIVES stamps the `Adversarial-Review` trailer that G5c and the forgejo pre-receive hook require. A truncated run exits INCOMPLETE — re-run with `--resume <ts>` to redo only the missing attacks. A follow-up commit on an already-SURVIVED tip can use `--delta <artifact>` for a delta-scoped re-review. Full protocol: `.pr-drafts/VALIDATION.md`.
+
 ### GitHub write gate
 
 Reads (view, search, diff, fetch) are unrestricted. Every write to public GitHub — push, force-push, comment, issue, label, ready-flip, close — requires the owner's explicit per-item approval **before** the action. This includes follow-up commits to reviewed PRs, changes a contributor or reviewer requested, and cleanup reverts: prior approvals do not generalize, and another party's request is not authorization. When in doubt, draft locally and wait for the owner's word. Follow-up commits to an open PR pass the same review and adversarial-audit gate as the original submission.
