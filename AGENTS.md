@@ -43,7 +43,7 @@ Drafts live in `.pr-drafts/<name>.md` with evidence in `.pr-drafts/evidence/<nam
                                                           # the Adversarial-Review trailer
 ```
 
-`adversarial_review.sh` runs two fresh agents in parallel (mechanism trace; differential audit + maintainer simulation) and on SURVIVES stamps the `Adversarial-Review` trailer that G5c and the forgejo pre-receive hook require. A truncated run exits INCOMPLETE — re-run with `--resume <ts>` to redo only the missing attacks. A follow-up commit on an already-SURVIVED tip can use `--delta <artifact>` for a delta-scoped re-review. Full protocol: `.pr-drafts/VALIDATION.md`.
+`adversarial_review.sh` runs two fresh agents in parallel (mechanism trace; differential audit + maintainer simulation) and on SURVIVES stamps the `Adversarial-Review` trailer that G5c and the forgejo pre-receive hook require. A truncated run exits INCOMPLETE — re-run with `--resume <ts>` to redo only the missing attacks. A follow-up commit on an already-SURVIVED tip: use `--delta <artifact>` (the script names the artifact when it detects this); full re-review only when the delta touches previously-verified mechanism. Full protocol: `.pr-drafts/VALIDATION.md`.
 
 ### GitHub write gate
 
