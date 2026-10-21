@@ -110,11 +110,13 @@ def test_dedup_attention_bitexact(num_tokens: int):
     indices = _make_indices(num_tokens, topk_w, num_slots, seed=11)
 
     ref_ws = _reference_rows(cache, indices, dequant_dim)
-    base_idx = torch.arange(num_tokens, dtype=torch.int64).unsqueeze(
-        1
-    ) * topk_w + torch.arange(topk_w, dtype=torch.int64).unsqueeze(0)
+    base_idx = torch.arange(
+        num_tokens, dtype=torch.int64, device=indices.device
+    ).unsqueeze(1) * topk_w + torch.arange(
+        topk_w, dtype=torch.int64, device=indices.device
+    ).unsqueeze(0)
     base_idx = torch.where(indices >= 0, base_idx, -1).view(num_tokens, 1, topk_w)
-    base_idx = base_idx.to(torch.int32).cuda()
+    base_idx = base_idx.to(torch.int32)
 
     ws, ws_indices = _dedup_dequant_gather(
         cache.device, cache.view(torch.uint8), indices, dequant_dim
