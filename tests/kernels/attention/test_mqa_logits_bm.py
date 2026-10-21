@@ -109,3 +109,37 @@ def test_bm_bench():
         f"speedup={t_legacy / t_bm:.2f}x"
     )
     assert t_bm < t_legacy
+
+
+def test_bm_bench_prod_shape():
+    """The shape prod actually runs (2026-10-21 trace fit): M=8192 chunk
+    rows against the full gathered pool width (N~111K at 445K ctx) with
+    ~2.5K-row live windows (top-k pools + the chunk's new pools)."""
+    M, N, W = 8192, 111_000, 2560
+    q, kv, w, ks, ke = _make(M, N, seed=11)
+    ks = torch.zeros_like(ks)
+    ke = torch.full_like(ke, W)
+
+    def timeit(fn, reps=10):
+        fn()  # autotune warm
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        for _ in range(reps):
+            fn()
+        torch.cuda.synchronize()
+        return (time.perf_counter() - t0) / reps * 1000
+
+    os.environ["VLLM_MQA_LOGITS_LEGACY"] = "1"
+    t_legacy = timeit(
+        lambda: fp8_mqa_logits_triton(q, kv, w, ks, ke, clean_logits=False)
+    )
+    os.environ["VLLM_MQA_LOGITS_LEGACY"] = "0"
+    t_bm = timeit(lambda: fp8_mqa_logits_triton(q, kv, w, ks, ke, clean_logits=False))
+    tflops = M * W * H * D * 2 / 1e12
+    print(
+        f"\nPROD SHAPE M={M} poolN={N} window={W}: "
+        f"legacy={t_legacy:.2f}ms ({tflops / (t_legacy / 1e3):.1f} TFLOPS) "
+        f"bm={t_bm:.2f}ms ({tflops / (t_bm / 1e3):.1f} TFLOPS) "
+        f"speedup={t_legacy / t_bm:.2f}x"
+    )
+    assert t_bm < t_legacy
