@@ -14,7 +14,10 @@ import pytest
 import torch
 
 from vllm.platforms import current_platform
-from vllm.v1.attention.ops.mqa_logits_triton import fp8_mqa_logits_triton
+from vllm.v1.attention.ops.mqa_logits_triton import (
+    fp8_mqa_logits_triton,
+    warmup_fp8_mqa_logits_triton,
+)
 
 pytestmark = pytest.mark.skipif(
     not current_platform.is_cuda_alike(),
@@ -23,6 +26,19 @@ pytestmark = pytest.mark.skipif(
 
 H = 32  # GLM-5.3 index_n_heads
 D = 128  # index_head_dim
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _seed_autotune_at_prod_shape():
+    """The autotune caches are shape-blind and single-sweep: the first
+    kernel call in the process picks the config every later call runs.
+    Seed both paths with the same prod-chunk-shape warmup the engine's
+    init makes, so gate benches measure the config prod will run —
+    otherwise pytest's first tiny case sweeps at a degenerate grid."""
+    os.environ["VLLM_MQA_LOGITS_LEGACY"] = "1"
+    warmup_fp8_mqa_logits_triton(H, D, torch.device("cuda"))
+    os.environ["VLLM_MQA_LOGITS_LEGACY"] = "0"
+    warmup_fp8_mqa_logits_triton(H, D, torch.device("cuda"))
 
 
 def _make(M: int, N: int, seed: int):
