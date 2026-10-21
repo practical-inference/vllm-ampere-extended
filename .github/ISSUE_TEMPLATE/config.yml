@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Questions
+  - name: vLLM feature requests and model support
+    url: https://github.com/vllm-project/vllm/issues
+    about: File vLLM source features and bugs upstream — they arrive here via the nightly merge
+  - name: Questions and usage help
     url: https://discuss.vllm.ai
     about: Ask questions and discuss with other vLLM community members

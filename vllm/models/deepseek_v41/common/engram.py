@@ -656,15 +656,18 @@ def _engram_lookup_kernel(
     BLOCK_R: tl.constexpr,
     GRID,
     SORTED: tl.constexpr if _SORTED_IS_CONSTEXPR else None,  # type: ignore[valid-type]
-    PACKED: tl.constexpr,
-    OUT_STRIDE: tl.constexpr,
+    INT4: tl.constexpr = False,
+    PACKED: tl.constexpr = False,
+    OUT_STRIDE: tl.constexpr = 0,
 ):
-    """Gather FP8 rows as packed values/scales or dequantized BF16.
+    """Gather rows, apply their per-block scales, write bf16 or packed FP8.
 
     Only this rank's heads are read; padded heads write zeros for all-gather.
     `weight`/`scales` may address pinned host memory through UVA. If SORTED,
     `ids` holds rows relative to vocab_start in table order and `sorted_dst`
-    their output rows.
+    their output rows. With `INT4` the rows are two signed 4-bit values per
+    byte (low nibble first) and the scales are fp16; otherwise rows are fp8
+    with ue8m0 scales.
     """
     cols = tl.arange(0, DIM)
     scale_cols = cols // QUANT_BLOCK
@@ -688,38 +691,57 @@ def _engram_lookup_kernel(
             owned &= (index >= vocab_start) & (index < vocab_end)
             local = index - vocab_start
         local = tl.where(owned, local, 0)
-        values = tl.load(
-            weight + local[:, None] * DIM + cols[None, :],
-            mask=owned[:, None],
-            other=0.0,
-        )
-        scale = tl.load(
-            scales + local[:, None] * (DIM // QUANT_BLOCK) + scale_cols[None, :],
-            mask=owned[:, None],
-            other=0,
-        )
-        if PACKED:
-            width: tl.constexpr = DIM + DIM // QUANT_BLOCK
-            dst = dst.to(tl.int64)
-            dst = dst // LOCAL_HEADS * OUT_STRIDE + dst % LOCAL_HEADS * width
-            tl.store(
-                out + dst[:, None] + cols[None, :],
-                values.to(tl.uint8, bitcast=True),
-                mask=valid[:, None],
+        if INT4:
+            packed = tl.load(
+                weight + local[:, None] * (DIM // 2) + (cols // 2)[None, :],
+                mask=owned[:, None],
+                other=0,
             )
-            tl.store(
-                out + dst[:, None] + DIM + scale_cols[None, :],
-                scale,
-                mask=valid[:, None] & (cols[None, :] % QUANT_BLOCK == 0),
-            )
-        else:
-            # ue8m0 is a power of two, so its byte *is* the fp32 exponent field.
-            scale = (scale.to(tl.int32) << 23).to(tl.float32, bitcast=True)
+            nib = (packed.to(tl.int32) >> ((cols % 2) * 4)[None, :]) & 0xF
+            values = tl.where(nib > 7, nib - 16, nib).to(tl.float32)
+            scale = tl.load(
+                scales + local[:, None] * (DIM // QUANT_BLOCK) + scale_cols[None, :],
+                mask=owned[:, None],
+                other=0.0,
+            ).to(tl.float32)
             tl.store(
                 out + dst[:, None] * DIM + cols[None, :],
-                (values.to(tl.float32) * scale).to(tl.bfloat16),
+                (values * scale).to(tl.bfloat16),
                 mask=valid[:, None],
             )
+        else:
+            values = tl.load(
+                weight + local[:, None] * DIM + cols[None, :],
+                mask=owned[:, None],
+                other=0.0,
+            )
+            scale = tl.load(
+                scales + local[:, None] * (DIM // QUANT_BLOCK) + scale_cols[None, :],
+                mask=owned[:, None],
+                other=0,
+            )
+            if PACKED:
+                width: tl.constexpr = DIM + DIM // QUANT_BLOCK
+                dst = dst.to(tl.int64)
+                dst = dst // LOCAL_HEADS * OUT_STRIDE + dst % LOCAL_HEADS * width
+                tl.store(
+                    out + dst[:, None] + cols[None, :],
+                    values.to(tl.uint8, bitcast=True),
+                    mask=valid[:, None],
+                )
+                tl.store(
+                    out + dst[:, None] + DIM + scale_cols[None, :],
+                    scale,
+                    mask=valid[:, None] & (cols[None, :] % QUANT_BLOCK == 0),
+                )
+            else:
+                # ue8m0 is a power of two, so its byte *is* the fp32 exponent field.
+                scale = (scale.to(tl.int32) << 23).to(tl.float32, bitcast=True)
+                tl.store(
+                    out + dst[:, None] * DIM + cols[None, :],
+                    (values.to(tl.float32) * scale).to(tl.bfloat16),
+                    mask=valid[:, None],
+                )
 
 
 def engram_head_shard_rank() -> int:
@@ -774,13 +796,27 @@ class DPSharedEngramStorage:
     """Registered host weights shared by a node-local DP group with one writer."""
 
     def __init__(
-        self, num_rows: int, dim: int, block_size: int, group: GroupCoordinator
+        self,
+        num_rows: int,
+        dim: int,
+        block_size: int,
+        group: GroupCoordinator,
+        int4: bool = False,
     ) -> None:
         self.group = group
-        weight_bytes = num_rows * dim
-        storage = self._allocate(weight_bytes + weight_bytes // block_size)
-        self.weight = storage[:weight_bytes].view(torch.float8_e4m3fn).view(-1, dim)
-        self.weight_scale_inv = storage[weight_bytes:].view(-1, dim // block_size)
+        weight_width = dim // 2 if int4 else dim
+        scale_bytes = num_rows * (dim // block_size) * (2 if int4 else 1)
+        weight_bytes = num_rows * weight_width
+        storage = self._allocate(weight_bytes + scale_bytes)
+        weight = storage[:weight_bytes]
+        scales = storage[weight_bytes:]
+        if int4:
+            weight = weight.view(torch.uint8)
+            scales = scales.view(torch.float16)
+        else:
+            weight = weight.view(torch.float8_e4m3fn)
+        self.weight = weight.view(-1, weight_width)
+        self.weight_scale_inv = scales.view(-1, dim // block_size)
         self._views: tuple[torch.Tensor, torch.Tensor] | None = None
 
     def _allocate(self, num_bytes: int) -> torch.Tensor:
@@ -988,6 +1024,7 @@ class ParallelEngramEmbedding(nn.Module):
         self.num_embeddings = num_embeddings
         self.dim = dim
         self.block_size = block_size
+        self.int4 = os.environ.get("DSV41_ENGRAM_DTYPE", "").lower() == "int4"
         self.n_hash_cols = len(head_sizes)
         self.tp_size = get_tensor_model_parallel_world_size()
         num_shards, head_rank = self._get_shard_info()
@@ -1019,14 +1056,22 @@ class ParallelEngramEmbedding(nn.Module):
         if cpu_offload:
             # Constant dummy values avoid randomizing huge CPU lookup tables.
             set_weight_attrs(self.weight, {"dummy_weight_value": 1.0})
-            # The ue8m0 encoding of scale 1.0 is exponent byte 127.
-            set_weight_attrs(self.weight_scale_inv, {"dummy_weight_value": 127})
+            # The ue8m0 encoding of scale 1.0 is exponent byte 127; int4
+            # scales are fp16 and use 1.0.
+            set_weight_attrs(
+                self.weight_scale_inv,
+                {"dummy_weight_value": 1.0 if self.int4 else 127},
+            )
+            row_bytes = self.dim // 2 + 2 * self.dim // self.block_size
             logger.info(
-                "Engram table offloaded to pinned host memory: %d rows x %d, "
+                "Engram table offloaded to pinned host memory: %d rows x %d (%s), "
                 "%.2f GiB %s",
                 self.part_num_embeddings,
                 dim,
-                self.part_num_embeddings * (dim + dim // block_size) / 1024**3,
+                "int4" if self.int4 else "fp8",
+                self.part_num_embeddings
+                * (row_bytes if self.int4 else dim + dim // block_size)
+                / 1024**3,
                 "shared across DP replicas" if dp_shared_memory else "per rank",
             )
 
@@ -1036,47 +1081,57 @@ class ParallelEngramEmbedding(nn.Module):
         return self.tp_size * self.dp_size, engram_head_shard_rank()
 
     def _allocate_weights(self) -> tuple[torch.Tensor, torch.Tensor]:
+        weight_width = self.dim // 2 if self.int4 else self.dim
+        scale_dim = self.dim // self.block_size
+        scale_dtype = torch.float16 if self.int4 else torch.uint8
         if self.dp_shared_memory:
             group = get_engram_dp_group()
             assert group is not None
             storage = DPSharedEngramStorage(
-                self.part_num_embeddings, self.dim, self.block_size, group
+                self.part_num_embeddings,
+                self.dim,
+                self.block_size,
+                group,
+                self.int4,
             )
             self._shared_memory = storage
             self._weight_loader = storage.load_weight
             return storage.weight, storage.weight_scale_inv
-        scale_dim = self.dim // self.block_size
         if not self.cpu_offload:
             return (
                 torch.empty(
-                    self.part_num_embeddings, self.dim, dtype=torch.float8_e4m3fn
+                    self.part_num_embeddings,
+                    weight_width,
+                    dtype=torch.uint8 if self.int4 else torch.float8_e4m3fn,
                 ),
-                torch.empty(self.part_num_embeddings, scale_dim, dtype=torch.uint8),
+                torch.empty(self.part_num_embeddings, scale_dim, dtype=scale_dtype),
             )
+        weight_bytes = self.part_num_embeddings * weight_width
+        scale_bytes = self.part_num_embeddings * scale_dim * (2 if self.int4 else 1)
         if self.use_thp:
-            weight_bytes = self.part_num_embeddings * self.dim
-            packed = _allocate_huge_page_storage(
-                weight_bytes + weight_bytes // self.block_size
-            )
+            packed = _allocate_huge_page_storage(weight_bytes + scale_bytes)
             if packed is not None:
                 self._packed = packed
+                weight, scales = packed[:weight_bytes], packed[weight_bytes:]
                 return (
-                    packed[:weight_bytes].view(torch.float8_e4m3fn).view(-1, self.dim),
-                    packed[weight_bytes:].view(-1, scale_dim),
+                    weight.view(torch.uint8 if self.int4 else torch.float8_e4m3fn).view(
+                        -1, weight_width
+                    ),
+                    scales.view(scale_dtype).view(-1, scale_dim),
                 )
         # Model initialization may be inside a CUDA device context.
         return (
             torch.empty(
                 self.part_num_embeddings,
-                self.dim,
-                dtype=torch.float8_e4m3fn,
+                weight_width,
+                dtype=torch.uint8 if self.int4 else torch.float8_e4m3fn,
                 device="cpu",
                 pin_memory=True,
             ),
             torch.empty(
                 self.part_num_embeddings,
                 scale_dim,
-                dtype=torch.uint8,
+                dtype=scale_dtype,
                 device="cpu",
                 pin_memory=True,
             ),
@@ -1120,6 +1175,9 @@ class ParallelEngramEmbedding(nn.Module):
         rows = indices.shape[0] * self.part_n_hash_cols
         if not rows:
             return
+        if os.environ.get("DSV41_ZERO_ENGRAM") == "1":
+            out.zero_()
+            return
         weight, scales = self._storage()
         ids_stride_t, ids_stride_h = indices.stride()
         sort_min_rows, _ = _engram_lookup_thresholds(indices.device)
@@ -1162,6 +1220,7 @@ class ParallelEngramEmbedding(nn.Module):
             BLOCK_R=16,
             GRID=grid,
             SORTED=sort,
+            INT4=self.int4,
             PACKED=out.dtype == torch.uint8,
             OUT_STRIDE=out.stride(0),
         )

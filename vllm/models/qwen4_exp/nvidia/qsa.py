@@ -203,7 +203,14 @@ class Qwen4ExpQSAFlashAttentionBackend(FlashAttentionBackend):
 
     @classmethod
     def supports_kv_connector(cls) -> bool:
-        return False
+        # qsa-kvoffload: SimpleCPUOffloadConnector transfers raw packed
+        # blocks derived from KVCacheTensor placements (block-outermost
+        # here), so the QSA packed cache -- fp8-e4m3 main KV bytes plus
+        # bf16 indexer side caches -- copies bit-exact and the QSA
+        # Triton kernel dequantizes on load. Hybrid (align-Mamba) models
+        # additionally need lazy_offload=true for CPU prefix hits; see
+        # the warning in vllm/v1/simple_kv_offload/manager.py.
+        return True
 
 
 class Qwen4ExpQSAFlashAttentionImpl(FlashAttentionImpl):
@@ -545,6 +552,20 @@ class Qwen4ExpQSAAttention(Qwen3NextAttention, AttentionLayerBase):
                 }
             )
         return AutoWeightsLoader(self).load_weights(weights, mapper=mapper)
+
+    def process_weights_after_loading(self, *args: object, **kwargs: object) -> None:
+        """Sync host scale floats from the loaded _k_scale/_v_scale buffers.
+
+        Checkpoints may ship per-layer KV dequant scales (e.g. leoncca's
+        calibrated model-kvscales shard); load_weights maps them onto the
+        persistent buffers, but nothing else syncs the _float copies the
+        QSA kernel folds into its softmax/output scales.
+        """
+        if self.kv_cache_dtype in ("fp8", "fp8_e4m3"):
+            self._k_scale_float = float(self._k_scale.item())
+            self._v_scale_float = float(self._v_scale.item())
+            self._k_scale_cpu.fill_(self._k_scale_float)
+            self._v_scale_cpu.fill_(self._v_scale_float)
 
     def get_attn_backend(self) -> type[AttentionBackend]:
         return self.attn_backend

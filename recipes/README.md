@@ -1,40 +1,33 @@
-# vLLM model recipes
+<!-- markdownlint-disable MD060 -->
 
-This directory holds the deployment recipes for models served by vLLM, one
-YAML per model at `models/<hf_org>/<hf_repo>.yaml`. The path mirrors the
-Hugging Face ID, so `models/Qwen/Qwen3.8-27B.yaml` renders at
-[recipes.vllm.ai/Qwen/Qwen3.8-27B](https://recipes.vllm.ai/Qwen/Qwen3.8-27B).
+# Recipes
 
-The site, the command builder, and the JSON API are built by
-[vllm-project/recipes](https://github.com/vllm-project/recipes). That
-repository owns the schema and the shared vocabulary (hardware profiles,
-serving strategies, KV-offload deployments) and pins this directory to a
-commit. Omni (image, video, audio) recipes stay in vllm-project/recipes for
-now (moving to vllm-omni), and Ascend NPU content is inline in these recipes
-(moving to vllm-ascend overlays).
+Configs for model + GPU combinations, with the data showing why they beat the
+alternatives. Every recipe states the mechanism (why it works) and includes
+measured numbers — a config without data is a guess, not a recipe.
 
-## Editing a recipe
+**The bar:** we publish a config only when it measurably improves performance
+or enables something that otherwise doesn't work. Tuning experiments with
+inconclusive results stay unpublished — signal, not noise.
 
-Start a new recipe from
-[`templates/recipe.yaml`](https://github.com/vllm-project/recipes/blob/main/templates/recipe.yaml).
-Fields are defined in
-[SCHEMA.md](https://github.com/vllm-project/recipes/blob/main/SCHEMA.md) and
-checked against [`recipe.schema.json`](https://recipes.vllm.ai/recipe.schema.json)
-on every build; an unknown or misspelled key is an error. For completion and
-inline errors in YAML-aware editors, start the file with
-`# yaml-language-server: $schema=https://recipes.vllm.ai/recipe.schema.json`.
+## Index
 
-Follow the recipes repository's
-[add-recipe skill](https://github.com/vllm-project/recipes/blob/main/.agents/skills/add-recipe/SKILL.md)
-for the schema and the validation steps. To validate a change exactly as this
-repository's `Recipes` PR check does, run from a checkout of
-`vllm-project/recipes`:
+| Recipe | Hardware | Verdict |
+|---|---|---|
+| [KV offloading on Ampere](kv-offload-ampere.md) | SM80 (Ampere), long-context doc-summary workload | **Avoid** — connector overhead causes the preemptions it exists to rescue |
 
-```bash
-node scripts/validate-source.mjs --source vllm --dir ~/vllm/recipes
-```
+## Format
 
-To preview the site with your changes, add a gitignored `sources.local.yaml`
-to that checkout with `overrides: { vllm: ~/vllm/recipes }` and run `pnpm dev`.
-This works once vllm-project/recipes reads this directory as its `vllm`
-source (vllm-project/recipes#1095).
+Each recipe: hardware, exact configuration, mechanism, data table vs
+alternatives, and reproduction commands. Benchmarks are run on the same
+hardware class the recipe targets; see each recipe for its setup. For
+compatibility-creating backends (models that cannot run on this hardware
+otherwise — there is no dense-attention fallback for the sparse-attention
+model classes), the data is absolute serving numbers plus the kernel-level
+analysis, not a comparison against a fallback that doesn't exist.
+
+## Contributing
+
+Ran a config comparison on Ampere or older hardware? Open a PR adding a
+recipe — include the raw numbers and how you measured them. Negative results
+(a config that loses) are welcome; they save everyone else the experiment.

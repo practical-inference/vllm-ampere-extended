@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 import torch
 
+from vllm import _custom_ops as ops
 from vllm.platforms import current_platform
 from vllm.triton_utils import tl, triton
 from vllm.utils.deep_gemm import mqa_logits_use_mx_scales
@@ -73,6 +74,27 @@ def _fp8_ue8m0_quantize(vals, FP8_MAX: tl.constexpr, USE_FNUZ: tl.constexpr):
     fp8_dtype = tl.float8e4b8 if USE_FNUZ else tl.float8e4nv
     fp8_vals = tl.div_rn(vals, scale).to(fp8_dtype)
     return fp8_vals, scale
+
+
+@triton.jit
+def _f32_to_e4m3_sw(x):
+    """Software f32 -> FP8 E4M3 bits (uint8): RNE, satfinite. Stand-in for
+    cvt.rn.satfinite.e4m3x2.f32 on archs without hw FP8 (SM80), where Triton
+    cannot compile fp8e4nv casts. Input must be finite with |x| <= FP8_MAX,
+    which ue8m0 scaling guarantees.
+    """
+    u = x.to(tl.uint32, bitcast=True)
+    s = ((u >> 24) & 0x80).to(tl.uint8)
+    a = u & 0x7FFFFFFF
+    # Normal path: RNE-round to a 3-bit mantissa (carry folds into exponent).
+    r = a + 0x0007FFFF + ((a >> 20) & 1)
+    normal = (((r >> 23) - 120) << 3) | ((r >> 20) & 7)
+    # Subnormal path: RNE onto the k*2^-9 grid (magic-add rounds to nearest
+    # even integer; a rollup to 8 lands exactly on the smallest normal).
+    y = tl.abs(x) * 512.0
+    sub = (y + 12582912.0) - 12582912.0
+    byte = tl.where(r >= 0x3C800000, normal, sub.to(tl.uint32)) & 0xFF
+    return (byte | s.to(tl.uint32)).to(tl.uint8)
 
 
 @triton.jit
@@ -555,6 +577,31 @@ def fused_norm_rope(
     kv_dim = kv_c.shape[-1]
     device = positions.device
 
+    # SM80 (no hw FP8): Triton cannot compile the FP8 quant stores of the
+    # cache-write branches here. Run only norm/RoPE/topk in the kernel (no
+    # cache pointers passed) and insert both caches with the CUDA reference
+    # ops, which the fused stores were written to match bit-exactly.
+    # ponytail: _f32_to_e4m3_sw can re-fuse these two stores into the kernel
+    # on SM80 too; revisit only if profiling shows 2 CUDA ops/layer matters.
+    host_cache_insert = not current_platform.supports_fp8()
+    mla_insert = indexer_insert = None
+    if host_cache_insert:
+        if mla_kv_cache is not None and slot_mapping is not None:
+            mla_insert = (mla_kv_cache, slot_mapping, mla_k_scale, mla_kv_cache_dtype)
+        ins_idx_slot = indexer_slot_mapping
+        if ins_idx_slot is None:
+            ins_idx_slot = slot_mapping
+        if indexer_k_cache is not None and ins_idx_slot is not None:
+            if index_k_out is None:
+                assert index_k is not None
+                index_k_out = torch.empty_like(index_k)
+            indexer_insert = (indexer_k_cache, ins_idx_slot)
+        indexer_k_cache = None
+        indexer_slot_mapping = None
+        mla_kv_cache = None
+        slot_mapping = None
+        mla_kv_cache_dtype = "auto"
+
     # Shared (no-indexer) layers: substitute cached 1-element dummies so the
     # kernel launches cleanly; pid 0/3 (indexer + topk fill) skipped by
     # HAS_INDEXER and never dereference them.
@@ -737,6 +784,16 @@ def fused_norm_rope(
         USE_FNUZ=_USE_FNUZ,
         **pdl_kwargs,
     )
+    if mla_insert is not None:
+        cache, slots, scale, dtype = mla_insert
+        assert kv_c_out is not None and k_pe_out is not None
+        if scale is None:
+            scale = torch.ones(1, dtype=torch.float32, device=device)
+        ops.concat_and_cache_mla(kv_c_out, k_pe_out, cache, slots, dtype, scale)
+    if indexer_insert is not None:
+        cache, slots = indexer_insert
+        assert index_k_out is not None
+        ops.indexer_k_quant_and_cache(index_k_out, cache, slots, index_k_dim, "ue8m0")
     return q_c_out
 
 
@@ -792,6 +849,7 @@ def _fused_q_kernel(
     USE_PDL: tl.constexpr,
     FP8_MAX: tl.constexpr,
     USE_FNUZ: tl.constexpr,
+    INDEX_Q_U8: tl.constexpr,
 ):
     tok_idx = tl.program_id(0).to(tl.int64)
     pid = tl.program_id(1)
@@ -803,34 +861,35 @@ def _fused_q_kernel(
 
     if pid == 2:
         # ql_nope quantize + pack into the front of mqa_q_fp8. On the bf16
-        # query path ql_nope is consumed as-is (no pack), so skip entirely.
-        if not QUANTIZE_MQA:
-            return
-        if 2 * head_idx >= NUM_Q_HEADS:
-            return
+        # query path ql_nope is consumed as-is (no pack). Must be a constexpr
+        # block, not an early return: Triton type-checks code after `return`
+        # and fp8e4nv casts fail to compile on archs without hw FP8 (SM80).
+        if QUANTIZE_MQA:
+            if 2 * head_idx >= NUM_Q_HEADS:
+                return
 
-        scale = tl.load(q_scale_ptr)
-        for local_head in range(2):
-            q_head_idx = head_idx * 2 + local_head
-            if q_head_idx < NUM_Q_HEADS:
-                ql_nope_off = tl.arange(0, QL_NOPE_BLOCK)
-                ql_nope_mask = ql_nope_off < QL_NOPE_DIM
-                ql_nope = tl.load(
-                    ql_nope_ptr
-                    + tok_idx * ql_nope_stride0
-                    + q_head_idx * ql_nope_stride1
-                    + ql_nope_off,
-                    mask=ql_nope_mask,
-                ).to(tl.float32)
-                ql_nope_fp8 = (ql_nope / scale).to(fp8_dtype)
-                tl.store(
-                    mqa_q_fp8_ptr
-                    + tok_idx * mqa_q_fp8_stride0
-                    + q_head_idx * mqa_q_fp8_stride1
-                    + ql_nope_off,
-                    ql_nope_fp8,
-                    mask=ql_nope_mask,
-                )
+            scale = tl.load(q_scale_ptr)
+            for local_head in range(2):
+                q_head_idx = head_idx * 2 + local_head
+                if q_head_idx < NUM_Q_HEADS:
+                    ql_nope_off = tl.arange(0, QL_NOPE_BLOCK)
+                    ql_nope_mask = ql_nope_off < QL_NOPE_DIM
+                    ql_nope = tl.load(
+                        ql_nope_ptr
+                        + tok_idx * ql_nope_stride0
+                        + q_head_idx * ql_nope_stride1
+                        + ql_nope_off,
+                        mask=ql_nope_mask,
+                    ).to(tl.float32)
+                    ql_nope_fp8 = (ql_nope / scale).to(fp8_dtype)
+                    tl.store(
+                        mqa_q_fp8_ptr
+                        + tok_idx * mqa_q_fp8_stride0
+                        + q_head_idx * mqa_q_fp8_stride1
+                        + ql_nope_off,
+                        ql_nope_fp8,
+                        mask=ql_nope_mask,
+                    )
         return
     elif pid == 0:
         # q_pe RoPE + quantize + pack into the tail of mqa_q_fp8.
@@ -939,14 +998,23 @@ def _fused_q_kernel(
         index_q = tl.where(in_rope, roped, index_q)
 
         # Index Q Quantize (from registers)
-        index_q_fp8, index_q_scale = _fp8_ue8m0_quantize(index_q, FP8_MAX, USE_FNUZ)
-        tl.store(
+        index_q_offs = (
             index_q_fp8_ptr
             + tok_idx * index_q_fp8_stride0
             + head_idx * index_q_fp8_stride1
-            + index_q_block,
-            index_q_fp8,
+            + index_q_block
         )
+        if INDEX_Q_U8:
+            # SM80: fp8 casts don't compile in Triton here; same ue8m0 recipe
+            # as _fp8_ue8m0_quantize with a software e4m3 encode (uint8 store
+            # into the fp8 buffer's uint8 view).
+            scale = tl.div_rn(tl.maximum(tl.max(tl.abs(index_q)), 1e-4), FP8_MAX)
+            scale = tl.math.exp2(tl.math.ceil(tl.math.log2(scale)))
+            tl.store(index_q_offs, _f32_to_e4m3_sw(tl.div_rn(index_q, scale)))
+            index_q_scale = scale
+        else:
+            index_q_fp8, index_q_scale = _fp8_ue8m0_quantize(index_q, FP8_MAX, USE_FNUZ)
+            tl.store(index_q_offs, index_q_fp8)
 
         # Index weights update
         index_weights = tl.load(
@@ -1047,6 +1115,10 @@ def fused_q(
 
     index_q_fp8 = torch.empty_like(index_q, dtype=_FP8_DTYPE)
     index_weights_out = torch.empty_like(index_weights, dtype=torch.float32)
+    # Triton rejects fp8e4nv pointer args on archs without hw FP8 (SM80);
+    # pass a uint8 view and let the kernel bitcast the store instead.
+    index_q_u8 = not current_platform.supports_fp8()
+    index_q_kernel_arg = index_q_fp8.view(torch.uint8) if index_q_u8 else index_q_fp8
     if cutedsl_kernel is not None:
         cutedsl_kernel(
             positions,
@@ -1088,7 +1160,7 @@ def fused_q(
         index_q_cos_sin_cache,
         index_q_cos_sin_cache.stride(0),
         index_q_cos_sin_cache.shape[-1] // 2,
-        index_q_fp8,
+        index_q_kernel_arg,
         index_q_fp8.stride(0),
         index_q_fp8.stride(1),
         index_q_head_dim,
@@ -1115,6 +1187,7 @@ def fused_q(
         QUANTIZE_MQA=quantize_mqa,
         FP8_MAX=_FP8_MAX,
         USE_FNUZ=_USE_FNUZ,
+        INDEX_Q_U8=index_q_u8,
         **pdl_kwargs,
         # num_warps=1 is optimal here: each program is a single 128-element
         # rope+quant, so the kernel is program-count/occupancy bound, not

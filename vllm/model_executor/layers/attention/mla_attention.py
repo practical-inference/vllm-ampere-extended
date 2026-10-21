@@ -299,6 +299,10 @@ from vllm.v1.attention.ops.pcp import (
     finalize_mla_pcp_decode,
     maybe_gather_mla_latent_cache_inputs,
 )
+from vllm.v1.attention.ops.triton_mla_sparse_kernel import (
+    _DIM_QK_NOPE,
+    _DS_MLA_CACHE_BYTES_NOPE,
+)
 from vllm.v1.attention.selector import get_attn_backend
 from vllm.v1.kv_cache_interface import (
     AttentionSpec,
@@ -1213,7 +1217,10 @@ class MLAAttention(nn.Module, AttentionLayerBase):
     def _use_sparse_mha(self, attn_metadata: "MLACommonMetadata") -> bool:
         if self.hisparse_cache is not None:
             return False
-        prefill = attn_metadata.prefill
+        # Sparse backends whose metadata carries no prefill classification
+        # (e.g. TritonMLASparse's XPU-style metadata) only implement the MQA
+        # path, so the MHA shortcut never applies to them.
+        prefill = getattr(attn_metadata, "prefill", None)
         if prefill is None:
             return False
         use_masked_mha = (
@@ -1380,10 +1387,15 @@ class MLAAttention(nn.Module, AttentionLayerBase):
             kv_quant_mode=get_kv_quant_mode(self.kv_cache_dtype),
             # ds_mla layouts pack NoPE + RoPE + scales into one opaque per-token
             # blob, so the size is not derivable from head_size.
-            # See flashmla_sparse.py.
-            state_content_bytes={"fp8_ds_mla": 656, "nvfp4_ds_mla": 352}.get(
-                self.kv_cache_dtype
-            ),
+            # See flashmla_sparse.py. NoPE models (head_size 512) drop the
+            # rope tail: 528B pages (TRITON_MLA_SPARSE writes/reads them
+            # with Triton kernels; see triton_mla_sparse.py).
+            state_content_bytes={
+                "fp8_ds_mla": (
+                    _DS_MLA_CACHE_BYTES_NOPE if self.head_size == _DIM_QK_NOPE else 656
+                ),
+                "nvfp4_ds_mla": 352,
+            }.get(self.kv_cache_dtype),
         )
         if self.sliding_window is not None:
             return SlidingWindowMLASpec(

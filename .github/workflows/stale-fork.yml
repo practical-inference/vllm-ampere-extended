@@ -1,0 +1,37 @@
+name: stale-fork
+
+on:
+  schedule:
+    - cron: '23 3 * * 1'  # weekly, Monday
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@eb5cf3af3ac0a1aa4c9c45633dd1ae542a27a899 # v10.3.0
+        with:
+          operations-per-run: 100
+          days-before-stale: 60
+          days-before-close: 30
+          exempt-issue-labels: 'keep-open'
+          exempt-pr-labels: 'keep-open'
+          stale-issue-message: >
+            This issue has been inactive for 60 days. It will close in 30
+            days if there is no further activity — comment to keep it open,
+            or add the `keep-open` label if it remains relevant.
+          stale-pr-message: >
+            This PR has been inactive for 60 days. It will close in 30 days
+            if there is no further activity — comment to keep it open, or add
+            the `keep-open` label.
+          close-issue-message: >
+            Closing for inactivity. If this is still relevant, reopen with a
+            comment or file a fresh issue with current details.
+          close-pr-message: >
+            Closing for inactivity. Reopen with a comment if still relevant.
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'

@@ -199,12 +199,23 @@ MAX_HOST_REGISTER_CHUNK_BYTES = 64 * 1024**3
 # Amortize per-call overhead with the bytes not registered in each row.
 MIN_HOST_REGISTER_SAVED_BYTES = 3 * 1024**2
 
+# cudaHostRegister on multi-hundred-GB regions pins enough RAM that NCCL's
+# own host allocations fail on the first collective. Unpinned DMA is slower.
+PIN_MAX_BYTES = 50 * 1024**3
+
 
 def pin_mmap_region(
     region: SharedOffloadRegion, worker_slot_only: bool = False
 ) -> None:
     """Register row-aligned chunks or this worker's slots, rolling back on failure."""
     rank = region.rank
+    if region.total_size_bytes > PIN_MAX_BYTES:
+        logger.info(
+            "Skipping mmap host registration: %.1f GB region exceeds %d GB cap",
+            region.total_size_bytes / 1e9,
+            PIN_MAX_BYTES // 1024**3,
+        )
+        return
     base_ptr = region._base.data_ptr()
     total_size = region.total_size_bytes
     # Chunks end on block-row boundaries, which are page aligned, so neither the

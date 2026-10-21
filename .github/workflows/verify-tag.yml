@@ -1,0 +1,61 @@
+name: verify-release
+
+on:
+  push:
+    tags: ["v*", "nightly-*"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-wheel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download the release wheel (waits for the publish pipeline to attach it)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for _ in $(seq 1 20); do
+            if gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern '*.whl' --dir wheelhouse --clobber 2>/dev/null && compgen -G "wheelhouse/*.whl" >/dev/null; then
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::no wheel asset on release $GITHUB_REF_NAME after 10 minutes"
+          exit 1
+      - name: Verify wheel provenance
+        run: |
+          WHEEL=$(ls wheelhouse/*.whl | head -1)
+          python - "$WHEEL" "$GITHUB_REF_NAME" <<'EOF'
+          import re
+          import subprocess
+          import sys
+          import zipfile
+
+          wheel, tag = sys.argv[1], sys.argv[2]
+          z = zipfile.ZipFile(wheel)
+          meta_name = next(n for n in z.namelist() if n.endswith("/METADATA"))
+          meta = z.read(meta_name).decode()
+          name = re.search(r"^Name: (.+)$", meta, re.M).group(1)
+          ver = re.search(r"^Version: (.+)$", meta, re.M).group(1)
+          assert name == "vllm", f"unexpected package: {name}"
+
+          sha = subprocess.check_output(
+              ["git", "rev-parse", f"{tag}^{{commit}}"], text=True
+          ).strip()
+          gsha = re.search(r"\+g([0-9a-f]+)", ver)
+          assert gsha, f"no commit segment in wheel version: {ver}"
+          assert sha.startswith(gsha.group(1)), (
+              f"provenance mismatch: wheel built from {gsha.group(1)}, "
+              f"tag {tag} points at {sha[:10]}"
+          )
+          print(f"OK: {name} {ver} matches tag {tag} @ {sha[:10]}")
+          EOF

@@ -90,11 +90,11 @@ async def call_vllm_api(
     seed: int | None = None,
     top_p: float | None = None,
     top_k: int | None = None,
-) -> tuple[str, int]:
+) -> tuple[str, int, str]:
     """Call vLLM's OpenAI-compatible completions endpoint.
 
     Returns:
-        Tuple of (response_text, completion_tokens)
+        Tuple of (response_text, completion_tokens, finish_reason)
 
     """
     data = {
@@ -112,10 +112,11 @@ async def call_vllm_api(
             result = await response.json()
             text = result["choices"][0]["text"]
             completion_tokens = result.get("usage", {}).get("completion_tokens", 0)
-            return text, completion_tokens
+            finish_reason = result["choices"][0].get("finish_reason", "")
+            return text, completion_tokens, finish_reason
     except Exception as e:
         print(f"Error calling vLLM API ({type(e).__name__}): {e}")
-        return "", 0
+        return "", 0, ""
 
 
 async def call_vllm_chat_api(
@@ -131,7 +132,7 @@ async def call_vllm_chat_api(
     top_k: int | None = None,
     reasoning_effort: str | None = None,
     chat_template_kwargs: dict[str, object] | None = None,
-) -> tuple[str, int]:
+) -> tuple[str, int, str]:
     """Call vLLM's OpenAI-compatible chat completions endpoint.
 
     ``model``, ``temperature``, ``stop`` and the other optional fields are
@@ -139,14 +140,17 @@ async def call_vllm_chat_api(
     uses its served model when ``model`` is omitted).
 
     Returns:
-        Tuple of (final answer content, completion_tokens). Reasoning returned
-        separately by a reasoning parser is not part of the answer.
+        Tuple of (final answer content, completion_tokens, finish_reason).
+        Reasoning returned separately by a reasoning parser is not part of
+        the answer.
 
     """
     data = {
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
     }
+    if chat_template_kwargs is None:
+        chat_template_kwargs = {"enable_thinking": False}
     data.update(
         _optional_params(
             stop=stop,
@@ -166,10 +170,11 @@ async def call_vllm_chat_api(
             result = await response.json()
             text = result["choices"][0]["message"]["content"] or ""
             completion_tokens = result.get("usage", {}).get("completion_tokens", 0)
-            return text, completion_tokens
+            finish_reason = result["choices"][0].get("finish_reason", "")
+            return text, completion_tokens, finish_reason
     except Exception as e:
         print(f"Error calling vLLM chat API ({type(e).__name__}): {e}")
-        return "", 0
+        return "", 0, ""
 
 
 def _build_gsm8k_prompts(
@@ -210,6 +215,7 @@ def _score_gsm8k(
     num_shots: int,
     max_tokens: int,
     latency: float,
+    finish_reasons: list[str] | None = None,
 ) -> dict[str, float | int]:
     """Score GSM8K responses and return a results dict."""
     num_questions = len(labels)
@@ -219,7 +225,7 @@ def _score_gsm8k(
     total_output_tokens = sum(output_tokens)
     tokens_per_second = total_output_tokens / latency if latency > 0 else 0.0
 
-    return {
+    results: dict[str, float | int] = {
         "accuracy": accuracy,
         "invalid_rate": invalid_rate,
         "latency": latency,
@@ -231,6 +237,16 @@ def _score_gsm8k(
         "max_tokens": max_tokens,
         "timestamp": time.time(),
     }
+    if output_tokens:
+        results["max_output_tokens"] = max(output_tokens)
+    if finish_reasons:
+        # finish_reason == "length" means the response hit the max_tokens cap
+        # mid-generation: the answer (if any) was cut off, so accuracy and
+        # invalid_rate are measurement artifacts for those samples.
+        truncated = sum(1 for fr in finish_reasons if fr == "length")
+        results["truncated_count"] = truncated
+        results["truncated_rate"] = truncated / num_questions if num_questions else 0.0
+    return results
 
 
 def evaluate_gsm8k(
@@ -246,6 +262,7 @@ def evaluate_gsm8k(
     request_timeout_seconds: float = 600,
     gen_prefix: str = "",
     max_concurrency: int | None = None,
+    save_outputs_path: str | None = None,
     top_p: float | None = None,
     top_k: int | None = None,
     reasoning_effort: str | None = None,
@@ -276,12 +293,15 @@ def evaluate_gsm8k(
     async def run_async_evaluation():
         states: list[str] = [""] * num_questions
         output_tokens: list[int] = [0] * num_questions
+        finish_reasons: list[str] = [""] * num_questions
 
-        async def get_answer(session: aiohttp.ClientSession, i: int) -> tuple[str, int]:
+        async def get_answer(
+            session: aiohttp.ClientSession, i: int
+        ) -> tuple[str, int, str]:
             if use_chat_completions:
                 # No stop strings: the chat template delimits the turn, and they
                 # would also cut off reasoning.
-                answer, tokens = await call_vllm_chat_api(
+                answer, tokens, finish = await call_vllm_chat_api(
                     session=session,
                     model=model,
                     prompt=prompts[i],
@@ -295,7 +315,7 @@ def evaluate_gsm8k(
                     chat_template_kwargs=chat_template_kwargs,
                 )
             else:
-                answer, tokens = await call_vllm_api(
+                answer, tokens, finish = await call_vllm_api(
                     session=session,
                     prompt=prompts[i],
                     temperature=temperature,
@@ -308,7 +328,8 @@ def evaluate_gsm8k(
                 )
             states[i] = answer
             output_tokens[i] = tokens
-            return answer, tokens
+            finish_reasons[i] = finish
+            return answer, tokens, finish
 
         timeout = aiohttp.ClientTimeout(total=request_timeout_seconds)
         connector = (
@@ -319,18 +340,58 @@ def evaluate_gsm8k(
         async with aiohttp.ClientSession(
             timeout=timeout, connector=connector
         ) as session:
-            tasks = [get_answer(session, i) for i in range(num_questions)]
+            # Gate dispatch on the concurrency limit: all tasks are created
+            # up-front and ClientTimeout(total) starts when session.post() is
+            # entered, so without this semaphore every request's budget
+            # includes its connector-queue wait and the tail of a long run
+            # expires before it is ever served.
+            sem = (
+                asyncio.Semaphore(max_concurrency)
+                if max_concurrency is not None
+                else None
+            )
+
+            async def gated(i: int) -> tuple[str, int, str]:
+                if sem is None:
+                    return await get_answer(session, i)
+                async with sem:
+                    return await get_answer(session, i)
+
+            tasks = [gated(i) for i in range(num_questions)]
             await tqdm.gather(*tasks, desc="Evaluating")
 
-        return states, output_tokens
+        return states, output_tokens, finish_reasons
 
     print(f"Running GSM8K evaluation: {num_questions} questions, {num_shots}-shot")
 
     tic = time.perf_counter()
-    states, output_tokens = asyncio.run(run_async_evaluation())
+    states, output_tokens, finish_reasons = asyncio.run(run_async_evaluation())
     latency = time.perf_counter() - tic
 
-    return _score_gsm8k(states, output_tokens, labels, num_shots, max_tokens, latency)
+    if save_outputs_path:
+        with open(save_outputs_path, "w") as f:
+            for i, (state, tokens, label) in enumerate(
+                zip(states, output_tokens, labels)
+            ):
+                pred = get_answer_value(state)
+                f.write(
+                    json.dumps(
+                        {
+                            "index": i,
+                            "label": label,
+                            "pred": pred,
+                            "valid": pred != INVALID,
+                            "output_tokens": tokens,
+                            "finish_reason": finish_reasons[i],
+                            "output": state,
+                        }
+                    )
+                    + "\n"
+                )
+
+    return _score_gsm8k(
+        states, output_tokens, labels, num_shots, max_tokens, latency, finish_reasons
+    )
 
 
 def evaluate_gsm8k_offline(
@@ -380,8 +441,11 @@ def evaluate_gsm8k_offline(
 
     states = [o.outputs[0].text for o in outputs]
     output_tokens = [len(o.outputs[0].token_ids) for o in outputs]
+    finish_reasons = [o.outputs[0].finish_reason or "" for o in outputs]
 
-    return _score_gsm8k(states, output_tokens, labels, num_shots, max_tokens, latency)
+    return _score_gsm8k(
+        states, output_tokens, labels, num_shots, max_tokens, latency, finish_reasons
+    )
 
 
 def main() -> None:
@@ -449,11 +513,28 @@ def main() -> None:
         help="Timeout for each request, including time waiting for a connection",
     )
     parser.add_argument("--save-results", type=str, help="Save results to JSON file")
+    parser.add_argument(
+        "--save-outputs",
+        type=str,
+        help="Save per-question outputs (index/label/pred/valid/output) as JSONL",
+    )
+    parser.add_argument(
+        "--use-chat",
+        action="store_true",
+        help="Use chat completions (required for instruction-tuned models)",
+    )
 
     args = parser.parse_args()
     temperature = args.temperature
     if temperature is None and not args.use_chat_completions:
         temperature = 0.0
+
+    model = args.model
+    if args.use_chat and model is None:
+        import urllib.request
+
+        with urllib.request.urlopen(f"{args.host}:{args.port}/v1/models") as r:
+            model = json.load(r)["data"][0]["id"]
 
     result = evaluate_gsm8k(
         num_questions=args.num_questions,
@@ -465,8 +546,9 @@ def main() -> None:
         seed=args.seed,
         max_concurrency=args.max_concurrency,
         request_timeout_seconds=args.request_timeout_seconds,
-        model=args.model,
-        use_chat_completions=args.use_chat_completions,
+        use_chat_completions=args.use_chat or args.use_chat_completions,
+        model=model,
+        save_outputs_path=args.save_outputs,
         top_p=args.top_p,
         top_k=args.top_k,
         reasoning_effort=args.reasoning_effort,
@@ -486,7 +568,9 @@ def main() -> None:
     if args.save_results:
         # None means the field was not sent and the server default applied.
         result["request_params"] = {
-            "endpoint": "chat" if args.use_chat_completions else "completions",
+            "endpoint": "chat"
+            if (args.use_chat or args.use_chat_completions)
+            else "completions",
             "model": args.model,
             "temperature": temperature,
             "top_p": args.top_p,

@@ -180,7 +180,7 @@ def _qsa_sparse_paged_gqa_splitk_kernel(
             + kv_head * stride_k_head
             + dim_offsets[:, None],
             mask=valid[None, :],
-            other=0.0,
+            other=0,
         )
         # e4m3 -> Q dtype is exact; keep the QK dot in Q's dtype (fp8 QK
         # measured slower here and less accurate).
@@ -192,7 +192,7 @@ def _qsa_sparse_paged_gqa_splitk_kernel(
             + kv_head * stride_v_head
             + dim_offsets[None, :],
             mask=valid[:, None],
-            other=0.0,
+            other=0,
         )
         # Dequant V to fp16 (not bf16) for the PV dot: P <= 1 (online
         # softmax) so fp16 has the range, its wider mantissa is more

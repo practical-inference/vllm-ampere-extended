@@ -134,6 +134,12 @@ def build_offloading_config(
                 f"'blocks_per_chunk' to express the chunk size in blocks."
             )
 
+    single_group_spec = (
+        kv_cache_config.kv_cache_groups[0].kv_cache_spec
+        if len(kv_cache_config.kv_cache_groups) == 1
+        else None
+    )
+
     worker_kv_bytes_per_block = 0
     if (
         kv_cache_config.hisparse_host_num_blocks is None
@@ -143,18 +149,20 @@ def build_offloading_config(
         # Scratch filtering must preserve the scheduler/worker allocation stride.
         # Every KVCacheTensor describes placement within the same backing allocation,
         # so its size is the total, not a per-tensor share.
-        total_gpu_kv_bytes = kv_cache_config.kv_cache_tensors[0].size
-        worker_kv_bytes_per_block = total_gpu_kv_bytes // kv_cache_config.num_blocks
+        if kv_cache_config.global_max_kv_block_bytes > 0:
+            # Stamped by get_kv_cache_configs with the max per-block bytes
+            # across pipeline stages: identical in every process. Deriving
+            # locally desyncs the shared offload region under PP, because
+            # stages project different layer subsets (e.g. DSA indexers on
+            # some stages only) and allocator slack (boot timeout).
+            worker_kv_bytes_per_block = kv_cache_config.global_max_kv_block_bytes
+        else:
+            total_gpu_kv_bytes = kv_cache_config.kv_cache_tensors[0].size
+            worker_kv_bytes_per_block = total_gpu_kv_bytes // kv_cache_config.num_blocks
     elif kv_cache_config.num_blocks > 0:
         worker_kv_bytes_per_block = sum(
             _group_kv_bytes_per_block(group) for _, group in selected_groups
         )
-
-    single_group_spec = (
-        kv_cache_config.kv_cache_groups[0].kv_cache_spec
-        if len(kv_cache_config.kv_cache_groups) == 1
-        else None
-    )
     replicated_layout = (
         vllm_config.model_config.use_mla
         and parallel_config.tensor_parallel_size > 1

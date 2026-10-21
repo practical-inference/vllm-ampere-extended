@@ -57,3 +57,5 @@ tests/platforms/test_cpu.py  # CPU-only unit test; no job targets tests/platform
 
 # tests/tools/
 tests/tools/test_config_validator.py  # logic covered by the validate-config pre-commit hook; no test_areas job
+tests/config/test_skip_draft_when_k0.py # fork: validated via the production canary; this distribution has no Buildkite workspace
+tests/models/deepseek/test_v41_triton_attn_sm80.py # fork: SM80 sparse-MLA validation via the production canary; no Buildkite workspace

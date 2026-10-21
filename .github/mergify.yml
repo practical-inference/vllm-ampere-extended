@@ -777,7 +777,6 @@ pull_request_rules:
     - or:
       - files~=(?:^|/)AGENTS\.md$
       - files~=^\.agents/
-      - files~=^\.claude/
       # The [Agents] title tag only: a bare "agents" also matches CI, K8s and
       # NIXL agents.
       - title~=(?i)\[agents\]

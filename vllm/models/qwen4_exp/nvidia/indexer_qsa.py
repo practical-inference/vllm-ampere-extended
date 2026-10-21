@@ -117,6 +117,14 @@ class QSAIndexer(nn.Module):
         self.index_head_dim = int(config.indexer_head_dim)
         self.token_topk = int(config.indexer_budget)
         self.compress_ratio = int(config.indexer_compress_ratio)
+        block_topk = self.token_topk // self.compress_ratio
+        if block_topk not in (64, 128, 512, 2048):
+            # ponytail: dev-only topk-512 accuracy arm allows 128/64; drop
+            # unless the arm passes its accuracy gates.
+            raise ValueError(
+                f"QSA indexer_budget // indexer_compress_ratio must be "
+                f"one of 64, 128, 512, 2048, got {block_topk}"
+            )
         self.rotary_emb = rotary_emb
         self.use_fused_pre_indexer = _supports_fused_pre_indexer(
             rotary_emb,

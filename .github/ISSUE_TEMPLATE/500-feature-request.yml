@@ -1,5 +1,5 @@
 name: 🚀 Feature request
-description: Submit a proposal/request for a new vllm feature
+description: Propose an improvement to this distribution (builds, docs, tooling).
 title: "[Feature]: "
 labels: ["feature request"]
 
@@ -7,32 +7,24 @@ body:
 - type: markdown
   attributes:
     value: >
-      #### Before submitting an issue, please make sure the issue hasn't been already addressed by searching through [the existing and past issues](https://github.com/vllm-project/vllm/issues?q=is%3Aissue+sort%3Acreated-desc+).
+      #### This repo ships validated vLLM builds — it does not fork vLLM source.
+
+      Feature requests for **vLLM itself** (models, engine features, kernels,
+      API changes) belong upstream at
+      [vllm-project/vllm](https://github.com/vllm-project/vllm/issues) — they
+      will reach this distribution through the nightly merge once merged there.
 - type: textarea
   attributes:
-    label: 🚀 The feature, motivation and pitch
-    description: >
-      A clear and concise description of the feature proposal. Please outline the motivation for the proposal. Is your feature request related to a specific problem? e.g., *"I'm working on X and would like Y to be possible"*. If this is related to another GitHub issue, please link here too.
+    label: What would you like improved?
+    description: If this is a vLLM feature, file it upstream and link the issue here only if it also affects this distribution.
   validations:
     required: true
 - type: textarea
   attributes:
-    label: Alternatives
-    description: >
-      A description of any alternative solutions or features you've considered, if any.
+    label: Why is this specific to this distribution?
+    description: Build tooling, release process, documentation, validation — rather than vLLM source.
+  validations:
+    required: true
 - type: textarea
   attributes:
-    label: Additional context
-    description: >
-      Add any other context or screenshots about the feature request.
-- type: markdown
-  attributes:
-    value: >
-      Thanks for contributing 🎉!
-- type: checkboxes
-  id: askllm
-  attributes:
-    label: Before submitting a new issue...
-    options:
-      - label: Make sure you already searched for relevant issues, and asked the chatbot living at the bottom right corner of the [documentation page](https://docs.vllm.ai/en/latest/), which can answer lots of frequently asked questions.
-        required: true
+    label: Proposed solution
