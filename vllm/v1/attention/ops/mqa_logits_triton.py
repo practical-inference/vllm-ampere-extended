@@ -2,6 +2,8 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """Triton fallback for DeepGEMM's fp8_mqa_logits / fp8_paged_mqa_logits."""
 
+import os
+
 import torch
 
 from vllm.triton_utils import tl, triton
@@ -22,6 +24,18 @@ _PREFILL_AUTOTUNE_CONFIGS = [
     for nw in (2, 4)
     for ns in (2, 4)
 ]
+
+# Row-blocked prefill schedule: BLOCK_M query rows flattened head-wise into
+# one [BLOCK_M*H, D] dot, K tiles streamed TILES-at-a-time per program.
+# BLOCK_M=8 keeps the bf16 Q block (8*32*128*2B = 64 KiB) plus a double-
+# buffered K tile (2*128*128*2B = 64 KiB) inside A100's 164 KiB smem.
+_PREFILL_BM_AUTOTUNE_CONFIGS = [
+    triton.Config({"BLOCK_N": bn, "TILES": t}, num_warps=nw, num_stages=2)
+    for bn in (64, 128)
+    for t in (4, 8)
+    for nw in (4, 8)
+]
+_PREFILL_BM_BLOCK_M = 8
 
 # Warmup shape mirrors the chunked-prefill regime (small M, long N) so
 # autotune picks a tile sized for real serving rather than a launch-overhead-
@@ -382,6 +396,115 @@ def _fp8_mqa_logits_kernel(
     )
 
 
+@triton.autotune(
+    configs=_PREFILL_BM_AUTOTUNE_CONFIGS,
+    key=["num_heads", "head_dim"],
+)
+@triton.jit
+def _fp8_mqa_logits_bm_kernel(
+    q_ptr,
+    k_ptr,
+    k_scale_ptr,
+    weights_ptr,
+    ks_ptr,
+    ke_ptr,
+    logits_ptr,
+    stride_q_m,
+    stride_q_h,
+    stride_q_d,
+    stride_k_n,
+    stride_k_d,
+    stride_w_m,
+    stride_w_h,
+    stride_l_m,
+    stride_l_n,
+    M,
+    num_heads: tl.constexpr,
+    head_dim: tl.constexpr,
+    N,
+    BLOCK_H: tl.constexpr,
+    BLOCK_D: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+    BLOCK_M: tl.constexpr,
+    TILES: tl.constexpr,
+):
+    """Row-blocked prefill logits: same math as `_fp8_mqa_logits_kernel`,
+    GEMM-style schedule.
+
+    The legacy kernel launches one CTA per (query row, K tile) — at prod
+    prefill shapes (M=8192, ~111K pool rows) that is ~7M CTAs per call with
+    the K tile re-read for every row: ~2.4% of A100 bf16 peak, 27% of
+    cold-prefill GPU time. Here a CTA owns BLOCK_M rows (heads flattened
+    into the dot's M dimension) and streams TILES consecutive K tiles, so
+    the Q block is loaded once per CTA, each K tile is read once per
+    row-block, and CTA count drops by BLOCK_M*TILES. Per-row math is
+    unchanged (same bf16 tl.dot over D, same ReLU → weight → head-sum
+    order), so outputs are bit-identical to the legacy kernel.
+    """
+    pid_m = tl.program_id(0)
+    pid_t = tl.program_id(1)
+
+    offs_r = pid_m * BLOCK_M + tl.arange(0, BLOCK_M)
+    mask_r = offs_r < M
+    ks = tl.load(ks_ptr + offs_r, mask=mask_r, other=0)
+    ke = tl.load(ke_ptr + offs_r, mask=mask_r, other=0)
+    n_base = pid_t * BLOCK_N * TILES
+    # Whole program is dead when no row's window overlaps this tile group.
+    if (n_base >= tl.max(ke)) | (n_base + BLOCK_N * TILES <= tl.min(ks)):
+        return
+
+    offs_h = tl.arange(0, BLOCK_H)
+    offs_d = tl.arange(0, BLOCK_D)
+    mask_h = offs_h < num_heads
+    mask_d = offs_d < head_dim
+
+    # Q block [BLOCK_M, H, D] bf16, loaded once and reused across every K
+    # tile this program covers; flattened to [BLOCK_M*H, D] for one dot.
+    q3 = tl.load(
+        q_ptr
+        + offs_r[:, None, None] * stride_q_m
+        + offs_h[None, :, None] * stride_q_h
+        + offs_d[None, None, :] * stride_q_d,
+        mask=mask_r[:, None, None] & mask_h[None, :, None] & mask_d[None, None, :],
+        other=0.0,
+    )
+    qf = tl.reshape(q3, (BLOCK_M * BLOCK_H, BLOCK_D))
+    w = tl.load(
+        weights_ptr + offs_r[:, None] * stride_w_m + offs_h[None, :] * stride_w_h,
+        mask=mask_r[:, None] & mask_h[None, :],
+        other=0.0,
+    )
+
+    for t in tl.static_range(TILES):
+        n_start = n_base + t * BLOCK_N
+        offs_n = n_start + tl.arange(0, BLOCK_N)
+        mask_n = offs_n < N
+        k = tl.load(
+            k_ptr + offs_n[:, None] * stride_k_n + offs_d[None, :] * stride_k_d,
+            mask=mask_n[:, None] & mask_d[None, :],
+            other=0.0,
+        )
+        k_scale = tl.load(k_scale_ptr + offs_n, mask=mask_n, other=0.0)
+        s = tl.dot(qf, tl.trans(k)) * k_scale[None, :]
+        s3 = tl.reshape(s, (BLOCK_M, BLOCK_H, BLOCK_N))
+        s3 = tl.where(s3 > 0, s3, 0.0) * w[:, :, None]
+        out = tl.sum(s3, axis=1)
+        valid = (
+            mask_r[:, None]
+            & mask_n[None, :]
+            & (offs_n[None, :] >= ks[:, None])
+            & (offs_n[None, :] < ke[:, None])
+        )
+        # Left-justified compressed layout, per row: column = n - ks[row].
+        tl.store(
+            logits_ptr
+            + offs_r.to(tl.int64)[:, None] * stride_l_m
+            + (offs_n[None, :] - ks[:, None]) * stride_l_n,
+            out,
+            mask=valid,
+        )
+
+
 def fp8_mqa_logits_triton(
     q: torch.Tensor,
     kv: tuple[torch.Tensor, torch.Tensor],
@@ -424,9 +547,41 @@ def fp8_mqa_logits_triton(
     q_bf16 = q.to(torch.bfloat16)
     k_bf16 = k_fp8.to(torch.bfloat16)
 
-    # Grid depends on the autotuned BLOCK_N.
-    grid = lambda meta: (M, triton.cdiv(N, meta["BLOCK_N"]))  # noqa: E731
-    _fp8_mqa_logits_kernel[grid](
+    legacy = os.environ.get("VLLM_MQA_LOGITS_LEGACY", "0") == "1"
+    if legacy:
+        # Grid depends on the autotuned BLOCK_N.
+        grid = lambda meta: (M, triton.cdiv(N, meta["BLOCK_N"]))  # noqa: E731
+        _fp8_mqa_logits_kernel[grid](
+            q_bf16,
+            k_bf16,
+            k_scales,
+            weights,
+            cu_seqlen_ks,
+            cu_seqlen_ke,
+            logits,
+            q_bf16.stride(0),
+            q_bf16.stride(1),
+            q_bf16.stride(2),
+            k_bf16.stride(0),
+            k_bf16.stride(1),
+            weights.stride(0),
+            weights.stride(1),
+            logits.stride(0),
+            logits.stride(1),
+            num_heads=num_heads,
+            head_dim=head_dim,
+            N=N,
+            BLOCK_H=BLOCK_H,
+            BLOCK_D=BLOCK_D,
+        )
+        return logits
+
+    # Row-blocked schedule: one CTA per (BLOCK_M rows, TILES K tiles).
+    grid = lambda meta: (  # noqa: E731
+        triton.cdiv(M, _PREFILL_BM_BLOCK_M),
+        triton.cdiv(N, meta["BLOCK_N"] * meta["TILES"]),
+    )
+    _fp8_mqa_logits_bm_kernel[grid](
         q_bf16,
         k_bf16,
         k_scales,
@@ -443,11 +598,13 @@ def fp8_mqa_logits_triton(
         weights.stride(1),
         logits.stride(0),
         logits.stride(1),
+        M,
         num_heads=num_heads,
         head_dim=head_dim,
         N=N,
         BLOCK_H=BLOCK_H,
         BLOCK_D=BLOCK_D,
+        BLOCK_M=_PREFILL_BM_BLOCK_M,
     )
     return logits
 
