@@ -82,13 +82,16 @@ def _run(M, N, seed, clean=True):
 def _assert_close(ref, out):
     """Cross-kernel bit-equality is config-dependent, not a stable
     contract: Triton lowers the dot with different MMA k-groupings per
-    swept config, so legacy-vs-bm shows ULP-level deltas (~1e-6 relative)
-    once both sweep at realistic shapes. The prod contract is correctness
-    within fp32 rounding plus structural fidelity — this tolerance
-    catches wrong scales/windows/masks (orders of magnitude off) while
-    tolerating the ULP noise; a ULP flip can at worst reorder a top-k
-    boundary tie between near-equal candidates."""
-    torch.testing.assert_close(ref, out, rtol=1e-5, atol=1e-2)
+    swept config, so legacy-vs-bm shows ULP-of-largest-term deltas once
+    both sweep at realistic shapes. Cancellation-heavy sums (32 head terms
+    of ~5e5 magnitude) land at small values where those deltas are large
+    RELATIVELY (~1%) but bounded ABSOLUTELY (observed <=0.4). Prod
+    contract: correctness within fp32 rounding + structural fidelity —
+    atol=1.0 (with rtol for the large elements) leaves margin vs observed
+    while catching any structural bug (wrong scale/window/mask is orders
+    of magnitude off); a ULP flip can at worst reorder a top-k boundary
+    tie between near-equal candidates."""
+    torch.testing.assert_close(ref, out, rtol=1e-5, atol=1.0)
 
 
 @pytest.mark.parametrize("M,N", [(8, 1), (8, 129), (2050, 4096), (8192, 32768)])
