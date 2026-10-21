@@ -133,7 +133,7 @@ def _dedup_dequant_gather(
     isf = (sorted_idx != prev).to(torch.int32)
     # Inclusive-cumsum rank: duplicates inherit their run's first-occurrence
     # rank ([5,5,7] -> isf [1,0,1] -> cumsum [1,1,2] -> ranks [0,0,1]).
-    ranks = torch.cumsum(isf, 0) - 1
+    ranks = (torch.cumsum(isf, 0) - 1).to(torch.int32)
     # Host upper bound on unique slots. Airtight: every valid global slot id
     # (block-table context positions and kpool tail slots alike) addresses the
     # same cache, so unique <= min(index count, pool rows). The dequant runs
