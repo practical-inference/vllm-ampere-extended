@@ -37,12 +37,6 @@ _PREFILL_BM_AUTOTUNE_CONFIGS = [
 ]
 _PREFILL_BM_BLOCK_M = 8
 
-# Warmup shape mirrors the chunked-prefill regime (small M, long N) so
-# autotune picks a tile sized for real serving rather than a launch-overhead-
-# dominated dummy grid.
-_PREFILL_WARMUP_M = 8
-_PREFILL_WARMUP_N = 8192
-
 
 _E4M3FN_BF16_LUT_CACHE: dict[torch.device, torch.Tensor] = {}
 
@@ -398,14 +392,16 @@ def _fp8_mqa_logits_kernel(
 
 @triton.autotune(
     configs=_PREFILL_BM_AUTOTUNE_CONFIGS,
-    # M-bucket key: per-CTA work scales with BLOCK_M rows per CTA, so the
-    # best (BLOCK_N, TILES, warps) differs between the tiny-M warmup shape
-    # and prod chunk shapes. The legacy per-row kernel was shape-blind;
-    # this one is not: at a shared (num_heads, head_dim) key the prod
-    # bucket inherited the M=8 warmup's config (an 8-CTA sweep where every
-    # config times as launch noise) and ran ~30 TFLOPS at prod shapes vs
-    # the 77 TFLOPS it reaches with a prod-shape sweep (2026-10-21).
-    key=["num_heads", "head_dim", "M_KEY"],
+    # Shape-blind key, exactly one sweep, at init only — the same invariant
+    # the legacy kernel has. M only scales the grid (every CTA processes
+    # BLOCK_M rows x TILES tiles regardless), so per-config efficiency is
+    # M-independent; the one sweep just has to be timed at a realistic
+    # grid, which warmup_fp8_mqa_logits_triton guarantees. NEVER key on
+    # runtime shape buckets: an unwarmed bucket sweeps inline in live
+    # traffic, and triton's do_bench allocates a 256 MiB L2-flush buffer —
+    # on a ~97%-full engine that OOMs all workers (EngineDead,
+    # 2026-10-21 11:57, M_KEY experiment).
+    key=["num_heads", "head_dim"],
 )
 @triton.jit
 def _fp8_mqa_logits_bm_kernel(
@@ -426,7 +422,6 @@ def _fp8_mqa_logits_bm_kernel(
     stride_l_m,
     stride_l_n,
     M,
-    M_KEY,
     num_heads: tl.constexpr,
     head_dim: tl.constexpr,
     N,
@@ -585,9 +580,6 @@ def fp8_mqa_logits_triton(
         return logits
 
     # Row-blocked schedule: one CTA per (BLOCK_M rows, TILES K tiles).
-    # M_KEY buckets M at powers of two so the autotune keys per row-count
-    # class instead of sharing one config across warmup and prod shapes.
-    m_key = 1 << max(0, M.bit_length() - 1)
     grid = lambda meta: (  # noqa: E731
         triton.cdiv(M, _PREFILL_BM_BLOCK_M),
         triton.cdiv(N, meta["BLOCK_N"] * meta["TILES"]),
@@ -610,7 +602,6 @@ def fp8_mqa_logits_triton(
         logits.stride(0),
         logits.stride(1),
         M,
-        M_KEY=m_key,
         num_heads=num_heads,
         head_dim=head_dim,
         N=N,
@@ -627,29 +618,18 @@ def warmup_fp8_mqa_logits_triton(
     device: torch.device,
 ) -> None:
     """Prime the prefill `@triton.autotune` cache so first-call doesn't pay
-    the inline sweep (~5–8 s on A100 SM80). N is a runtime scalar, so one
-    small-M / long-N shape covers all chunk lengths.
+    the inline sweep (~5–8 s on A100 SM80).
 
-    The bm schedule additionally sweeps a prod-chunk shape: M = one full
-    scheduler chunk (mbt=8192 on the GLM fleet) scoring a ~2.5K live
-    pool-row window (top-k candidate pools + the chunk's new pools;
-    2026-10-21 trace fit: legacy 26.4 TFLOPS x ~6.7 ms/call ->
-    M=8192 x N_eff ~=2.6K). The autotune key is M-bucketed, so this sweep
-    primes the bucket every real prefill chunk lands in; sweeping only the
-    tiny-M shape degenerates to an 8-CTA launch-overhead benchmark and
-    hands prod a noise-picked config.
+    The one sweep must run at a realistic grid, not a tiny dummy: with the
+    shape-blind (num_heads, head_dim) key the first sweep's pick is the
+    config ALL prod shapes run. A degenerate M=8 / N=8192 sweep times 8
+    CTAs of launch overhead and hands prod a noise-picked config — bm ran
+    ~30 TFLOPS at prod shapes vs the 63 TFLOPS it reaches with a prod-shape
+    sweep (2026-10-21). Prod-chunk shape: M = one full scheduler chunk
+    (mbt=8192 on the GLM fleet) scoring a ~2.5K live pool-row window
+    (top-k candidate pools + the chunk's new pools; trace fit: legacy
+    26.4 TFLOPS x ~6.7 ms/call -> M=8192 x N_eff~=2.6K).
     """
-    max_block_n = max(c.kwargs["BLOCK_N"] for c in _PREFILL_AUTOTUNE_CONFIGS)
-    m = _PREFILL_WARMUP_M
-    n = max(_PREFILL_WARMUP_N, max_block_n)
-    q = torch.empty(m, num_heads, head_dim, dtype=torch.float8_e4m3fn, device=device)
-    k = torch.empty(n, head_dim, dtype=torch.float8_e4m3fn, device=device)
-    scales = torch.zeros(n, dtype=torch.float32, device=device)
-    weights = torch.zeros(m, num_heads, dtype=torch.float32, device=device)
-    ks = torch.zeros(m, dtype=torch.int32, device=device)
-    ke = torch.full((m,), n, dtype=torch.int32, device=device)
-    fp8_mqa_logits_triton(q, (k, scales), weights, ks, ke)
-
     m = 8192
     n = 2560
     q = torch.empty(m, num_heads, head_dim, dtype=torch.float8_e4m3fn, device=device)
