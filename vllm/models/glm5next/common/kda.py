@@ -739,6 +739,7 @@ class Glm5NextLinearAttention(GatedDeltaNetAttention):
                     output_final_state=True,
                     use_qk_l2norm_in_kernel=True,
                     cu_seqlens=non_spec_query_start_loc,
+                    chunk_indices=attn_metadata_narrowed.non_spec_chunk_indices,
                     safe_gate=safe_gate,
                     lower_bound=lower_bound,
                 )
