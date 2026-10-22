@@ -63,6 +63,13 @@ _DS_MLA_DEQUANT_DIM = 576
 # dequant-workspace path and the fix ships on the 2-pass kernels instead.
 _PREFILL_FUSED_MIN_TOKENS = 1 << 30
 
+# Dedup dequant-gather dispatch: below this token count the gather is small
+# enough that the sort+remap overhead outweighs the duplication it removes
+# (decode batches: 133-2048 queries x topk 2048 over a long context dedup
+# ~2-5x at ~0.3ms gather cost — not worth it). Prefill chunks (4096-8192
+# tokens) dedup ~40x at long context.
+_DEDUP_MIN_TOKENS = 4096
+
 logger = init_logger(__name__)
 
 # Persistent dequant-gather workspace, keyed by device, grow-only in slots.
@@ -88,6 +95,70 @@ def _get_ds_mla_dequant_workspace(
         _DS_MLA_DEQUANT_WS_LIVE.append(ws)
         _DS_MLA_DEQUANT_WS[(device, dequant_dim)] = ws
     return ws[:total_slots]
+
+
+def _dedup_dequant_gather(
+    device: torch.device,
+    u8_cache: torch.Tensor,  # [num_blocks, block_size, cache_bytes] uint8
+    topk_indices: torch.Tensor,  # [num_tokens, topk_w] int32 global slot ids, -1 pad
+    dequant_dim: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Deduplicating dequant-gather for large sparse-MLA batches.
+
+    The 2-pass path gathers ``num_tokens x topk`` rows per call (16.8M at an
+    8192-token chunk, topk 2048) while those queries select from at most
+    ``max_seq_len + tail`` distinct slots — at long context the gather is
+    ~40x duplicated work (prod trace 2026-10-21: ``_dequant_ds_mla_slots_kernel``
+    = 26% of prefill CUDA time, 2x the attention kernel itself).
+
+    Sort + inclusive-cumsum ranks + idempotent scatter: every unique slot is
+    dequantized once into the front of the persistent workspace and per-query
+    indices are remapped to workspace ranks. All shapes are host-known — zero
+    device syncs. Bit-exact vs the 2-pass path: each query reads the same
+    dequantized row values in the same topk order.
+
+    Returns (workspace_view, ws_indices) for ``_forward_bf16_kv``.
+    """
+    num_tokens, topk_w = topk_indices.shape
+    flat = topk_indices.reshape(-1)
+    valid = flat >= 0
+    # Clamp pads to 0 so they dedup with any real slot-0 picks; -1 is
+    # restored per position at the end.
+    flat_c = torch.where(valid, flat, torch.zeros_like(flat)).to(torch.int32)
+    sorted_idx, perm = torch.sort(flat_c)
+    # First-occurrence flag: position 0 compares against a -2 sentinel.
+    prev = torch.empty_like(sorted_idx)
+    prev[0] = -2
+    prev[1:] = sorted_idx[:-1]
+    isf = (sorted_idx != prev).to(torch.int32)
+    # Inclusive-cumsum rank: duplicates inherit their run's first-occurrence
+    # rank ([5,5,7] -> isf [1,0,1] -> cumsum [1,1,2] -> ranks [0,0,1]).
+    ranks = torch.cumsum(isf, 0) - 1
+    # Host upper bound on unique slots. Airtight: every valid global slot id
+    # (block-table context positions and kpool tail slots alike) addresses the
+    # same cache, so unique <= min(index count, pool rows). The dequant runs
+    # over this bound; rows past the true unique count re-dequant slot 0
+    # harmlessly (attention never reads them — ranks < unique count).
+    pool_rows = u8_cache.shape[0] * u8_cache.shape[1]
+    u_upper = max(min(flat.numel(), pool_rows), 1)
+    # Zero-init: rows >= unique-count dequant slot 0 harmlessly (attention
+    # never reads them — ranks < unique count by construction).
+    uniq = torch.zeros(u_upper, dtype=torch.int32, device=flat.device)
+    uniq.scatter_(0, ranks.to(torch.int64), sorted_idx)
+    workspace = _get_ds_mla_dequant_workspace(device, u_upper, dequant_dim)
+    dequant_ds_mla_slots(
+        workspace.reshape(-1, dequant_dim),
+        u8_cache,
+        uniq,
+        cache_block_size=u8_cache.shape[1],
+        rope_dim=dequant_dim - _DS_MLA_NOPE_DIM,
+    )
+    inverse = torch.empty_like(ranks)
+    inverse.scatter_(0, perm, ranks)
+    ws_indices = torch.where(valid, inverse, torch.full_like(inverse, -1)).view(
+        num_tokens, 1, topk_w
+    )
+    return workspace, ws_indices
 
 
 class TritonMLASparseMetadataBuilder(XPUMLASparseMetadataBuilder):
@@ -288,6 +359,14 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
             )
             return fused_out[:, : self.num_heads, :]
 
+        u8_cache = kv_c_and_k_pe_cache.view(torch.uint8)
+
+        if num_tokens >= _DEDUP_MIN_TOKENS:
+            workspace, ws_indices = _dedup_dequant_gather(
+                q.device, u8_cache, topk_indices, self.head_size
+            )
+            return self._forward_bf16_kv(q, workspace, ws_indices, attn_metadata)
+
         total_slots = num_tokens * topk
 
         # Flatten topk indices to 1D for the gather kernel
@@ -301,7 +380,6 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
         workspace = _get_ds_mla_dequant_workspace(q.device, total_slots, dequant_dim)
 
         # Dequant-gather from fp8_ds_mla cache into bf16 workspace
-        u8_cache = kv_c_and_k_pe_cache.view(torch.uint8)
         ws_rows = workspace.reshape(total_slots, dequant_dim)
         dequant_ds_mla_slots(
             ws_rows,

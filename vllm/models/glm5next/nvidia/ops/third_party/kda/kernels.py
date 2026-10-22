@@ -930,7 +930,9 @@ def _chunk_kda_fwd_with_cumulative_g(
         chunk_size=chunk_size,
         output_dtype=torch.float32,
     )
-    A = solve_tril(A=A, cu_seqlens=cu_seqlens, output_dtype=k.dtype)
+    A = solve_tril(
+        A=A, cu_seqlens=cu_seqlens, chunk_indices=chunk_indices, output_dtype=k.dtype
+    )
     w, u, _, kg = recompute_w_u_fwd(
         k=k,
         v=v,
@@ -1022,15 +1024,13 @@ def chunk_kda_with_fused_gate_fwd(
     initial_state: torch.Tensor,
     output_final_state: bool,
     cu_seqlens: torch.Tensor | None = None,
+    chunk_indices: torch.Tensor | None = None,
     safe_gate: bool = False,
     lower_bound: float = -5.0,
 ):
     chunk_size = FLA_CHUNK_SIZE
-    chunk_indices = (
-        prepare_chunk_indices(cu_seqlens, chunk_size)
-        if cu_seqlens is not None
-        else None
-    )
+    if chunk_indices is None and cu_seqlens is not None:
+        chunk_indices = prepare_chunk_indices(cu_seqlens, chunk_size)
     g = fused_kda_gate_chunk_cumsum(
         raw_g,
         A_log=A_log,
@@ -1103,6 +1103,7 @@ def chunk_kda_with_fused_gate(
     output_final_state: bool = False,
     use_qk_l2norm_in_kernel: bool = False,
     cu_seqlens: torch.Tensor | None = None,
+    chunk_indices: torch.Tensor | None = None,
     safe_gate: bool = False,
     lower_bound: float = -5.0,
     **kwargs,
@@ -1127,6 +1128,7 @@ def chunk_kda_with_fused_gate(
         initial_state=initial_state.contiguous() if initial_state is not None else None,
         output_final_state=output_final_state,
         cu_seqlens=cu_seqlens,
+        chunk_indices=chunk_indices,
         safe_gate=safe_gate,
         lower_bound=lower_bound,
     )

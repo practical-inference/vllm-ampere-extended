@@ -119,6 +119,10 @@ class GDNAttentionMetadata:
     # Pre-computed FLA chunk metadata (avoids GPU->CPU sync in prepare_chunk_indices)
     chunk_indices: torch.Tensor | None = None
     chunk_offsets: torch.Tensor | None = None
+    # Pre-computed FLA chunk indices for the non-spec (prefill+decode) subset —
+    # consumed by the glm5next KDA chunk path to avoid a per-layer GPU->CPU
+    # sync (.tolist()) in prepare_chunk_indices.
+    non_spec_chunk_indices: torch.Tensor | None = None
     # Chunk-kernel inputs for prefill
     prefill_query_start_loc: torch.Tensor | None = None
     prefill_state_indices: torch.Tensor | None = None
@@ -670,6 +674,23 @@ class GDNAttentionMetadataBuilder(AttentionMetadataBuilder[GDNAttentionMetadata]
             non_spec_query_start_loc = self.non_spec_query_start_loc[: batch_size + 1]
             non_spec_query_start_loc[num_decodes + 1 :].fill_(non_spec_num_query_tokens)
 
+        # Pre-compute non-spec chunk indices on the CPU twin (no GPU sync);
+        # the glm5next KDA chunk path consumes these instead of recomputing
+        # prepare_chunk_indices per layer on the GPU tensor.
+        non_spec_chunk_indices = None
+        if num_prefills > 0 and non_spec_query_start_loc_cpu is not None:
+            from vllm.third_party.flash_linear_attention.ops.index import (
+                prepare_chunk_indices,
+            )
+            from vllm.third_party.flash_linear_attention.ops.utils import (
+                FLA_CHUNK_SIZE,
+            )
+
+            non_spec_chunk_indices = async_tensor_h2d(
+                prepare_chunk_indices(non_spec_query_start_loc_cpu, FLA_CHUNK_SIZE),
+                device=query_start_loc.device,
+            )
+
         attn_metadata = GDNAttentionMetadata(
             num_prefills=num_prefills,
             num_prefill_tokens=num_prefill_tokens,
@@ -689,6 +710,7 @@ class GDNAttentionMetadataBuilder(AttentionMetadataBuilder[GDNAttentionMetadata]
             aiter_prefill_metadata=aiter_prefill_metadata,
             spec_query_start_loc=spec_query_start_loc,
             non_spec_query_start_loc=non_spec_query_start_loc,
+            non_spec_chunk_indices=non_spec_chunk_indices,
             spec_state_indices_tensor=spec_state_indices_tensor,
             non_spec_state_indices_tensor=non_spec_state_indices_tensor,
             spec_sequence_masks=spec_sequence_masks,
