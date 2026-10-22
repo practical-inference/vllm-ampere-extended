@@ -33,7 +33,7 @@ jobs:
           exit 1
       - name: Verify wheel provenance
         run: |
-          WHEEL=$(ls wheelhouse/*.whl | head -1)
+          WHEEL=$(find wheelhouse -name "*.whl" | sort | head -1)
           python - "$WHEEL" "$GITHUB_REF_NAME" <<'EOF'
           import re
           import subprocess
