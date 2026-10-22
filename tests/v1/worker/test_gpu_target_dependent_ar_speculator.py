@@ -3,6 +3,7 @@
 
 from contextlib import nullcontext
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -512,7 +513,7 @@ def test_multi_step_decode_replays_captured_graph_as_expected(
 
 
 def test_propose_k0_runs_prefill_without_draft_decode(monkeypatch):
-    speculator = object.__new__(_TestSpeculator)
+    speculator: Any = object.__new__(_TestSpeculator)
     speculator.num_speculative_steps = 2
     speculator.max_model_len = 32
     speculator.max_num_reqs = 2
