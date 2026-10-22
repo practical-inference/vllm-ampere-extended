@@ -6,23 +6,39 @@
 
 ## Why this repo and not upstream?
 
-<!-- This distribution carries no vLLM source changes. Features, model support,
-     and kernel work belong in vllm-project/vllm. Explain why this change is
-     specific to the ampere-extended distribution (build tooling, validation,
-     docs, release process). If it touches vllm/ source, link the upstream PR
-     or issue that covers it. -->
+<!-- This distribution carries a documented source delta on upstream vLLM
+     (sparse-attention backends, hardware fallbacks — see DELTA.md). Features,
+     model support, and kernel work belong in vllm-project/vllm; they arrive
+     here through the nightly merge. Explain why this change is specific to
+     this distribution: build tooling, validation, docs, release process, or
+     Ampere/older-GPU support upstream doesn't ship. If it touches vllm/
+     source, link the upstream PR or issue that covers it. -->
 
 ## Claims
 
-<!-- State the accomplishments in a few concrete bullets. -->
+<!-- State the accomplishments in a few concrete bullets: speedups, feature support, bug fixes, etc. -->
 
-## Test evidence
+## Validation
 
-<!-- Commands run and results. Note any validation against a published build. -->
+<!-- Show evidence that the claims are met by this change, and steps to reproduce validations. Note any validation against a published build. -->
 
-## Checklist
+## Details
 
-- [ ] Every commit is signed off (`git commit -s`) with an email that GitHub
-      credits to your account — see [CONTRIBUTING](.github/CONTRIBUTING.md#sign-off-dco)
-- [ ] If AI assistance was used, this is disclosed and a human reviewed every
-      changed line
+<!-- Explain motivation, design decisions, root cause, tradeoffs, and limitations concisely. Link or collapse lengthy supporting material. -->
+
+---
+
+<details>
+<summary> Pull Request Checklist </summary>
+
+- [ ] I used vLLM's `/pr-checklist` skill. (Mandatory for agents, optional for humans).
+- [ ] AI assistance was used during the creation of this PR, and a human reviewed every changed line.
+- [ ] Every commit is signed off (`git commit -s`) with an email that GitHub credits to your account — see [CONTRIBUTING](.github/CONTRIBUTING.md#sign-off-dco).
+
+- [ ] **Design Fit:** Minimizes impact on core components, reuses existing functionality, and justifies added complexity.
+- [ ] **Testing and Validation:** Validates the change and ensures any added tests are meaningful and reliable, with CI coverage or documented CI resource constraints and validation performed outside CI.
+- [ ] **Code Quality and Style:** Keeps code and comments clear and concise, and updates relevant documentation and examples.
+- [ ] **Pull Request Contents:** Includes a brief summary and relevant links, supports claims with evidence, explains root causes and implementation trade-offs, and follows the contributing guide.
+</details>
+
+**BEFORE SUBMITTING, PLEASE READ <https://docs.vllm.ai/en/latest/contributing>** (anything written below this line will be removed by GitHub Actions)

@@ -38,7 +38,7 @@ Do not open one-off PRs for tiny edits (single typo, isolated style change, one 
 
 ### Local pre-submission gates (this machine)
 
-Drafts live in `.pr-drafts/<name>.md` with evidence in `.pr-drafts/evidence/<name>/`. Before any push to a public repo (drafts included) and before requesting re-review, run both:
+Drafts live in `.pr-drafts/<name>.md` with evidence in `.pr-drafts/evidence/<name>/`. Scaffold drafts with `new_draft.sh <name> "<title>"` (universal template — Overview/Claims/Validation/Details; `validate_pr.sh` gates the headings). Before any push to a public repo (drafts included) and before requesting re-review, run both:
 
 ```bash
 .pr-drafts/validate_pr.sh <draft> [--files <changed>]     # mechanical gates G1-G5c
