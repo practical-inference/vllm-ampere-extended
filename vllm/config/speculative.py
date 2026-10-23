@@ -35,6 +35,21 @@ else:
 
 logger = init_logger(__name__)
 
+
+def _propagate_rope_to_draft(target_hf_config: Any, draft_hf_config: Any) -> None:
+    """Copy resolved rope fields from the target to the draft text config.
+
+    The drafter's rotary cos/sin cache is position-indexed; a draft config
+    missing the target's yarn override builds a native-sized cache and OOBs
+    once the target runs past the native max position.
+    """
+    tgt_tc = target_hf_config.get_text_config()
+    drf_tc = draft_hf_config.get_text_config()
+    for attr in ("rope_parameters", "rope_scaling"):
+        if hasattr(tgt_tc, attr):
+            setattr(drf_tc, attr, getattr(tgt_tc, attr))
+
+
 MTPModelTypes = Literal[
     "deepseek_mtp",
     "dots3_note_mtp",
@@ -1390,6 +1405,26 @@ class SpeculativeConfig:
                     hf_overrides=draft_hf_overrides,
                     config_format=self.target_model_config.config_format,
                 )
+                # Rope overrides must reach the draft even as a dict (dicts are
+                # target-only): a native-sized draft rotary cache OOBs once a
+                # yarn-extended target passes the native max. Same-checkpoint
+                # drafts only — EAGLE-style drafts keep their own rope config.
+                # model_weights (runai streamer) may replace .model as the draft
+                # source, so compare against both target source paths.
+                tgt_sources = {
+                    self.target_model_config.model,
+                    self.target_model_config.model_weights,
+                } - {None}
+                if self.draft_model_config.model in tgt_sources:
+                    try:
+                        _propagate_rope_to_draft(
+                            self.target_model_config.hf_config,
+                            self.draft_model_config.hf_config,
+                        )
+                    except Exception as e:
+                        logger.warning_once(
+                            "Could not propagate rope overrides to draft config: %s", e
+                        )
 
                 # Automatically detect the method
                 if self.method in ("eagle", "eagle3", "dflash", "dspark"):
