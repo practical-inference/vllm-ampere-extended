@@ -98,7 +98,17 @@ def test_dedup_rows_bitexact(num_tokens: int, dequant_dim: int):
     assert bool((ranks[~valid] == -1).all())
     assert bool((ranks[valid] >= 0).all())
     assert bool((ranks[valid] < ws.shape[0]).all())
-    assert torch.equal(ws.reshape(-1, dequant_dim)[ranks[valid]], ref[valid])
+    # Chunked comparison: the materialized gather (num_valid x dequant_dim
+    # bf16, ~1 GB at the 8192-token shape) plus the equality mask transiently
+    # needs ~3.5 GB — at the edge of typical spare memory, where allocator
+    # OOM-retry made torch.equal return false on identical data. Sliced
+    # comparison reaches the same verdict with a ~134 MiB peak.
+    ws2 = ws.reshape(-1, dequant_dim)
+    vpos = valid.nonzero(as_tuple=True)[0]
+    CH = 65536
+    for i in range(0, vpos.numel(), CH):
+        vp = vpos[i : i + CH]
+        assert torch.equal(ws2[ranks[vp]], ref[vp])
 
 
 @pytest.mark.parametrize("num_tokens", [4096])
