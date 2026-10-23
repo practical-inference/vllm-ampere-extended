@@ -334,8 +334,9 @@ def _fp8_mqa_logits_kernel(
     n_start = n_block * BLOCK_N
     offs_n = n_start + tl.arange(0, BLOCK_N)
     mask_n = offs_n < N
-    # int64: at prod prefill M=2048 x ~1.05M gathered rows, the logits row
-    # offset m*stride_l_m exceeds 2**31 in int32 and wraps negative -> IMA.
+    # int64: at large-batch prefill (M=2048 x ~1.05M gathered rows), the
+    # logits row offset m*stride_l_m exceeds 2**31 in int32 and wraps
+    # negative -> IMA.
     # Row offsets only; q/k/weights offsets stay int32 (M*H*D and N*D << 2**31).
     logits_row = logits_ptr + m.to(tl.int64) * stride_l_m
     # Early-exit when this row's `[ks, ke)` range doesn't overlap the tile.
@@ -433,10 +434,11 @@ def _fp8_mqa_logits_bm_kernel(
     """Row-blocked prefill logits: same math as `_fp8_mqa_logits_kernel`,
     GEMM-style schedule.
 
-    The legacy kernel launches one CTA per (query row, K tile) — at prod
-    prefill shapes (M=8192, ~111K pool rows) that is ~7M CTAs per call with
-    the K tile re-read for every row: ~2.4% of A100 bf16 peak, 27% of
-    cold-prefill GPU time. Here a CTA owns BLOCK_M rows (heads flattened
+    The legacy kernel launches one CTA per (query row, K tile) — at
+    large-batch prefill shapes (M=8192, ~111K pool rows) that is ~7M CTAs
+    per call with the K tile re-read for every row: ~2.4% of A100 bf16
+    peak, 27% of cold-prefill GPU time. Here a CTA owns BLOCK_M rows
+    (heads flattened
     into the dot's M dimension) and streams TILES consecutive K tiles, so
     the Q block is loaded once per CTA, each K tile is read once per
     row-block, and CTA count drops by BLOCK_M*TILES. Per-row math is
@@ -615,6 +617,7 @@ def warmup_fp8_mqa_logits_triton(
     num_heads: int,
     head_dim: int,
     device: torch.device,
+    num_tokens: int = 8192,
 ) -> None:
     """Prime the prefill `@triton.autotune` cache so first-call doesn't pay
     the inline sweep (~5–8 s on A100 SM80).
@@ -625,10 +628,11 @@ def warmup_fp8_mqa_logits_triton(
     CTAs of launch overhead and hands every real shape a noise-picked
     config — measured ~30 TFLOPS at serving shapes vs the 63 TFLOPS
     reached with a realistic-grid sweep. Realistic shape: M = one full
-    scheduler chunk (max_num_batched_tokens) scoring a ~2.5K live
-    pool-row window (top-k candidate pools + the chunk's new pools).
+    scheduler chunk (pass ``num_tokens=max_num_batched_tokens``) scoring a
+    ~2.5K live pool-row window (top-k candidate pools + the chunk's new
+    pools).
     """
-    m = 8192
+    m = num_tokens
     n = 2560
     q = torch.empty(m, num_heads, head_dim, dtype=torch.float8_e4m3fn, device=device)
     k = torch.empty(n, head_dim, dtype=torch.float8_e4m3fn, device=device)

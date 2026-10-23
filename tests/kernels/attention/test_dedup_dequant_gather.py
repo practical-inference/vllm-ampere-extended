@@ -14,6 +14,7 @@ from vllm.platforms import current_platform
 from vllm.v1.attention.backends.mla.triton_mla_sparse import (
     _DS_MLA_DEQUANT_WS,
     _DS_MLA_NOPE_DIM,
+    _dedup_active,
     _dedup_dequant_gather,
 )
 from vllm.v1.attention.ops.triton_mla_sparse_kernel import (
@@ -21,7 +22,7 @@ from vllm.v1.attention.ops.triton_mla_sparse_kernel import (
     triton_mla_sparse_attention,
 )
 
-pytestmark = pytest.mark.skipif(
+requires_cuda = pytest.mark.skipif(
     not current_platform.is_cuda_alike(),
     reason="Triton dequant kernel requires CUDA/ROCm",
 )
@@ -74,6 +75,7 @@ def _reference_rows(cache: torch.Tensor, indices: torch.Tensor, dequant_dim: int
 
 @pytest.mark.parametrize("num_tokens", [4096, 8192])
 @pytest.mark.parametrize("dequant_dim", [512, 576])
+@requires_cuda
 def test_dedup_rows_bitexact(num_tokens: int, dequant_dim: int):
     topk_w = 128  # small width keeps the reference gather affordable
     num_slots = 4096
@@ -100,6 +102,7 @@ def test_dedup_rows_bitexact(num_tokens: int, dequant_dim: int):
 
 
 @pytest.mark.parametrize("num_tokens", [4096])
+@requires_cuda
 def test_dedup_attention_bitexact(num_tokens: int):
     """End-to-end: sparse attention over (dedup ws, ranks) == (2-pass ws, base)."""
     topk_w = 128
@@ -132,6 +135,7 @@ def test_dedup_attention_bitexact(num_tokens: int):
     assert torch.equal(out_ref[:, :heads, :], out_dedup[:, :heads, :])
 
 
+@requires_cuda
 def test_dedup_all_padded():
     """All -1 indices: ranks valid, rows masked, no crash."""
     num_tokens, topk_w = 4096, 64
@@ -145,6 +149,7 @@ def test_dedup_all_padded():
     assert ws.shape[0] >= 1
 
 
+@requires_cuda
 def test_dedup_workspace_reuse():
     """Grow-only workspace: a smaller u_upper views the front, same storage."""
     dequant_dim = 512
@@ -164,6 +169,7 @@ def test_dedup_workspace_reuse():
     assert (cache.device, dequant_dim) in _DS_MLA_DEQUANT_WS
 
 
+@requires_cuda
 def test_dedup_u_upper_pool_bound():
     """u_upper = min(index count, pool rows): pool binds when it is smaller."""
     dequant_dim = 512
@@ -178,8 +184,35 @@ def test_dedup_u_upper_pool_bound():
     assert bool((ranks[indices.reshape(-1) >= 0] < ws.shape[0]).all())
 
 
+@pytest.mark.parametrize(
+    "env_value,num_tokens,expected",
+    [
+        (None, 4095, False),  # default 4096, just below the threshold
+        (None, 4096, True),  # default, at the threshold
+        (None, 8192, True),  # default, well above
+        ("0", 8192, False),  # 0 disables dedup
+        ("-4", 8192, False),  # negative values also disable
+        ("1024", 1024, True),  # custom threshold, at the boundary
+        ("1024", 1023, False),  # custom threshold, just below
+    ],
+)
+def test_dedup_dispatch_predicate(
+    monkeypatch, env_value: str | None, num_tokens: int, expected: bool
+):
+    """CPU-runnable: the env-driven dispatch contract.
+
+    env_value None exercises the real envs machinery (unset -> default
+    4096); the other cases monkeypatch the resolved knob value.
+    """
+    if env_value is None:
+        monkeypatch.delenv("VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS", raising=False)
+    else:
+        monkeypatch.setenv("VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS", env_value)
+    assert _dedup_active(num_tokens) is expected
+
+
 def _smoke_bench(num_tokens: int = 8192, topk_w: int = 2112, num_slots: int = 450_000):
-    """Rough per-call cost, dedup vs 2-pass, at prod-ish prefill shapes."""
+    """Rough per-call cost, dedup vs 2-pass, at large-batch prefill shapes."""
     import time
 
     dequant_dim = 512

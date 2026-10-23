@@ -91,6 +91,20 @@ def _get_ds_mla_dequant_workspace(
     return ws[:total_slots]
 
 
+def _dedup_active(num_tokens: int) -> bool:
+    """Dispatch predicate for the dedup dequant-gather fast path.
+
+    Threshold semantics live on ``VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS``
+    (vllm/envs.py): batches at or above the threshold deduplicate the
+    gather — at long context the per-query gather is ~40x duplicated work
+    (measured on A100-class SM80 at 445K context) — while below it the
+    2-pass gather is cheaper (sort overhead dominates at decode batch
+    sizes, where duplication is only ~2-5x). Values <= 0 disable dedup.
+    """
+    threshold = envs.VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS
+    return threshold > 0 and num_tokens >= threshold
+
+
 def _dedup_dequant_gather(
     device: torch.device,
     u8_cache: torch.Tensor,  # [num_blocks, block_size, cache_bytes] uint8
@@ -235,7 +249,12 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
         # poisons the capture), and a post-init grow lands the workspace
         # outside the init memory budget (stages sat at ~97% of physical
         # memory once the 1024-token prefill workspace materialized). Dequant
-        # slots are driven by prefill: max_num_batched_tokens * topk.
+        # slots are driven by prefill: max_num_batched_tokens * topk. This is
+        # the 2-pass bound, kept deliberately: the dedup path only ever
+        # fronts min(tokens x topk, pool rows) — a tighter bound — but the
+        # dispatch threshold is env-tunable at runtime, and the cache pool
+        # shape is not known at impl init, so reserving the 2-pass worst
+        # case is what keeps every knob setting grow-free.
         cfg = get_current_vllm_config_or_none()
         if cfg is not None:
             max_seqs = cfg.scheduler_config.max_num_seqs
@@ -292,6 +311,9 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
             num_heads=indexer_num_heads or _INDEXER_NUM_HEADS,
             head_dim=indexer_head_dim or _INDEXER_HEAD_DIM,
             device=device,
+            num_tokens=cfg.scheduler_config.max_num_batched_tokens
+            if cfg is not None
+            else 8192,
         )
         cfg = get_current_vllm_config_or_none()
         if cfg is not None:
@@ -358,13 +380,7 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
 
         u8_cache = kv_c_and_k_pe_cache.view(torch.uint8)
 
-        # Dedup dequant-gather dispatch: below the threshold the gather is
-        # small enough that the sort+remap overhead outweighs the duplication
-        # it removes (decode batches: 133-2048 queries x topk 2048 over a long
-        # context dedup ~2-5x at ~0.3ms gather cost — not worth it). Prefill
-        # chunks dedup ~40x at long context. 0 disables dedup entirely.
-        dedup_min = envs.VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS
-        if dedup_min > 0 and num_tokens >= dedup_min:
+        if _dedup_active(num_tokens):
             workspace, ws_indices = _dedup_dequant_gather(
                 q.device, u8_cache, topk_indices, self.head_size
             )

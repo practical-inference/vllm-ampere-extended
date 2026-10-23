@@ -1088,9 +1088,9 @@ environment_variables: dict[str, Callable[[], Any]] = {
     # Dispatch threshold (query tokens) for the sparse-MLA fp8 dequant-gather
     # dedup fast path: batches at or above this size deduplicate the gather
     # (sort + rank remap) instead of gathering num_tokens x topk rows, which
-    # is ~40x duplicated work at long context. Below it the 2-pass gather is
-    # cheaper (sort overhead dominates at decode batch sizes). 0 disables
-    # dedup entirely.
+    # is ~40x duplicated work at long context (measured on A100-class SM80 at
+    # 445K context). Below it the 2-pass gather is cheaper (sort overhead
+    # dominates at decode batch sizes). Values <= 0 disable dedup entirely.
     # Default: 4096
     "VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS": lambda: int(
         os.getenv("VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS", "4096")
