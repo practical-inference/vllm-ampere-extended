@@ -185,11 +185,11 @@ def _smoke_bench(num_tokens: int = 8192, topk_w: int = 2112, num_slots: int = 45
     indices = _make_indices(num_tokens, topk_w, num_slots, seed=43)
 
     def timeit(fn, reps=10):
-        torch.cuda.synchronize()
+        torch.accelerator.synchronize()
         t0 = time.perf_counter()
         for _ in range(reps):
             fn()
-        torch.cuda.synchronize()
+        torch.accelerator.synchronize()
         return (time.perf_counter() - t0) / reps * 1000
 
     t_dedup = timeit(
