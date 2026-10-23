@@ -120,8 +120,11 @@ class GDNAttentionMetadata:
     chunk_indices: torch.Tensor | None = None
     chunk_offsets: torch.Tensor | None = None
     # Pre-computed FLA chunk indices for the non-spec (prefill+decode) subset —
-    # consumed by the glm5next KDA chunk path to avoid a per-layer GPU->CPU
-    # sync (.tolist()) in prepare_chunk_indices.
+    # consumed by the glm5next KDA chunk path. prepare_chunk_indices is
+    # tensor_cache'd, so its .tolist() sync fires once per step, not per layer;
+    # pre-computing here moves that sync out of the forward path onto the CPU
+    # twin. (Step-time impact: unverified — the Oct-20 profile traces do not
+    # capture the sync; magnitudes claimed in b7d7a9986e are unadjudicated.)
     non_spec_chunk_indices: torch.Tensor | None = None
     # Chunk-kernel inputs for prefill
     prefill_query_start_loc: torch.Tensor | None = None
