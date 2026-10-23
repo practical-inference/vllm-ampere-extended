@@ -399,8 +399,7 @@ def _fp8_mqa_logits_kernel(
     # grid, which warmup_fp8_mqa_logits_triton guarantees. NEVER key on
     # runtime shape buckets: an unwarmed bucket sweeps inline in live
     # traffic, and triton's do_bench allocates a 256 MiB L2-flush buffer —
-    # on a ~97%-full engine that OOMs all workers (EngineDead,
-    # 2026-10-21 11:57, M_KEY experiment).
+    # on a ~97%-full engine that OOMs all workers (EngineDead).
     key=["num_heads", "head_dim"],
 )
 @triton.jit
@@ -622,13 +621,12 @@ def warmup_fp8_mqa_logits_triton(
 
     The one sweep must run at a realistic grid, not a tiny dummy: with the
     shape-blind (num_heads, head_dim) key the first sweep's pick is the
-    config ALL prod shapes run. A degenerate M=8 / N=8192 sweep times 8
-    CTAs of launch overhead and hands prod a noise-picked config — bm ran
-    ~30 TFLOPS at prod shapes vs the 63 TFLOPS it reaches with a prod-shape
-    sweep (2026-10-21). Prod-chunk shape: M = one full scheduler chunk
-    (mbt=8192 on the GLM fleet) scoring a ~2.5K live pool-row window
-    (top-k candidate pools + the chunk's new pools; trace fit: legacy
-    26.4 TFLOPS x ~6.7 ms/call -> M=8192 x N_eff~=2.6K).
+    config ALL serving shapes run. A degenerate M=8 / N=8192 sweep times 8
+    CTAs of launch overhead and hands every real shape a noise-picked
+    config — measured ~30 TFLOPS at serving shapes vs the 63 TFLOPS
+    reached with a realistic-grid sweep. Realistic shape: M = one full
+    scheduler chunk (max_num_batched_tokens) scoring a ~2.5K live
+    pool-row window (top-k candidate pools + the chunk's new pools).
     """
     m = 8192
     n = 2560

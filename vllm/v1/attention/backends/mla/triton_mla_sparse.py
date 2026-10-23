@@ -6,6 +6,7 @@ from typing import ClassVar
 
 import torch
 
+import vllm.envs as envs
 from vllm.config import get_current_vllm_config_or_none
 from vllm.config.cache import CacheDType
 from vllm.logger import init_logger
@@ -63,22 +64,15 @@ _DS_MLA_DEQUANT_DIM = 576
 # dequant-workspace path and the fix ships on the 2-pass kernels instead.
 _PREFILL_FUSED_MIN_TOKENS = 1 << 30
 
-# Dedup dequant-gather dispatch: below this token count the gather is small
-# enough that the sort+remap overhead outweighs the duplication it removes
-# (decode batches: 133-2048 queries x topk 2048 over a long context dedup
-# ~2-5x at ~0.3ms gather cost — not worth it). Prefill chunks (4096-8192
-# tokens) dedup ~40x at long context.
-_DEDUP_MIN_TOKENS = 4096
-
 logger = init_logger(__name__)
 
 # Persistent dequant-gather workspace, keyed by device, grow-only in slots.
 _DS_MLA_DEQUANT_WS: dict[tuple[torch.device, int], torch.Tensor] = {}
-# ponytail: every superseded workspace stays alive for the process lifetime.
-# Captured cudagraphs bake raw addresses of the workspace they were captured
-# with; dropping the old tensor lets the caching allocator reuse that memory
-# (eager grow path) and corrupts later replays (device-side index asserts,
-# garbage attention). Bounded: one tensor per grow event.
+# Every superseded workspace stays alive for the process lifetime. Captured
+# cudagraphs bake raw addresses of the workspace they were captured with;
+# dropping the old tensor lets the caching allocator reuse that memory (eager
+# grow path) and corrupts later replays (device-side index asserts, garbage
+# attention). Bounded: one tensor per grow event.
 _DS_MLA_DEQUANT_WS_LIVE: list[torch.Tensor] = []
 
 
@@ -106,10 +100,10 @@ def _dedup_dequant_gather(
     """Deduplicating dequant-gather for large sparse-MLA batches.
 
     The 2-pass path gathers ``num_tokens x topk`` rows per call (16.8M at an
-    8192-token chunk, topk 2048) while those queries select from at most
+    8192-token chunk with topk 2048) while those queries select from at most
     ``max_seq_len + tail`` distinct slots — at long context the gather is
-    ~40x duplicated work (prod trace 2026-10-21: ``_dequant_ds_mla_slots_kernel``
-    = 26% of prefill CUDA time, 2x the attention kernel itself).
+    ~40x duplicated work (measured at 445K context: the gather kernel alone
+    was 26% of prefill CUDA time, twice the attention kernel itself).
 
     Sort + inclusive-cumsum ranks + idempotent scatter: every unique slot is
     dequantized once into the front of the persistent workspace and per-query
@@ -133,6 +127,9 @@ def _dedup_dequant_gather(
     isf = (sorted_idx != prev).to(torch.int32)
     # Inclusive-cumsum rank: duplicates inherit their run's first-occurrence
     # rank ([5,5,7] -> isf [1,0,1] -> cumsum [1,1,2] -> ranks [0,0,1]).
+    # int32 contract: ws_indices feeds the attention kernel's index math and
+    # the remap runs over num_tokens x topk elements (16.8M at an 8192-token
+    # chunk) — int64 would double the remap traffic.
     ranks = (torch.cumsum(isf, 0) - 1).to(torch.int32)
     # Host upper bound on unique slots. Airtight: every valid global slot id
     # (block-table context positions and kpool tail slots alike) addresses the
@@ -361,7 +358,13 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
 
         u8_cache = kv_c_and_k_pe_cache.view(torch.uint8)
 
-        if num_tokens >= _DEDUP_MIN_TOKENS:
+        # Dedup dequant-gather dispatch: below the threshold the gather is
+        # small enough that the sort+remap overhead outweighs the duplication
+        # it removes (decode batches: 133-2048 queries x topk 2048 over a long
+        # context dedup ~2-5x at ~0.3ms gather cost — not worth it). Prefill
+        # chunks dedup ~40x at long context. 0 disables dedup entirely.
+        dedup_min = envs.VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS
+        if dedup_min > 0 and num_tokens >= dedup_min:
             workspace, ws_indices = _dedup_dequant_gather(
                 q.device, u8_cache, topk_indices, self.head_size
             )

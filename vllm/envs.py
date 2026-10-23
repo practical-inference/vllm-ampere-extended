@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     VLLM_XLA_CACHE_PATH: str = os.path.join(VLLM_CACHE_ROOT, "xla_cache")
     VLLM_XLA_CHECK_RECOMPILATION: bool = False
     VLLM_SPARSE_INDEXER_MAX_LOGITS_MB: int = 512
+    VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS: int = 4096
     VLLM_ADAPTIVE_VERIFICATION_PROFILE_CONTEXT_LEN: int = 8192
     VLLM_XPU_PP_MICROBATCH: bool = True
     VLLM_DISTRIBUTED_USE_SPLIT_GROUP: bool = False
@@ -1083,6 +1084,16 @@ environment_variables: dict[str, Callable[[], Any]] = {
     # Default: 512 MB
     "VLLM_SPARSE_INDEXER_MAX_LOGITS_MB": lambda: int(
         os.getenv("VLLM_SPARSE_INDEXER_MAX_LOGITS_MB", "512")
+    ),
+    # Dispatch threshold (query tokens) for the sparse-MLA fp8 dequant-gather
+    # dedup fast path: batches at or above this size deduplicate the gather
+    # (sort + rank remap) instead of gathering num_tokens x topk rows, which
+    # is ~40x duplicated work at long context. Below it the 2-pass gather is
+    # cheaper (sort overhead dominates at decode batch sizes). 0 disables
+    # dedup entirely.
+    # Default: 4096
+    "VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS": lambda: int(
+        os.getenv("VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS", "4096")
     ),
     # KV context length each adaptive-verification profiling request pretends to
     # carry, so the profiled step reads a realistic amount of cache.
