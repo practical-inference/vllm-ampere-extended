@@ -45,13 +45,16 @@ Cold 128k run raw: `glm-5.3-flash-ctx128000-cold.log` (full
 `vllm bench serve` output; warm runs demonstrate prefix caching paying off
 at agent-workload scale — 47 s → 1 s on a repeated 128k context).
 
-## Accuracy canary (same window, same build)
+## Accuracy
 
-| Gate | Result |
-|---|---|
-| GSM8K, 1319 samples @1024 tok | **96.1%** (invalid 0.9%) |
-| GSM8K-32 smoke | 96.9% |
-| Needle retrieval + drift (min recall) | **1.00** |
+| Measurement | Result | Provenance |
+|---|---|---|
+| GSM8K, 1319 samples @1024 tok | **97.2%** (invalid 0.3%) | dedicated deep run 2026-10-13 against the then-prod build; value recorded in the promote-gate script (`vllm_promote_prod.sh` standing-gate comment); raw JSON not retained, log: `glm_gsm8k1319_maxtok1024_20261013.log` |
+
+The nightly canary's accuracy gates (GSM8K-1319 96.1%, needle 1.00, run
+2026-10-23 06:09–06:24) measure the **qwen** stage-1 endpoint, not GLM —
+they are deliberately not reproduced here. GLM's post-publish canary is a
+~4-minute tier-0 smoke, not a full accuracy suite.
 
 ## Why this is measured here
 
