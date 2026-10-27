@@ -2,11 +2,20 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vllm-project/vllm/main/docs/assets/logos/vllm-logo-text-dark.png">
-    <img alt="vLLM" src="https://raw.githubusercontent.com/vllm-project/vllm/main/docs/assets/logos/vllm-logo-text-light.png" width=55%>
+    <img alt="vLLM" src="https://raw.githubusercontent.com/vllm-project/vllm/main/docs/assets/logos/vllm-logo-text-light.png" width=25%>
   </picture>
 </p>
 
-<h3 align="center">The latest vLLM models on the GPUs people actually own</h3>
+<h1 align="center">vllm-ampere-extended</h1>
+
+<p align="center">
+  <b>The newest open models don't run on stock vLLM for your GPU. This fork makes them run.</b>
+</p>
+
+<p align="center">
+  DeepSeek V4.1 · GLM · Qwen — sparse-attention architectures served on
+  A100s and RTX 3090s, validated nightly against live production traffic.
+</p>
 
 <p align="center">
   <a href="https://github.com/practical-inference/vllm-ampere-extended/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/practical-inference/vllm-ampere-extended?include_prereleases"></a>
