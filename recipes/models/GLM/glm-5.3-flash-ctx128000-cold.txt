@@ -1,0 +1,50 @@
+W1023 16:24:04.145000 2625457 torch/_opaque_base.py:6] torch._opaque_base is deprecated, use torch._custom_class_base instead
+W1023 16:24:04.146000 2625457 torch/_library/opaque_object.py:288] register_opaque_type is deprecated, use register_custom_class instead
+W1023 16:24:04.146000 2625457 torch/_library/opaque_object.py:211] typ='value' is deprecated, use typ='constant' instead
+FlashInfer kernels are disabled: flashinfer-cubin is not installed and nvcc (CUDA_HOME, CUDA_PATH, PATH or /usr/local/cuda) or ninja (PATH) is missing. Set CUDA_HOME to a CUDA toolkit and put ninja on PATH, or run `vllm download-kernels`.
+Namespace(subparser='bench', bench_type='serve', dispatch_function=<function BenchmarkServingSubcommand.cmd at 0x7fa984970e00>, trust_remote_code=False, seed=303, num_prompts=4, dataset_name='random', no_stream=False, dataset_path=None, no_oversample=False, skip_chat_template=False, enable_multimodal_chat=False, disable_shuffle=False, custom_output_len=256, custom_ensure_client_side_data=False, spec_bench_output_len=256, spec_bench_category=None, sharegpt_output_len=None, timed_trace_chunk_hash_size=16, timed_trace_sec_multiplier=1, timed_trace_label_timestamp='timestamp', timed_trace_label_input_length='input_length', timed_trace_label_output_length='output_length', timed_trace_label_hash_ids='hash_ids', blazedit_min_distance=0.0, blazedit_max_distance=1.0, asr_max_audio_len_sec=inf, asr_min_audio_len_sec=0.0, random_input_len=128000, random_output_len=64, random_range_ratio='0.0', random_prefix_len=0, random_batch_size=1, no_reranker=False, random_mm_base_items_per_request=1, random_mm_num_mm_items_range_ratio=0.0, random_mm_limit_mm_per_prompt={'image': 255, 'video': 1}, random_mm_bucket_config={(256, 256, 1): 0.5, (720, 1280, 1): 0.5, (720, 1280, 16): 0.0}, hf_subset=None, hf_split=None, hf_name=None, hf_output_len=None, bfcl_categories=None, prefix_repetition_prefix_len=256, prefix_repetition_suffix_len=256, prefix_repetition_num_prefixes=10, prefix_repetition_output_len=128, speed_bench_dataset_subset='qualitative', speed_bench_output_len=4096, speed_bench_category=None, label=None, backend='openai', base_url='http://localhost:8080', host='127.0.0.1', port=8000, endpoint='/v1/completions', header=None, max_concurrency=2, model='glm-5.3-flash', input_len=None, output_len=None, tokenizer='/data/models/cyankiwi', tokenizer_mode='auto', use_beam_search=False, logprobs=None, request_rate=inf, burstiness=1.0, probe_request_rate=0.0, disable_tqdm=False, num_warmups=0, profile=False, save_result=False, save_detailed=False, append_result=False, metadata=None, result_dir=None, result_filename=None, ignore_eos=False, self_timed=None, percentile_metrics=None, metric_percentiles='99', goodput=None, request_id_prefix='bench-75f80859-', top_p=None, top_k=None, min_p=None, temperature=None, frequency_penalty=None, presence_penalty=None, repetition_penalty=None, served_model_name=None, lora_modules=None, lora_assignment='random', ramp_up_strategy=None, ramp_up_start_rps=None, ramp_up_end_rps=None, ready_check_timeout_sec=0, chat_template_kwargs=None, extra_body=None, skip_tokenizer_init=False, insecure=False, plot_timeline=False, timeline_itl_thresholds='25,50', plot_dataset_stats=False, log_config_file=None, logging_config=LoggingConfig(log_level='INFO', formatter='text', configure_logging=True, pylogging_config_file=None))
+(MainProcess pid=2625457) INFO 10-23 16:24:12 [utils.py:88] Sampling input_len from [128000, 128000] and output_len from [64, 64]
+WARNING: tokenizer mismatch (server=233126, expected=128000), re-aligning prompts.
+WARNING: vllm bench serve no longer sets temperature==0 (greedy) in requests by default. The default will be determined on the server side and can be model/API specific. For the old behavior, include --temperature=0.
+Starting initial single prompt test run...
+Skipping endpoint ready check.
+Starting main benchmark run...
+Traffic request rate: inf
+Burstiness factor: 1.0 (Poisson process)
+Maximum request concurrency: 2
+  0%|          | 0/4 [00:00<?, ?it/s] 25%|██▌       | 1/4 [01:05<03:15, 65.20s/it] 50%|█████     | 2/4 [01:33<01:26, 43.41s/it] 75%|███████▌  | 3/4 [02:09<00:40, 40.12s/it]100%|██████████| 4/4 [02:19<00:00, 28.11s/it]100%|██████████| 4/4 [02:19<00:00, 34.82s/it]
+tip: install termplotlib and gnuplot to plot the metrics
+============ Serving Benchmark Result ============
+Successful requests:                     4         
+Failed requests:                         0         
+Maximum request concurrency:             2         
+Benchmark duration (s):                  139.27    
+Total input tokens:                      511998    
+Total generated tokens:                  256       
+Request throughput (req/s):              0.03      
+Output token throughput (tok/s):         1.84      
+Peak output token throughput (tok/s):    19.00     
+Peak concurrent requests:                3.00      
+Total token throughput (tok/s):          3678.17   
+---------------Time to First Token----------------
+Mean TTFT (ms):                          47096.36  
+Median TTFT (ms):                        42259.72  
+P99 TTFT (ms):                           68452.79  
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          319.17    
+Median TPOT (ms):                        392.69    
+P99 TPOT (ms):                           481.65    
+---------------Inter-token Latency----------------
+Mean ITL (ms):                           670.26    
+Median ITL (ms):                         908.71    
+P99 ITL (ms):                            998.55    
+---------------Speculative Decoding---------------
+Acceptance rate (%):                     56.69     
+Acceptance length:                       2.13      
+Drafts:                                  142       
+Draft tokens:                            284       
+Accepted tokens:                         161       
+Per-position acceptance (%):
+  Position 0:                            67.61     
+  Position 1:                            45.77     
+==================================================

@@ -1,0 +1,13 @@
+=== leoncca benchmark: http://127.0.0.1:8080 model=glm-5.3-flash ===
+=== out=/data/models/leoncca_bench_20261023_101800.json ===
+name                   conc maxtok   wall_s   tok   tok_s
+------------------------------------------------------------
+hello_short               1     80    0.311    44   141.5
+code_few                  1    300    1.600   300   187.5
+agent_tool_schema         1    500    1.737   301   173.3
+long_context_pack         4    200    3.320   795   239.5
+long_context_pack        16    200    9.917  3200   322.7
+long_context_pack        32    200   18.045  6396   354.4
+
+Wrote /data/models/leoncca_bench_20261023_101800.json
+done

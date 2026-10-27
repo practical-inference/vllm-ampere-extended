@@ -31,7 +31,7 @@ different model class: 39.4 no-MTP → 57.5 with MTP N=1 at c1 (banked
 | long-context pack | 16 | 322.7 |
 | long-context pack | 32 | **354.4** |
 
-Raw: `glm-5.3-flash-conc-sweep.{log,json}` (per-request rows included).
+Raw: `glm-5.3-flash-conc-sweep.{txt,json}` (per-request rows included).
 
 ## Long-context prefill (4 random prompts, concurrency 2, chunked prefill)
 
@@ -41,7 +41,7 @@ Raw: `glm-5.3-flash-conc-sweep.{log,json}` (per-request rows included).
 | 128,000 | **47.1 s** | 1.0 s |
 | 200,000 | 34.7 s | — |
 
-Cold 128k run raw: `glm-5.3-flash-ctx128000-cold.log` (full
+Cold 128k run raw: `glm-5.3-flash-ctx128000-cold.txt` (full
 `vllm bench serve` output; warm runs demonstrate prefix caching paying off
 at agent-workload scale — 47 s → 1 s on a repeated 128k context).
 
@@ -49,7 +49,7 @@ at agent-workload scale — 47 s → 1 s on a repeated 128k context).
 
 | Measurement | Result | Provenance |
 |---|---|---|
-| GSM8K, 1319 samples @1024 tok | **97.2%** (invalid 0.3%) | dedicated deep run 2026-10-13 against the then-prod build; value recorded in the promote-gate script (`vllm_promote_prod.sh` standing-gate comment); raw JSON not retained, log: `glm_gsm8k1319_maxtok1024_20261013.log` |
+| GSM8K, 1319 samples @1024 tok | **97.2%** (invalid 0.3%) | dedicated deep run 2026-10-13 against the then-prod build; value recorded in the promote-gate script (`vllm_promote_prod.sh` standing-gate comment); raw JSON not retained, log: `glm_gsm8k1319_maxtok1024_20261013.txt` |
 
 The nightly canary's accuracy gates (GSM8K-1319 96.1%, needle 1.00, run
 2026-10-23 06:09–06:24) measure the **qwen** stage-1 endpoint, not GLM —
