@@ -5,8 +5,16 @@ Checkpoint: GLM-5.3-Flash (MoE, sparse-attention class). Measured 2026-10-23
 by the two-stage production canary harness against the live endpoint —
 these are not lab numbers; the exact build that produced them is the build
 in production (`0.32.1rc3.dev229+gac4573115`, release nightly-20261023).
-Speculative decoding (MTP) was armed on this fleet 2026-10-24 and is NOT in
-these numbers — treat them as the no-MTP floor.
+
+**MTP speculative decoding (N=1) was ACTIVE during these measurements** —
+it is permanent unit config (`MTP_N=1`, serving with MTP since 2026-10-01).
+The banked A/B from that arm (GLM-5.3-SplitQuant TP2xPP3, ~79% acceptance,
+`results/mtp_nightly_20261001`): MTP is worth **+46% / +36% / +19% / +7%**
+at c1/c4/c16/c32 vs no-MTP — so the true no-MTP floor at c1 is roughly
+~105 tok/s, not the 187.5 measured here. A same-config no-MTP arm on the
+current TP4 stack has not been run; N=2 remains untested on this config
+(the 2026-10-01 Flash study measured N=2 at +56% c1 on a 16k-context
+W4A16 variant).
 
 ## Decode (concurrency sweep, synthetic workloads, temp 0)
 
