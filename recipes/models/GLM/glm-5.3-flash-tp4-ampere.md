@@ -9,14 +9,15 @@ class and config family) — these are not lab numbers; the exact build that
 produced them is the build in production at the time
 (`0.32.1rc3.dev229+gac4573115`, release nightly-20261023).
 
-**MTP speculative decoding (N=1) was ACTIVE during these measurements** —
-permanent unit config, serving since 2026-10-01. Banked same-model A/B
-(`~/glm53-perf/results/flash_mtp_nightly_20261001`, Flash W4A16 TP4,
-16k ctx, 2026-10-01): **99.3 tok/s no-MTP → 155.3 with MTP N=2** at c1
-(+56%); the 187.5 here is the same class at N=1 with a matured config
-(longer ctx, KV pin). Do not divide these numbers by another model's
-acceptance factor — for scale, Big GLM (SplitQuant TP2xPP3) is a different
-model class: 39.4 no-MTP → 57.5 with MTP N=1 at c1 (banked
+**MTP speculative decoding (N=2) was ACTIVE during these measurements.**
+The serving boot's own config echo (service log 2026-10-23 08:22:49):
+`speculative_config=SpeculativeConfig(method='mtp',
+model='/data/models/glm-5.3-w4a16-mtp', num_spec_tokens=2)`. This matches
+the banked same-model A/B (`~/glm53-perf/results/flash_mtp_nightly_20261001`,
+Flash W4A16 TP4, 16k ctx): **99.3 tok/s no-MTP → 155.3 with MTP N=2** at
+c1 (+56%) — the 187.5 here is the same N=2 config with a matured serving
+setup (longer ctx, KV pin). For scale, Big GLM (SplitQuant TP2xPP3) is a
+different model class: 39.4 no-MTP → 57.5 with MTP N=1 at c1 (banked
 `results/mtp_nightly_20261001`).
 
 ## Decode (concurrency sweep, synthetic workloads, temp 0)
@@ -62,11 +63,16 @@ red gate blocks the release rather than shipping it.
 
 ## Reproduce
 
+The raw numbers above came from the production canary harness (a
+concurrency-sweep client for the decode table; `vllm bench serve` for the
+long-context rows — both committed in this directory). To re-measure with
+the current harness:
+
 ```bash
-# concurrency sweep against a running endpoint
+# full matrix against a running endpoint (single/batch/longctx/demo)
 python recipes/bench/serve_matrix.py --base-url http://localhost:8080/v1 \
   --model glm-5.3-flash --out results.json
-# long-context prefill (vllm bench serve, as the canary runs it)
+# long-context prefill rows, as the canary runs them
 vllm bench serve --backend openai --base-url http://localhost:8080 \
   --model glm-5.3-flash --dataset-name random --random-input-len 128000 \
   --random-output-len 64 --num-prompts 4 --max-concurrency 2
