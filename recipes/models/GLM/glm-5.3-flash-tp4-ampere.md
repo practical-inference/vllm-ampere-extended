@@ -15,14 +15,14 @@ numbers here describe the 6-GPU SplitQuant deployment that existed on
 2026-10-23.
 
 **MTP speculative decoding (N=1) was ACTIVE during these measurements** —
-it is permanent unit config (`MTP_N=1`, serving with MTP since 2026-10-01).
-The banked A/B from that arm (GLM-5.3-SplitQuant TP2xPP3, ~79% acceptance,
-`results/mtp_nightly_20261001`): MTP is worth **+46% / +36% / +19% / +7%**
-at c1/c4/c16/c32 vs no-MTP — so the true no-MTP floor at c1 is roughly
-~105 tok/s, not the 187.5 measured here. A same-config no-MTP arm on the
-current TP4 stack has not been run; N=2 remains untested on this config
-(the 2026-10-01 Flash study measured N=2 at +56% c1 on a 16k-context
-W4A16 variant).
+permanent unit config, serving since 2026-10-01. Banked same-model A/B
+(`~/glm53-perf/results/flash_mtp_nightly_20261001`, Flash W4A16 TP4,
+16k ctx, 2026-10-01): **99.3 tok/s no-MTP → 155.3 with MTP N=2** at c1
+(+56%); the 187.5 here is the same class at N=1 with a matured config
+(longer ctx, KV pin). Do not divide these numbers by another model's
+acceptance factor — for scale, Big GLM (SplitQuant TP2xPP3) is a different
+model class: 39.4 no-MTP → 57.5 with MTP N=1 at c1 (banked
+`results/mtp_nightly_20261001`).
 
 ## Decode (concurrency sweep, synthetic workloads, temp 0)
 
