@@ -1,18 +1,13 @@
-# GLM-5.3 (SplitQuant) on 6× A100 (TP6) — production-validated, pre-reorg fleet
+# GLM-5.3-Flash on 4× A100 (TP4) — production-validated
 
-Hardware: 6× 96GB A100 (SM80), TP6 (`CUDA_DEVICES=0,1,3,4,5,6`), one engine
-serving live traffic — the 2026-10-23 fleet, before the 2026-10-25 GPU-loss
-reorganization. Checkpoint: GLM-5.3-SplitQuant (served under the name
-`glm-5.3-flash`). Measured 2026-10-23 by the two-stage production canary
-harness against the live endpoint — these are not lab numbers; the exact
-build that produced them is the build in production at the time
+Hardware: 4× 96GB A100 (SM80), TP4, one engine serving live traffic.
+Checkpoint: GLM-5.3-Flash W4A16+int4-RTN-draft (MoE, sparse-attention
+class). Measured 2026-10-23 by the two-stage production canary harness
+against the live endpoint (`vllm-glm53-flash`, then on physical GPUs
+0,4,5,6 — the 2026-10-25 reorg moved the unit to GPUs 0,2,4,5; same model
+class and config family) — these are not lab numbers; the exact build that
+produced them is the build in production at the time
 (`0.32.1rc3.dev229+gac4573115`, release nightly-20261023).
-
-**NOTE (2026-10-26):** the current production unit is `vllm-glm53-flash`
-(GLM-5.3-Flash W4A16+int4-RTN-draft, TP4 on GPUs 0,2,4,5) — a different,
-smaller configuration. The sweep below has NOT been re-run against it; the
-numbers here describe the 6-GPU SplitQuant deployment that existed on
-2026-10-23.
 
 **MTP speculative decoding (N=1) was ACTIVE during these measurements** —
 permanent unit config, serving since 2026-10-01. Banked same-model A/B
