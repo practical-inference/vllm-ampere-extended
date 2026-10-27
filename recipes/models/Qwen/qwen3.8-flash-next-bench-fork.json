@@ -1,0 +1,69 @@
+{
+  "config": {
+    "base_url": "http://localhost:8017/v1",
+    "model": "qwen3.8-flash-next",
+    "in_tokens": 512,
+    "out_tokens": 256,
+    "long_in_tokens": 32768,
+    "batch": 64,
+    "single_requests": 8,
+    "warmup": 2,
+    "seed": 1234,
+    "temperature": 0.0,
+    "invocation": "/home/michael/source/vllm-nightly/.worktrees/next/recipes/bench/serve_matrix.py --base-url http://localhost:8017/v1 --model qwen3.8-flash-next --out /tmp/opencode/bench-fork-qwen.json"
+  },
+  "single": {
+    "concurrency": 1,
+    "wall_s": 1.84,
+    "ttft_p50_s": 1.407,
+    "ttft_p90_s": 1.407,
+    "decode_tok_s_mean": 595.5,
+    "aggregate_tok_s": 139.3,
+    "prompt_tokens": 500,
+    "completion_tokens_each": 256
+  },
+  "batch": {
+    "concurrency": 64,
+    "wall_s": 13.75,
+    "ttft_p50_s": 10.215,
+    "ttft_p90_s": 13.66,
+    "decode_tok_s_mean": 254.5,
+    "aggregate_tok_s": 1164.1,
+    "prompt_tokens": 500,
+    "completion_tokens_each": 256
+  },
+  "longctx": {
+    "concurrency": 4,
+    "wall_s": 6.39,
+    "ttft_p50_s": 6.347,
+    "ttft_p90_s": 6.389,
+    "decode_tok_s_mean": null,
+    "aggregate_tok_s": 160.1,
+    "prompt_tokens": 30068,
+    "completion_tokens_each": 256
+  },
+  "demo": {
+    "concurrency": 1,
+    "wall_s": 1.11,
+    "ttft_p50_s": 0.921,
+    "ttft_p90_s": 0.921,
+    "decode_tok_s_mean": 842.1,
+    "aggregate_tok_s": 132.3,
+    "prompt_tokens": 500,
+    "completion_tokens_each": 147,
+    "demo_arrivals_ms": [
+      921,
+      937,
+      953,
+      968,
+      984,
+      1000,
+      1015,
+      1031,
+      1047,
+      1062,
+      1078,
+      1094
+    ]
+  }
+}

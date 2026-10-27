@@ -1,0 +1,11 @@
+ERROR 10-26 22:33:27 [core.py:1510]     buf = torch.zeros(buf_size, dtype=torch.int8, device=device)
+ERROR 10-26 22:33:27 [core.py:1510]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ERROR 10-26 22:33:27 [core.py:1510] torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 18.95 GiB. GPU 0 has a total capacity of 95.15 GiB of which 16.06 GiB is free. Including non-PyTorch memory, this process has 78.82 GiB memory in use. Of the allocated memory 77.80 GiB is allocated by PyTorch, and 452.84 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)
+Process EngineCore:
+Traceback (most recent call last):
+  File "/home/michael/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/home/michael/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/tmp/opencode/stock-vllm-venv/lib/python3.12/site-packages/vllm/v1/engine/core.py", line 1514, in run_engine_core
+    raise e
