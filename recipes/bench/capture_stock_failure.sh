@@ -52,7 +52,7 @@ numactl --cpunodebind=0 --membind=0 \
 SERVE_PID=$!
 
 BOOTED=0
-for i in $(seq 1 $((BOOT_POLL_SECS / 5))); do
+for _ in $(seq 1 $((BOOT_POLL_SECS / 5))); do
   sleep 5
   if curl -sf "http://localhost:$PORT/health" >/dev/null 2>&1; then BOOTED=1; break; fi
   if ! kill -0 "$SERVE_PID" 2>/dev/null; then break; fi
@@ -60,10 +60,13 @@ done
 
 if [ "$BOOTED" = 1 ]; then
   log "stock vLLM BOOTS — running the same benchmark matrix"
-  "$STOCK_VENV/bin/python" "$(dirname "$0")/serve_matrix.py" \
+  if "$STOCK_VENV/bin/python" "$(dirname "$0")/serve_matrix.py" \
     --base-url "http://localhost:$PORT/v1" --model qwen3.8-flash-next \
-    --out "$OUT_DIR/bench-stock.json" > "$OUT_DIR/bench-stock.log" 2>&1 \
-    && log "stock benchmark done" || log "stock benchmark FAILED (see bench-stock.log)"
+    --out "$OUT_DIR/bench-stock.json" > "$OUT_DIR/bench-stock.log" 2>&1; then
+    log "stock benchmark done"
+  else
+    log "stock benchmark FAILED (see bench-stock.log)"
+  fi
 else
   log "stock vLLM DID NOT BOOT — capturing failure"
   cp "$OUT_DIR/stock-serve.log" "$OUT_DIR/stock-failure.log"
@@ -73,7 +76,7 @@ fi
 
 log "stopping stock serve (own PID $SERVE_PID)"
 kill "$SERVE_PID" 2>/dev/null
-for i in $(seq 1 12); do kill -0 "$SERVE_PID" 2>/dev/null || break; sleep 5; done
+for _ in $(seq 1 12); do kill -0 "$SERVE_PID" 2>/dev/null || break; sleep 5; done
 kill -9 "$SERVE_PID" 2>/dev/null || true
 # EngineCore children survive a parent kill (2026-10-26: orphaned EngineCore
 # held 81GB, the fork unit OOM'd restarting into it). Kill descendants by
@@ -87,7 +90,7 @@ done
 
 # Wait for GPU memory to actually drain before restarting the unit —
 # restarting into a draining GPU OOMs the weight load (same incident).
-for i in $(seq 1 36); do
+for _ in $(seq 1 36); do
   USED=$(nvidia-smi -i "$GPU_IDX" --query-gpu=memory.used --format=csv,noheader,nounits)
   [ "${USED:-999999}" -lt 1000 ] && break
   sleep 5
@@ -96,7 +99,7 @@ log "GPU${GPU_IDX} drained to ${USED:-?} MiB"
 
 log "restoring $UNIT (fork wheel)"
 systemctl --user start "$UNIT"
-for i in $(seq 1 90); do
+for _ in $(seq 1 90); do
   sleep 5
   curl -sf "http://localhost:$PORT/health" >/dev/null 2>&1 && break
 done

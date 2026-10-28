@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+
 """Render a token-arrival replay (GIF) from serve_matrix.py demo output.
 
 Input: one or two serve_matrix JSON files (--fork, --stock). Each panel

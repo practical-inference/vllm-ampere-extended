@@ -15,15 +15,15 @@ from unittest.mock import patch
 
 import pytest
 import torch
-from vllm.v1.worker.gpu.spec_decode.target_dependent_ar.speculator import (
-    TargetDependentARSpeculator,
-)
 
 from vllm.config.model import ModelConfig
 from vllm.config.parallel import ParallelConfig
 from vllm.config.speculative import SpeculativeConfig
 from vllm.v1.worker.gpu.spec_decode.dflash2.speculator import (
     DFlash2Speculator,
+)
+from vllm.v1.worker.gpu.spec_decode.target_dependent_ar.speculator import (
+    TargetDependentARSpeculator,
 )
 
 MODEL = "facebook/opt-125m"
@@ -160,9 +160,7 @@ def _bare_speculator(skip: bool) -> TargetDependentARSpeculator:
     spec.skip_draft_when_k0 = skip
     spec.draft_tokens = torch.zeros(4, 2, dtype=torch.int64)
     spec.num_speculative_steps = 2
-    spec.vllm_config = SimpleNamespace(
-        model_config=SimpleNamespace(max_model_len=128)
-    )
+    spec.vllm_config = SimpleNamespace(model_config=SimpleNamespace(max_model_len=128))
     spec.hidden_states = torch.zeros(8, 8)
     spec.dtype = torch.float32
     # sentinel on the first method call after the hidden-state copy:
@@ -256,9 +254,7 @@ def _bare_dflash(skip: bool) -> "DFlash2Speculator":
     spec.draft_tokens = torch.zeros(4, 7, dtype=torch.int64)
     spec.num_query_per_req = 8
     spec.pcp_manager = None
-    spec.vllm_config = SimpleNamespace(
-        model_config=SimpleNamespace(max_model_len=128)
-    )
+    spec.vllm_config = SimpleNamespace(model_config=SimpleNamespace(max_model_len=128))
     return spec
 
 
