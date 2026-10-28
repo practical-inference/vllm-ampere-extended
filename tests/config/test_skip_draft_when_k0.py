@@ -168,7 +168,7 @@ def _bare_speculator(skip: bool) -> TargetDependentARSpeculator:
     # sentinel on the first method call after the hidden-state copy:
     # if propose() runs past the K=0 skip branch it reaches this and
     # raises, proving the prefill path was entered.
-    spec._copy_request_inputs = _sentinel
+    spec._copy_request_inputs = _sentinel  # type: ignore[method-assign]
     return spec
 
 
