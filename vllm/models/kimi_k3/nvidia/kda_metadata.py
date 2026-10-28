@@ -395,7 +395,14 @@ class KimiK3KDAMetadataBuilder(GDNAttentionMetadataBuilder):
             num_spec_decodes = 0
             active_non_spec_mask_cpu = None
         else:
-            spec_sequence_masks_cpu = num_decode_draft_tokens_cpu >= 0
+            # Spec rows carry a real draft count; with the align fold active
+            # (or RecoverSSM's same-step restore), draft-less decode rows
+            # (count 0, the K=0 ladder tier) take the regular decode path.
+            # RecoverSSM still forces every active decode row below.
+            if self._k0_regular_decode:
+                spec_sequence_masks_cpu = num_decode_draft_tokens_cpu > 0
+            else:
+                spec_sequence_masks_cpu = num_decode_draft_tokens_cpu >= 0
             active_non_spec_mask_cpu = None
             if self.use_recoverssm:
                 assert m.is_prefilling is not None
@@ -410,9 +417,11 @@ class KimiK3KDAMetadataBuilder(GDNAttentionMetadataBuilder):
                 spec_sequence_masks_cpu &= (
                     query_start_loc_cpu.diff() <= self.num_spec + 1
                 )
-            # A batch whose rows all drafted nothing still has to run the
-            # speculative path: that is the only path that applies each row's
-            # accepted-token offset to the recurrent state.
+            # Without RecoverSSM's same-step restore (or the align fold), the
+            # speculative path is the only reader that applies each row's
+            # accepted-token offset to the recurrent state, so draft-less
+            # rows must stay here; _k0_regular_decode demotes them where the
+            # fold runs.
             num_spec_decodes = spec_sequence_masks_cpu.sum().item()
             if num_spec_decodes == 0:
                 spec_sequence_masks_cpu = None

@@ -182,6 +182,13 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
     """Triton sparse-MLA impl with split-KV decode (3-7× faster than the
     single-pass XPU base for single-query decode on SM80 / SM121)."""
 
+    def get_fp8_ds_mla_row_bytes(self) -> int:
+        # NoPE models (head_size 512) drop the rope tail: 528B pages written
+        # and read by the Triton kernels (see triton_mla_sparse_kernel).
+        if self.head_size == _DIM_QK_NOPE:
+            return _DS_MLA_CACHE_BYTES_NOPE
+        return super().get_fp8_ds_mla_row_bytes()
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._sm_count: int | None = None
