@@ -15,8 +15,8 @@ from unittest.mock import patch
 
 import pytest
 import torch
-from vllm.v1.worker.gpu.spec_decode.autoregressive.speculator import (
-    AutoRegressiveSpeculator,
+from vllm.v1.worker.gpu.spec_decode.target_dependent_ar.speculator import (
+    TargetDependentARSpeculator,
 )
 
 from vllm.config.model import ModelConfig
@@ -147,20 +147,22 @@ def test_skip_does_not_fire_when_k_unresolved():
         _call_propose(spec, _k0_batch(num_reqs=2), num_speculative_tokens=None)
 
 
-class _ConcreteSpeculator(AutoRegressiveSpeculator):
+class _ConcreteSpeculator(TargetDependentARSpeculator):
     """Stub making the abstract base instantiable via __new__."""
 
     def load_draft_model(self, *args, **kwargs):  # pragma: no cover
         raise NotImplementedError
 
 
-def _bare_speculator(skip: bool) -> AutoRegressiveSpeculator:
+def _bare_speculator(skip: bool) -> TargetDependentARSpeculator:
     """Only the state propose() touches before the K=0 branch."""
     spec = _ConcreteSpeculator.__new__(_ConcreteSpeculator)
     spec.skip_draft_when_k0 = skip
     spec.draft_tokens = torch.zeros(4, 2, dtype=torch.int64)
     spec.num_speculative_steps = 2
-    spec.max_model_len = 128
+    spec.vllm_config = SimpleNamespace(
+        model_config=SimpleNamespace(max_model_len=128)
+    )
     spec.hidden_states = torch.zeros(8, 8)
     spec.dtype = torch.float32
     # sentinel on the first method call after the hidden-state copy:
@@ -204,18 +206,19 @@ def _call_propose(spec, batch, num_speculative_tokens=0):
 
 @pytest.mark.cpu_test
 def test_skip_returns_zero_width_without_running_prefill():
-    """K=0 + flag on: propose returns [num_reqs, 0] immediately; the
-    draft prefill path is never entered (proved by a sentinel raised
-    from the first prefill-path helper propose would otherwise reach)."""
+    """K=0 + flag on: propose fills the draft rows with -1 and returns
+    immediately; the draft prefill path is never entered (proved by a
+    sentinel raised from the first prefill-path helper propose would
+    otherwise reach)."""
     spec = _bare_speculator(skip=True)
     with patch(
-        "vllm.v1.worker.gpu.spec_decode.autoregressive.speculator."
+        "vllm.v1.worker.gpu.spec_decode.target_dependent_ar.speculator."
         "prepare_prefill_inputs",
         side_effect=AssertionError("prefill path must not run"),
     ):
         out = _call_propose(spec, _k0_batch(num_reqs=2))  # must NOT raise
-    assert out.shape == (2, 0)
-    assert out.dtype == torch.int64
+    assert out.shape == (2, 2)
+    assert (out == -1).all()
 
 
 @pytest.mark.cpu_test
@@ -240,18 +243,22 @@ class SentinelError(Exception):
     pass
 
 
-# --- DFlash speculator K=0 skip (mirrors the AutoRegressive tests above) ---
+# --- DFlash speculator K=0 skip (mirrors the target-dependent AR tests above) ---
 
 
 def _bare_dflash(skip: bool) -> "DFlash2Speculator":
     """Only the state propose() touches before the K=0 branch. The
-    hidden_states buffer is intentionally absent: propose() reaching the
-    forward path raises on it, proving the skip did (or did not) fire."""
+    draft KV cache group id is intentionally absent: propose() reaching
+    the forward path raises on its assert, proving the skip did (or did
+    not) fire."""
     spec = DFlash2Speculator.__new__(DFlash2Speculator)
     spec.skip_draft_when_k0 = skip
     spec.draft_tokens = torch.zeros(4, 7, dtype=torch.int64)
     spec.num_query_per_req = 8
-    spec.max_model_len = 128
+    spec.pcp_manager = None
+    spec.vllm_config = SimpleNamespace(
+        model_config=SimpleNamespace(max_model_len=128)
+    )
     return spec
 
 
@@ -266,16 +273,16 @@ def test_dflash_skip_returns_zero_width_at_k0():
 @pytest.mark.cpu_test
 def test_dflash_flag_off_runs_forward_at_k0():
     spec = _bare_dflash(skip=False)
-    with pytest.raises(AttributeError, match="hidden_states"):
+    with pytest.raises(AttributeError, match="draft_kv_cache_group_id"):
         _call_propose(spec, _k0_batch(num_reqs=2))
 
 
 @pytest.mark.cpu_test
 def test_dflash_skip_does_not_fire_when_k_unresolved_or_positive():
     spec = _bare_dflash(skip=True)
-    with pytest.raises(AttributeError, match="hidden_states"):
+    with pytest.raises(AttributeError, match="draft_kv_cache_group_id"):
         _call_propose(spec, _k0_batch(num_reqs=2), num_speculative_tokens=None)
-    with pytest.raises(AttributeError, match="hidden_states"):
+    with pytest.raises(AttributeError, match="draft_kv_cache_group_id"):
         _call_propose(spec, _k0_batch(num_reqs=2), num_speculative_tokens=7)
 
 

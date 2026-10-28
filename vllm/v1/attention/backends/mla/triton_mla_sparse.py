@@ -202,6 +202,7 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
         slot_mapping: torch.Tensor,
         kv_cache_dtype: str,
         k_scale: torch.Tensor,
+        skip_scale: bool = False,
     ) -> None:
         if kv_cache.numel() == 0:
             return
@@ -224,6 +225,7 @@ class TritonMLASparseImpl(XPUMLASparseImpl):
             slot_mapping,
             kv_cache_dtype,
             k_scale,
+            skip_scale,
         )
 
     def _warmup_autotune(self, indexer) -> None:
