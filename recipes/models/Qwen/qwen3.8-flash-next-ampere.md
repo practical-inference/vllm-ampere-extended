@@ -7,7 +7,7 @@ BF16 PLE n-gram table, 38 shards). Measured 2026-10-26.
 ## Numbers
 
 | Scenario | Config | Result |
-|---|---|---|
+| --- | --- | --- |
 | Single-stream decode | 500 in / 256 out, temp 0, c=1 | **596 tok/s**, TTFT 1.41 s |
 | 64-concurrent | 500 in / 256 out, c=64 | **1,164 tok/s aggregate**, per-stream 254 tok/s, TTFT p50 10.2 s |
 | Long-context prefill | 30,068 in / 256 out, c=4 | TTFT **6.35 s** |
@@ -40,7 +40,7 @@ Stock upstream **vLLM 0.32.0** (current stable, fresh venv, minimal flags,
 resolves `EngramConfig(cpu_offload=True)` regardless): weights load, then
 the engine **fails to start**:
 
-```
+```text
 torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 18.95 GiB.
 GPU 0 has a total capacity of 95.15 GiB of which 16.06 GiB is free.
 ... v1/engine/core.py:315, in _initialize_kv_caches

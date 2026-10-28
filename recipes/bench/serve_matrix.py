@@ -12,6 +12,7 @@ with the numbers AND the exact invocation, so every published table can be
 reproduced. Compatibility-creating backends report absolute numbers (there
 is no dense fallback to compare against for the sparse-attention classes).
 """
+
 import argparse
 import json
 import sys
@@ -76,12 +77,20 @@ def one_request(client, model, prompt, out_tokens, seed, record_arrivals=False):
     }
 
 
-def scenario(client, model, name, prompt, out_tokens, concurrency, seed, arrivals=False):
+def scenario(
+    client, model, name, prompt, out_tokens, concurrency, seed, arrivals=False
+):
     import concurrent.futures
 
     def run(i):
-        return one_request(client, model, prompt, out_tokens, seed + i,
-                           record_arrivals=arrivals and i == 0)
+        return one_request(
+            client,
+            model,
+            prompt,
+            out_tokens,
+            seed + i,
+            record_arrivals=arrivals and i == 0,
+        )
 
     t0 = time.monotonic()
     with concurrent.futures.ThreadPoolExecutor(max_workers=concurrency) as ex:
@@ -128,16 +137,20 @@ def main():
 
     # single-stream = truly sequential (concurrency 1); per-stream decode
     # rates at concurrency >1 are unreliable (chunk buffering under load).
-    single, single_raw = scenario(client, args.model, "single", prompt,
-                                  args.out_tokens, 1, args.seed)
+    single, single_raw = scenario(
+        client, args.model, "single", prompt, args.out_tokens, 1, args.seed
+    )
     for _ in range(args.single_requests - 1):
         one_request(client, args.model, prompt, args.out_tokens, args.seed)
-    batch, _ = scenario(client, args.model, "batch", prompt,
-                        args.out_tokens, args.batch, args.seed)
-    longctx, _ = scenario(client, args.model, "longctx", long_prompt,
-                          args.out_tokens, 4, args.seed)
-    demo, _ = scenario(client, args.model, "demo", prompt,
-                       args.out_tokens, 1, args.seed, arrivals=True)
+    batch, _ = scenario(
+        client, args.model, "batch", prompt, args.out_tokens, args.batch, args.seed
+    )
+    longctx, _ = scenario(
+        client, args.model, "longctx", long_prompt, args.out_tokens, 4, args.seed
+    )
+    demo, _ = scenario(
+        client, args.model, "demo", prompt, args.out_tokens, 1, args.seed, arrivals=True
+    )
 
     result = {
         "config": {

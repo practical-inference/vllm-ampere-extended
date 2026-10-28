@@ -23,7 +23,7 @@ different model class: 39.4 no-MTP → 57.5 with MTP N=1 at c1 (banked
 ## Decode (concurrency sweep, synthetic workloads, temp 0)
 
 | Workload | Concurrency | Decode tok/s |
-|---|---|---|
+| --- | --- | --- |
 | short greeting (44 tok out) | 1 | 141.5 |
 | code few-shot (300 tok out) | 1 | **187.5** |
 | agent tool-schema (500 tok out) | 1 | 173.3 |
@@ -36,7 +36,7 @@ Raw: `glm-5.3-flash-conc-sweep.{txt,json}` (per-request rows included).
 ## Long-context prefill (4 random prompts, concurrency 2, chunked prefill)
 
 | Context | TTFT (cold) | TTFT (prefix-cached) |
-|---|---|---|
+| --- | --- | --- |
 | 100,000 | 35.5 – 40.1 s | — |
 | 128,000 | **47.1 s** | 1.0 s |
 | 200,000 | 34.7 s | — |
@@ -48,7 +48,7 @@ at agent-workload scale — 47 s → 1 s on a repeated 128k context).
 ## Accuracy
 
 | Measurement | Result | Provenance |
-|---|---|---|
+| --- | --- | --- |
 | GSM8K, 1319 samples @1024 tok | **97.2%** (invalid 0.3%) | dedicated deep run 2026-10-13 against the then-prod build; value recorded in the promote-gate script (`vllm_promote_prod.sh` standing-gate comment); raw JSON not retained, log: `glm_gsm8k1319_maxtok1024_20261013.txt` |
 
 The nightly canary's accuracy gates (GSM8K-1319 96.1%, needle 1.00, run
