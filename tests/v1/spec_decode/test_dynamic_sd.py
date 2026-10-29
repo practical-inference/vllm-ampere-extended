@@ -277,8 +277,9 @@ def _make_scheduler_with_k0_lifecycle(
     # The lifecycle gate keys on the eagle-family method; the scheduler-side
     # mechanics are drafter-agnostic, so re-label the validated ngram config.
     object.__setattr__(base.vllm_config.speculative_config, "method", "mtp")
-    base.vllm_config.speculative_config.num_speculative_tokens_per_batch_size = schedule
-    base.vllm_config.speculative_config.num_speculative_tokens_per_batch_size = schedule
+    spec_config = base.vllm_config.speculative_config
+    assert spec_config is not None
+    spec_config.num_speculative_tokens_per_batch_size = schedule
     spec = FullAttentionSpec(
         block_size=16, num_kv_heads=1, head_size=1, dtype=torch.float32
     )

@@ -5211,6 +5211,9 @@ class GPUModelRunner(
                     num_chunk_reqs, dtype=torch.bool, device=self.device
                 ),
             )
+            # The lifecycle gate admits only the eagle-family drafters, whose
+            # propose takes the full replay kwargs.
+            assert isinstance(self.drafter, EagleProposer)
             self.drafter.propose(
                 num_speculative_tokens=0,
                 target_token_ids=replay_tokens[a:b],
