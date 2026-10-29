@@ -5158,6 +5158,8 @@ class GPUModelRunner(
         replay_next = torch.cat(nexts)
         total = int(replay_tokens.shape[0])
 
+        # The lifecycle gate admits only the eagle-family drafters.
+        assert isinstance(self.drafter, EagleProposer)
         draft_gid = self.drafter.kv_cache_gid
         block_table_obj = self.input_batch.block_table[draft_gid]
         block_table = block_table_obj.get_device_tensor(num_reqs)
@@ -5211,9 +5213,6 @@ class GPUModelRunner(
                     num_chunk_reqs, dtype=torch.bool, device=self.device
                 ),
             )
-            # The lifecycle gate admits only the eagle-family drafters, whose
-            # propose takes the full replay kwargs.
-            assert isinstance(self.drafter, EagleProposer)
             self.drafter.propose(
                 num_speculative_tokens=0,
                 target_token_ids=replay_tokens[a:b],
