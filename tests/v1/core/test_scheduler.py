@@ -5051,6 +5051,7 @@ def test_abort_request_when_structured_output_fsm_cannot_advance():
     scheduler.perf_metrics = None
     scheduler.connector = None
     scheduler.ec_connector = None
+    scheduler.eagle_k0_lifecycle = False
     scheduler.structured_output_manager = Mock()
     scheduler.structured_output_manager.accept_tokens.return_value = False
     scheduler.requests = {request.request_id: request}

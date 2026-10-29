@@ -233,6 +233,7 @@ if TYPE_CHECKING:
     VLLM_MSGPACK_ZERO_COPY_THRESHOLD: int = 256
     VLLM_ALLOW_INSECURE_SERIALIZATION: bool = False
     VLLM_DISABLE_REQUEST_ID_RANDOMIZATION: bool = False
+    VLLM_EAGLE_K0_LIFECYCLE: bool = False
     VLLM_NIXL_SIDE_CHANNEL_HOST: str = "localhost"
     VLLM_NIXL_SIDE_CHANNEL_PORT: int = 5600
     VLLM_P2P_SIDE_CHANNEL_HOST: str = "localhost"
@@ -1736,6 +1737,13 @@ environment_variables: dict[str, Callable[[], Any]] = {
     # insecure method and it is needed for some reason.
     "VLLM_ALLOW_INSECURE_SERIALIZATION": lambda: bool(
         int(os.getenv("VLLM_ALLOW_INSECURE_SERIALIZATION", "0"))
+    ),
+    # Eagle K=0 draft-resource lifecycle (V1 runner only): skip the drafter
+    # sync prefill at K=0 tiers, hold draft-KV growth via retroactive
+    # per-group block release, and replay a gap catch-up prefill on the
+    # K=0 -> K>0 resume.
+    "VLLM_EAGLE_K0_LIFECYCLE": lambda: bool(
+        int(os.getenv("VLLM_EAGLE_K0_LIFECYCLE", "0"))
     ),
     # Temporary: skip adding random suffix to internal request IDs. May be
     # needed for KV connectors that match request IDs across instances.

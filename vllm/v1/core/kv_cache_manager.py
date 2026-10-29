@@ -406,6 +406,23 @@ class KVCacheManager:
         # Per-group lookups do not detect an uncached shared prefix (boundary 0).
         return blocks, num_local, 0, min(per_group_hits) < num_local
 
+    @staticmethod
+    def _eagle_target_delta(
+        num_tokens_need_slot: int,
+        eagle_extra_tokens: int,
+        eagle_table_cap_tokens: int | None,
+    ) -> int:
+        """Fold the eagle table cap into the eagle-group target delta.
+
+        The eagle groups' allocation target is `num_tokens_need_slot +
+        eagle_extra_tokens`; a cap shrinks it to
+        `min(target, eagle_table_cap_tokens)`. The cap and the resume extra
+        never co-occur (hold vs resume), but the arithmetic composes.
+        """
+        if eagle_table_cap_tokens is not None:
+            eagle_extra_tokens += eagle_table_cap_tokens - num_tokens_need_slot
+        return eagle_extra_tokens
+
     def allocate_slots(
         self,
         request: Request,
@@ -420,6 +437,8 @@ class KVCacheManager:
         reserved_blocks: int = 0,
         has_scheduled_reqs: bool = True,
         skip_zeroing_group_ids: tuple[int, ...] = (),
+        eagle_extra_tokens: int = 0,
+        eagle_table_cap_tokens: int | None = None,
     ) -> KVCacheBlocks | None:
         """Add slots for a request with new tokens to append.
 
@@ -433,6 +452,12 @@ class KVCacheManager:
             num_lookahead_tokens: The number of speculative tokens to allocate.
                 This is used by spec decode proposers with kv-cache such
                 as eagle.
+            eagle_extra_tokens: Extra slots for eagle (draft) groups only —
+                drafter catch-up prefill over tokens whose main KV already
+                exists (K=0 growth-hold resume).
+            eagle_table_cap_tokens: Cap the eagle (draft) groups' table at
+                this many tokens — the K=0 growth hold allocates the draft
+                groups no further than the synced prefix. None disables.
             num_external_computed_tokens: The number of tokens that their
                 KV caches are not cached by vLLM but cached by the connector.
             delay_cache_blocks: Whether to skip caching the blocks. This is
@@ -613,6 +638,9 @@ class KVCacheManager:
             num_local_computed_tokens=num_local_computed_tokens,
             num_tokens_main_model=num_tokens_main_model,
             prefill_end=prefill_end,
+            eagle_extra_tokens=self._eagle_target_delta(
+                num_tokens_need_slot, eagle_extra_tokens, eagle_table_cap_tokens
+            ),
         )
 
         # Keep `reserved_blocks` free for other in-flight sequences, and an
@@ -649,6 +677,9 @@ class KVCacheManager:
             num_tokens_need_slot,
             num_tokens_main_model,
             num_encoder_tokens,
+            eagle_extra_tokens=self._eagle_target_delta(
+                num_tokens_need_slot, eagle_extra_tokens, eagle_table_cap_tokens
+            ),
         )
 
         # P/D: delay caching blocks if we have to recv from

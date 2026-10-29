@@ -5,9 +5,18 @@
 import logging
 
 import pytest
+import torch
 
+import vllm.envs as envs
 from tests.v1.core.utils import create_requests, create_scheduler
 from vllm.v1.core.sched.scheduler import Scheduler
+from vllm.v1.kv_cache_interface import (
+    FullAttentionSpec,
+    KVCacheConfig,
+    KVCacheGroupSpec,
+)
+from vllm.v1.outputs import ModelRunnerOutput
+from vllm.v1.request import RequestStatus
 from vllm.v1.spec_decode.dynamic.utils import build_dynamic_sd_schedule_lookup
 from vllm.v1.structured_output import StructuredOutputManager
 
@@ -245,3 +254,225 @@ def test_scheduler_passes_max_num_seqs_as_dsd_runtime_batch_limit():
     assert len(scheduler.dynamic_sd_lookup) == 17
     assert len(output.num_scheduled_tokens) == 16
     assert output.num_spec_tokens_to_schedule == 3
+
+
+def _make_scheduler_with_k0_lifecycle(
+    schedule: list[tuple[int, int, int]],
+    *,
+    max_num_seqs: int = 16,
+    max_num_batched_tokens: int = 512,
+    num_spec: int = 2,
+    monkeypatch: pytest.MonkeyPatch | None = None,
+) -> Scheduler:
+    if monkeypatch is not None:
+        monkeypatch.setattr(envs, "VLLM_EAGLE_K0_LIFECYCLE", True)
+        # The lifecycle is V1-runner scoped; force the V1 selection the same
+        # way the env would.
+        monkeypatch.setattr(envs, "VLLM_USE_V2_MODEL_RUNNER", False)
+    base = create_scheduler(
+        max_num_seqs=max_num_seqs,
+        max_num_batched_tokens=max_num_batched_tokens,
+        num_speculative_tokens=num_spec,
+    )
+    # The lifecycle gate keys on the eagle-family method; the scheduler-side
+    # mechanics are drafter-agnostic, so re-label the validated ngram config.
+    object.__setattr__(base.vllm_config.speculative_config, "method", "mtp")
+    base.vllm_config.speculative_config.num_speculative_tokens_per_batch_size = schedule
+    base.vllm_config.speculative_config.num_speculative_tokens_per_batch_size = schedule
+    spec = FullAttentionSpec(
+        block_size=16, num_kv_heads=1, head_size=1, dtype=torch.float32
+    )
+    kv_cache_config = KVCacheConfig(
+        num_blocks=10000,
+        kv_cache_tensors=[],
+        kv_cache_groups=[
+            KVCacheGroupSpec(["layer"], spec),
+            KVCacheGroupSpec(["draft_layer"], spec, is_eagle_group=True),
+        ],
+    )
+    return Scheduler(
+        vllm_config=base.vllm_config,
+        kv_cache_config=kv_cache_config,
+        block_size=16,
+        log_stats=True,
+        structured_output_manager=StructuredOutputManager(base.vllm_config),
+    )
+
+
+def _step(scheduler: Scheduler):
+    output = scheduler.schedule()
+    scheduled = output.num_scheduled_tokens
+    scheduler.update_from_output(
+        output,
+        ModelRunnerOutput(
+            req_ids=list(scheduled.keys()),
+            req_id_to_index={rid: i for i, rid in enumerate(scheduled)},
+            sampled_token_ids=[[0] for _ in scheduled],
+        ),
+    )
+    return output
+
+
+def test_eagle_k0_lifecycle_disabled_by_default(monkeypatch):
+    scheduler = _make_scheduler_with_k0_lifecycle(
+        [(1, 4, 2), (5, 16, 0)], monkeypatch=None
+    )
+    assert not scheduler.eagle_k0_lifecycle
+
+    for request in create_requests(num_requests=5, num_tokens=20):
+        scheduler.add_request(request)
+    output = _step(scheduler)
+    assert output.num_spec_tokens_to_schedule == 0
+    assert not output.eagle_k0_hold
+    assert not output.eagle_catchup_req_ids
+    assert not scheduler._eagle_hold
+
+
+def test_eagle_k0_lifecycle_hold_resume_cycle(monkeypatch):
+    scheduler = _make_scheduler_with_k0_lifecycle(
+        [(1, 4, 2), (5, 16, 0)], monkeypatch=monkeypatch
+    )
+    assert scheduler.eagle_k0_lifecycle
+    coordinator = scheduler.kv_cache_manager.coordinator
+    requests = create_requests(num_requests=4, num_tokens=20)
+    for request in requests:
+        scheduler.add_request(request)
+
+    # K=2 tier: normal speculation, no hold; the written-coverage tracker
+    # is refreshed to the post-rejection frontier.
+    output = _step(scheduler)
+    assert output.num_spec_tokens_to_schedule == 2
+    assert not output.eagle_k0_hold
+    assert not scheduler._eagle_hold
+    for request in requests:
+        assert scheduler._eagle_sync_points[request.request_id] == (
+            request.num_computed_tokens
+        )
+
+    # Admitting a 5th request moves the batch to the K=0 tier: the edge
+    # engages the hold; the newly admitted request has no tracked write.
+    fifth = create_requests(num_requests=5, num_tokens=20)[-1]
+    scheduler.add_request(fifth)
+    output = _step(scheduler)
+    assert output.num_spec_tokens_to_schedule == 0
+    assert output.eagle_k0_hold
+    assert scheduler._eagle_hold
+    assert scheduler._eagle_sync_points[fifth.request_id] == 0
+
+    # Held steps: the entry trim releases the edge step's transient draft
+    # growth and the allocation cap keeps the tables at the frozen sync
+    # points while num_computed advances.
+    output = _step(scheduler)
+    assert output.num_spec_tokens_to_schedule == 0
+    assert output.eagle_k0_hold
+    held_capacities = {
+        rid: coordinator.eagle_synced_tokens(rid)
+        for rid in scheduler._eagle_sync_points
+    }
+    for _ in range(2):
+        output = _step(scheduler)
+        assert output.num_spec_tokens_to_schedule == 0
+        assert output.eagle_k0_hold
+    for rid, sync_point in scheduler._eagle_sync_points.items():
+        capacity = coordinator.eagle_synced_tokens(rid)
+        assert sync_point <= capacity < sync_point + 16
+    assert {
+        rid: coordinator.eagle_synced_tokens(rid)
+        for rid in scheduler._eagle_sync_points
+    } == held_capacities
+
+    # Dropping back under the tier resumes: one-step pause, catch-up gaps
+    # equal to the held-back range, hold lifted.
+    scheduler.finish_requests([requests[0].request_id], RequestStatus.FINISHED_STOPPED)
+    fifth_nc = scheduler.requests[fifth.request_id].num_computed_tokens
+    output = _step(scheduler)
+    assert output.num_spec_tokens_to_schedule == 0
+    assert not output.eagle_k0_hold
+    assert not scheduler._eagle_hold
+    assert set(output.eagle_catchup_req_ids) == {r.request_id for r in requests[1:]} | {
+        fifth.request_id
+    }
+    for request in requests[1:]:
+        gap = output.eagle_catchup_req_ids[request.request_id]
+        assert 0 < gap <= request.num_computed_tokens
+    # The mid-hold admission catches up over its full context (every token
+    # computed before the resume step; the pause step's own token is not
+    # part of the gap).
+    assert output.eagle_catchup_req_ids[fifth.request_id] == fifth_nc
+
+    # The step after the pause speculates normally again.
+    output = _step(scheduler)
+    assert output.num_spec_tokens_to_schedule == 2
+    assert not output.eagle_k0_hold
+
+
+def test_eagle_k0_lifecycle_midhold_admission(monkeypatch):
+    # 2026-10-28 exp2 regression: admissions stalled for the whole K=0 hold
+    # (c32 waves collapsed 3/12, admission queue depth 16 at max concurrency).
+    # A same-prefix request admitted mid-hold must be scheduled, must NOT
+    # adopt eagle-group blocks (its sync-point-0 hold trim would free
+    # adopted blocks its source still reads), and must not disturb the
+    # sources' written eagle coverage.
+    scheduler = _make_scheduler_with_k0_lifecycle(
+        [(1, 4, 2), (5, 16, 0)], monkeypatch=monkeypatch
+    )
+    coordinator = scheduler.kv_cache_manager.coordinator
+    requests = create_requests(num_requests=4, num_tokens=20, same_prompt=True)
+    for request in requests:
+        scheduler.add_request(request)
+    output = _step(scheduler)
+    assert output.num_spec_tokens_to_schedule == 2
+
+    # The 5th same-prompt request tips the batch into the K=0 tier.
+    fifth = create_requests(num_requests=5, num_tokens=20, same_prompt=True)[-1]
+    scheduler.add_request(fifth)
+    output = _step(scheduler)
+    assert output.eagle_k0_hold
+    assert scheduler._eagle_sync_points[fifth.request_id] == 0
+    # One held step: the entry trim releases the edge step's transient draft
+    # growth (the 5th's adopted hit included) and the tables sit at their
+    # sync points.
+    output = _step(scheduler)
+    assert output.eagle_k0_hold
+
+    # Mid-hold admission of a 6th same-prompt request: scheduled (no
+    # deferral), eagle table empty (hit stripped + allocation capped at
+    # the sync point), sources' written eagle coverage untouched.
+    sixth = create_requests(num_requests=6, num_tokens=20, same_prompt=True)[-1]
+    before = {
+        rid: coordinator.eagle_synced_tokens(rid)
+        for rid in scheduler._eagle_sync_points
+    }
+    scheduler.add_request(sixth)
+    output = _step(scheduler)
+    assert output.eagle_k0_hold
+    assert sixth.request_id in output.num_scheduled_tokens
+    assert scheduler._eagle_sync_points[sixth.request_id] == 0
+    assert coordinator.eagle_synced_tokens(sixth.request_id) == 0
+    after = {
+        rid: coordinator.eagle_synced_tokens(rid)
+        for rid in scheduler._eagle_sync_points
+    }
+    assert {rid: after[rid] for rid in before} == before
+
+    # Held steps keep the admitted request's eagle table empty.
+    for _ in range(2):
+        output = _step(scheduler)
+        assert output.eagle_k0_hold
+        assert coordinator.eagle_synced_tokens(sixth.request_id) == 0
+
+    # Dropping under the tier resumes: the mid-hold admission catches up
+    # over its full computed context (sync point 0), hold lifts. Two
+    # finishes take the batch from 6 to 4 (the K=2 tier).
+    scheduler.finish_requests(
+        [requests[0].request_id, requests[1].request_id],
+        RequestStatus.FINISHED_STOPPED,
+    )
+    sixth_nc = scheduler.requests[sixth.request_id].num_computed_tokens
+    output = _step(scheduler)
+    assert not scheduler._eagle_hold
+    assert output.eagle_catchup_req_ids[sixth.request_id] == sixth_nc
+    # The step after the pause speculates normally again.
+    output = _step(scheduler)
+    assert output.num_spec_tokens_to_schedule == 2
+    assert not output.eagle_k0_hold
