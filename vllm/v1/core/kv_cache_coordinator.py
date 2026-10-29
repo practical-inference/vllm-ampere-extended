@@ -202,6 +202,7 @@ class KVCacheCoordinator(ABC):
         num_tokens_main_model: int,
         apply_admission_cap: bool = False,
         prefill_end: int = 0,
+        eagle_extra_tokens: int = 0,
     ) -> int:
         """Get the number of device blocks needed to be allocated for the request.
 
@@ -219,6 +220,9 @@ class KVCacheCoordinator(ABC):
             num_tokens_main_model: The number of tokens for the main model (aka target
                 model in spec decode). w/o spec decode, it is num_tokens;
                 with spec decode, it is num_tokens - num_lookahead_tokens.
+            eagle_extra_tokens: Extra slots for eagle (draft) groups only —
+                drafter catch-up prefill over tokens whose main KV already
+                exists (K=0 growth-hold resume).
             apply_admission_cap: If True, apply the recycling-aware
                 per-request admission cap (SWA / chunked-local). Set only by
                 the full-sequence admission gate; per-step allocation must
@@ -250,9 +254,12 @@ class KVCacheCoordinator(ABC):
                     apply_admission_cap=apply_admission_cap,
                 )
             else:
+                num_tokens_i = num_tokens + (
+                    eagle_extra_tokens if i in self.eagle_group_ids else 0
+                )
                 num_blocks_to_allocate += manager.get_num_blocks_to_allocate(
                     request_id,
-                    num_tokens,
+                    num_tokens_i,
                     new_computed_blocks[i],
                     total_computed_tokens,
                     num_local_computed_tokens,
@@ -318,6 +325,7 @@ class KVCacheCoordinator(ABC):
         num_tokens: int,
         num_tokens_main_model: int,
         num_encoder_tokens: int = 0,
+        eagle_extra_tokens: int = 0,
     ) -> tuple[list[KVCacheBlock], ...]:
         """Allocate new blocks for the request to give it at least `num_tokens`
         token slots.
@@ -331,20 +339,27 @@ class KVCacheCoordinator(ABC):
                 with spec decode, it is num_tokens - num_lookahead_tokens.
             num_encoder_tokens: The number of encoder tokens for allocating
                 blocks for cross-attention.
+            eagle_extra_tokens: Extra slots for eagle (draft) groups only —
+                drafter catch-up prefill over tokens whose main KV already
+                exists (K=0 growth-hold resume).
 
         Returns:
             The new allocated blocks.
 
         """
+
+        def _target_tokens(i: int, manager) -> int:
+            if isinstance(manager, CrossAttentionManager):
+                return num_encoder_tokens
+            return num_tokens + (eagle_extra_tokens if i in self.eagle_group_ids else 0)
+
         return tuple(
             manager.allocate_new_blocks(
                 request_id,
-                num_encoder_tokens
-                if isinstance(manager, CrossAttentionManager)
-                else num_tokens,
+                _target_tokens(i, manager),
                 num_tokens_main_model,
             )
-            for manager in self.single_type_managers
+            for i, manager in enumerate(self.single_type_managers)
         )
 
     def get_num_cacheable_tokens(
@@ -373,12 +388,49 @@ class KVCacheCoordinator(ABC):
         for group_id, manager in enumerate(self.single_type_managers):
             if not manager.enable_caching:
                 continue
+            num_cacheable = self.get_num_cacheable_tokens(num_computed_tokens, group_id)
+            if group_id in self.eagle_group_ids:
+                # The draft table can lag the main context under the K=0
+                # growth hold; never cache past blocks that exist.
+                table = manager.req_to_blocks.get(request.request_id)
+                if table is not None:
+                    num_cacheable = min(num_cacheable, len(table) * manager.block_size)
             manager.cache_blocks(
                 request,
-                self.get_num_cacheable_tokens(num_computed_tokens, group_id),
+                num_cacheable,
                 retention_interval=self.retention_interval,
                 replay_boundaries=boundaries,
             )
+
+    def eagle_synced_tokens(self, request_id: str) -> int:
+        """Tokens covered by the request's eagle (draft) group tables.
+
+        Under the K=0 growth hold this lags `num_computed_tokens`; the
+        difference is the catch-up prefill range at the K=0 -> K>0 resume.
+
+        Returns 0 when the request has no eagle table entry (never synced).
+        """
+        synced: int | None = None
+        for gid in self.eagle_group_ids:
+            table = self.single_type_managers[gid].req_to_blocks.get(request_id)
+            tokens = len(table) * self.single_type_managers[gid].block_size
+            synced = tokens if synced is None else min(synced, tokens)
+        return synced if synced is not None else 0
+
+    def remove_eagle_blocks(self, request_id: str, num_synced_tokens: int) -> None:
+        """Free eagle (draft) group blocks beyond the synced prefix.
+
+        The K=0 growth hold skips the drafter sync, so blocks allocated past
+        the synced prefix hold no draft KV; trim them back so the pool
+        reuses them while the batch sits at the K=0 tier.
+        """
+        for gid in self.eagle_group_ids:
+            manager = self.single_type_managers[gid]
+            table = manager.req_to_blocks.get(request_id)
+            if not table:
+                continue
+            first_block = cdiv(num_synced_tokens, manager.block_size)
+            manager._remove_blocks_in_range(request_id, first_block, len(table))
 
     def emit_cached_block_events(
         self, request: Request, computed_blocks: tuple[list[KVCacheBlock], ...]
