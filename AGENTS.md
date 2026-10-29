@@ -57,28 +57,17 @@ This gate applies to **public GitHub only**. Private repos and mirrors: commit e
 ### Evidence convention (fork)
 
 Numbers published in `recipes/` (and drafts) must cite provenance the evidence
-gate can validate. Three valid forms:
-
-1. **In-tree path** — the evidence file is committed (backticked path, or the
-   bracketed `evidence:` tag form). The gate checks it exists in the pushed
-   tree. Watch `.gitignore`: log files are swallowed — use `.txt`.
-2. **Tag-pinned forgejo raw URL** —
-   `http://192.168.2.31:3001/michael/vllm-nightly/raw/tag/nightly-YYYYMMDD/<path>`
-   for internal/review-pipeline citation; the gate validates it offline against
-   the local tree. Cite the tag the evidence was produced under — never a
-   branch head (drifts) or a not-yet-published tag (fails the gate).
-3. **GitHub release asset** —
-   `https://github.com/practical-inference/vllm-ampere-extended/releases/download/<tag>/<asset>`
-   for upstream-facing citation (public; upstream reviewers have no forgejo
-   access). The gate checks the asset exists on the release. Every nightly
-   release carries `evidence-<tag>.tar.gz` (recipes/ at the tag, uploaded by
-   the promote pipeline) — the frozen public copy; cite files inside it as
-   `<tarball-url> :: <path-in-archive>`.
-
-A cited link that is dead in any form fails the push (evidence gate). What the
-gate cannot enforce is that a recipe cites evidence at all — a number with no
-provenance passes mechanically and is a review concern (adversarial/delta
-review).
+gate can validate. Valid forms: (1) an in-tree committed path — backticked, or
+the bracketed `evidence:` tag form (log files are gitignore-swallowed — use
+`.txt`); (2) a tag-pinned forgejo raw URL,
+`http://192.168.2.31:3001/michael/vllm-nightly/raw/tag/nightly-YYYYMMDD/<path>`,
+for internal/review citation — cite the tag the evidence was produced under,
+never a branch head or an unpublished tag; (3) a GitHub release asset,
+`https://github.com/practical-inference/vllm-ampere-extended/releases/download/<tag>/<asset>`,
+for upstream-facing citation — every nightly release carries
+`evidence-<tag>.tar.gz` (recipes/ at the tag, uploaded by the promote pipeline)
+as the frozen public copy. A dead link in any form fails the push; that a
+recipe cites evidence at all is a review concern, not a gate.
 
 ### Fail-closed behavior
 
