@@ -9,7 +9,7 @@
 <h1 align="center">vllm-ampere-extended</h1>
 
 <p align="center">
-  <b>The newest open models don't run on stock vLLM for your GPU. This fork makes them run.</b>
+  <b>The newest open models don't run on stock vLLM with Ampere GPUs. This fork makes them run.</b>
 </p>
 
 <p align="center">
