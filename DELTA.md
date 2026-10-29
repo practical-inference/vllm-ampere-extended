@@ -1,17 +1,17 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 17 source commits (74 files changed, 4849 insertions(+), 287 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 18 source commits (74 files changed, 4848 insertions(+), 287 deletions(-)).
 
 Diff base: upstream commit `3765000a37` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 3765000a37..fb4a6ae46d -- vllm/ csrc/` and `git diff --stat 3765000a37..fb4a6ae46d -- vllm/ csrc/`.
+`git log --no-merges 3765000a37..b017bd1ce9 -- vllm/ csrc/` and `git diff --stat 3765000a37..b017bd1ce9 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
 | Area | Commits |
 |---|---|
+| general fixes | 6 |
 | spec-decode fixes | 5 |
-| general fixes | 5 |
 | model bring-up (GLM5Next / Qwen4Exp / DSV41) | 2 |
 | KV-cache / offload fixes | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + KV-cache / offload fixes) | 1 |
@@ -21,6 +21,7 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- docs: regenerate DELTA.md for the current delta (b017bd1ce9)
 - fix(spec): mypy narrowing on the K=0 catch-up propose + test helper (6c1e67f8c1)
 - style: ruff format scheduler.py eagle-hit strip (d187cac631)
 - fix(spec): eagle K=0 hold admits requests — eagle hits stripped, table capped (38f18ce0f1)
