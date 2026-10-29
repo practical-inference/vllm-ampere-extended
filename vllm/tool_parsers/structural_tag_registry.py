@@ -1086,7 +1086,11 @@ def _glm_4_7_strict_tool_tag(tool: FunctionToolParam) -> TagFormat:
             if tool.function.parameters is not None
             else True,
             style="glm_xml",
-            any_order=False,
+            # Sequential (declared-order) closure rejects valid emissions whose
+            # optional keys disagree with schema order (e.g. limit before
+            # offset), trapping constrained decoding in a repetition basin.
+            # Any-order only adds orderings; per-key value schemas stay pinned.
+            any_order=True,
         ),
         end="</tool_call>",
     )
@@ -1115,7 +1119,8 @@ def get_glm_4_7_structural_tag(
     del builtin_tools, token_suffix
 
     if function_tools and all(tool.function.strict for tool in function_tools):
-        # Strict-only requests stay byte-identical to the xgrammar builtin.
+        # Any-order keeps strict decoding total when optional-key emission
+        # order disagrees with schema order (mirrors the shallow path).
         dumped_choice: Any = (
             {"type": "function", "function": {"name": function_tools[0].function.name}}
             if tool_choice == "forced"
@@ -1134,6 +1139,7 @@ def get_glm_4_7_structural_tag(
             tools=dumped_tools,
             tool_choice=dumped_choice,
             reasoning=reasoning,
+            any_order=True,
         )
 
     tags = [

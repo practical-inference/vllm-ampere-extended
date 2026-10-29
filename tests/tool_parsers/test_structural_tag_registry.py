@@ -1765,7 +1765,10 @@ def _glm47_strict_tools() -> list[ChatCompletionToolsParam]:
     ],
 )
 def test_glm47_strict_only_matches_xgrammar_builtin(tool_choice: str, reasoning: bool):
-    # Strict-only requests stay byte-identical to the xgrammar builtin.
+    # Strict-only requests delegate to the xgrammar builtin with any_order=True:
+    # sequential (declared-order) closure would reject valid emissions whose
+    # optional keys disagree with schema order and can trap constrained
+    # decoding in a repetition basin.
     strict_tools = _glm47_strict_tools()
     dumped = [
         {"type": "function", "function": t.function.model_dump(exclude_none=True)}
@@ -1805,6 +1808,7 @@ def test_glm47_strict_only_matches_xgrammar_builtin(tool_choice: str, reasoning:
         tools=dumped,
         tool_choice=builtin_choice,
         reasoning=reasoning,
+        any_order=True,
     )
 
     assert isinstance(ours, StructuralTag)
@@ -1836,6 +1840,7 @@ def test_glm47_parameter_level_pins_schemas_like_the_builtin(
         ],
         tool_choice="required",
         reasoning=False,
+        any_order=True,
     )
 
     assert isinstance(ours, StructuralTag)
@@ -1863,6 +1868,68 @@ def test_glm47_mixed_tools_dispatch_per_tool(
         sample_tools_strict[0].function.parameters
     )
     assert tags[1]["content"]["type"] != "json_schema"
+
+
+def test_glm47_strict_grammar_accepts_optional_keys_in_any_order():
+    # Regression: the strict grammar compiled optional object properties as a
+    # sequential chain in schema-declared order, so an emission that emitted a
+    # later-declared key first was un-representable and constrained decoding
+    # could fall into a repetition basin (degenerate tool-call loops).
+    tag = get_model_structural_tag(
+        model="glm_4_7",
+        tools=_glm47_strict_tools(),
+        tool_choice="auto",
+        reasoning=False,
+    )
+    assert isinstance(tag, StructuralTag)
+    grammar = Grammar.from_structural_tag(tag)
+
+    declared_order = _glm47_call(
+        "get_weather", _glm47_arg("city", "Paris"), _glm47_arg("unit", "celsius")
+    )
+    reverse_order = _glm47_call(
+        "get_weather", _glm47_arg("unit", "celsius"), _glm47_arg("city", "Paris")
+    )
+    assert _is_grammar_accept_string(grammar, declared_order)
+    assert _is_grammar_accept_string(grammar, reverse_order)
+    # Key validity and value schemas stay pinned under any-order.
+    assert not _is_grammar_accept_string(
+        grammar,
+        _glm47_call(
+            "get_weather", _glm47_arg("city", "Paris"), _glm47_arg("bogus", "1")
+        ),
+    )
+    assert not _is_grammar_accept_string(
+        grammar,
+        _glm47_call(
+            "get_weather", _glm47_arg("city", "Paris"), _glm47_arg("unit", "kelvin")
+        ),
+    )
+
+
+def test_glm47_mixed_strict_tag_accepts_optional_keys_in_any_order(
+    sample_tools: list[ChatCompletionToolsParam],
+):
+    # The per-tool strict tag built for mixed strict/non-strict requests must
+    # also compile optional keys any-order.
+    mixed = [_glm47_strict_tools()[0], sample_tools[0]]
+    mixed[1] = mixed[1].model_copy(deep=True)
+    mixed[1].function.name = "run_command"
+
+    tag = get_model_structural_tag(
+        model="glm_4_7",
+        tools=mixed,
+        tool_choice="required",
+        reasoning=False,
+    )
+    assert isinstance(tag, StructuralTag)
+    grammar = Grammar.from_structural_tag(tag)
+    assert _is_grammar_accept_string(
+        grammar,
+        _glm47_call(
+            "get_weather", _glm47_arg("unit", "celsius"), _glm47_arg("city", "Paris")
+        ),
+    )
 
 
 def _glm47_parser(
