@@ -1119,12 +1119,14 @@ class Scheduler(SchedulerInterface):
                     step_skipped_waiting.appendleft(request_to_skip)
 
             while token_budget > 0:
-                # Eagle K=0 hold: defer admissions so no request enters with
-                # a draft-group prefix hit mid-hold (the catch-up replay must
-                # never rewrite adopted draft blocks shared with a source
-                # request). Admissions resume when the hold lifts.
-                if self._eagle_hold and not self.kv_holding_waiting:
-                    break
+                # Eagle K=0 hold: admissions stay open. A mid-hold entry
+                # adopts main-group blocks only — its eagle-group hit is
+                # stripped below (an adopted eagle block would be freed by
+                # this request's sync-point-0 hold trim while its source
+                # still reads it), and its eagle table is capped at the
+                # sync point (0) so the allocate-then-trim cycle is a
+                # no-op. The stash cap bounds the extra replay growth this
+                # creates and force-resumes past it.
                 # Requests holding KV blocks are always drained first, and are
                 # the only ones admitted under PAUSED_NEW (e.g. async KV loads).
                 request_queue = self.kv_holding_waiting
@@ -1337,6 +1339,30 @@ class Scheduler(SchedulerInterface):
                         skip_request(request_queue)
                         continue
 
+                if self._eagle_hold:
+                    # Mid-hold admission: adopt main-group blocks only. An
+                    # eagle-group hit adopts written draft KV shared with
+                    # its source; this request's sync-point-0 stamp would
+                    # trim it at the hold edge, freeing blocks the source
+                    # still reads. Eagle coverage regrows via the resume
+                    # replay (the edge-step-admission path).
+                    eagle_ids = self.kv_cache_manager.coordinator.eagle_group_ids
+                    if any(
+                        i < len(new_computed_blocks.blocks)
+                        and new_computed_blocks.blocks[i]
+                        for i in eagle_ids
+                    ):
+                        new_computed_blocks = KVCacheBlocks(
+                            tuple(
+                                ()
+                                if i in eagle_ids
+                                else blocks
+                                for i, blocks in enumerate(
+                                    new_computed_blocks.blocks
+                                )
+                            )
+                        )
+
                 encoder_inputs_to_schedule = None
                 external_load_encoder_input = []
                 duplicate_encoder_inputs = []
@@ -1511,6 +1537,11 @@ class Scheduler(SchedulerInterface):
                         else ()
                     ),
                     num_encoder_tokens=num_encoder_tokens,
+                    eagle_table_cap_tokens=(
+                        self._eagle_sync_points.get(request.request_id, 0)
+                        if self._eagle_hold
+                        else None
+                    ),
                     full_sequence_must_fit=self.scheduler_reserve_full_isl,
                     reserved_blocks=reserved_blocks,
                     has_scheduled_reqs=bool(self.running),

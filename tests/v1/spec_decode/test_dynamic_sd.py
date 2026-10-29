@@ -404,3 +404,75 @@ def test_eagle_k0_lifecycle_hold_resume_cycle(monkeypatch):
     output = _step(scheduler)
     assert output.num_spec_tokens_to_schedule == 2
     assert not output.eagle_k0_hold
+
+
+def test_eagle_k0_lifecycle_midhold_admission(monkeypatch):
+    # 2026-10-28 exp2 regression: admissions stalled for the whole K=0 hold
+    # (c32 waves collapsed 3/12, admission queue depth 16 at max concurrency).
+    # A same-prefix request admitted mid-hold must be scheduled, must NOT
+    # adopt eagle-group blocks (its sync-point-0 hold trim would free
+    # adopted blocks its source still reads), and must not disturb the
+    # sources' written eagle coverage.
+    scheduler = _make_scheduler_with_k0_lifecycle(
+        [(1, 4, 2), (5, 16, 0)], monkeypatch=monkeypatch
+    )
+    coordinator = scheduler.kv_cache_manager.coordinator
+    requests = create_requests(num_requests=4, num_tokens=20, same_prompt=True)
+    for request in requests:
+        scheduler.add_request(request)
+    output = _step(scheduler)
+    assert output.num_spec_tokens_to_schedule == 2
+
+    # The 5th same-prompt request tips the batch into the K=0 tier.
+    fifth = create_requests(num_requests=5, num_tokens=20, same_prompt=True)[-1]
+    scheduler.add_request(fifth)
+    output = _step(scheduler)
+    assert output.eagle_k0_hold
+    assert scheduler._eagle_sync_points[fifth.request_id] == 0
+    # One held step: the entry trim releases the edge step's transient draft
+    # growth (the 5th's adopted hit included) and the tables sit at their
+    # sync points.
+    output = _step(scheduler)
+    assert output.eagle_k0_hold
+
+    # Mid-hold admission of a 6th same-prompt request: scheduled (no
+    # deferral), eagle table empty (hit stripped + allocation capped at
+    # the sync point), sources' written eagle coverage untouched.
+    sixth = create_requests(num_requests=6, num_tokens=20, same_prompt=True)[-1]
+    before = {
+        rid: coordinator.eagle_synced_tokens(rid)
+        for rid in scheduler._eagle_sync_points
+    }
+    scheduler.add_request(sixth)
+    output = _step(scheduler)
+    assert output.eagle_k0_hold
+    assert sixth.request_id in output.num_scheduled_tokens
+    assert scheduler._eagle_sync_points[sixth.request_id] == 0
+    assert coordinator.eagle_synced_tokens(sixth.request_id) == 0
+    after = {
+        rid: coordinator.eagle_synced_tokens(rid)
+        for rid in scheduler._eagle_sync_points
+    }
+    assert {rid: after[rid] for rid in before} == before
+
+    # Held steps keep the admitted request's eagle table empty.
+    for _ in range(2):
+        output = _step(scheduler)
+        assert output.eagle_k0_hold
+        assert coordinator.eagle_synced_tokens(sixth.request_id) == 0
+
+    # Dropping under the tier resumes: the mid-hold admission catches up
+    # over its full computed context (sync point 0), hold lifts. Two
+    # finishes take the batch from 6 to 4 (the K=2 tier).
+    scheduler.finish_requests(
+        [requests[0].request_id, requests[1].request_id],
+        RequestStatus.FINISHED_STOPPED,
+    )
+    sixth_nc = scheduler.requests[sixth.request_id].num_computed_tokens
+    output = _step(scheduler)
+    assert not scheduler._eagle_hold
+    assert output.eagle_catchup_req_ids[sixth.request_id] == sixth_nc
+    # The step after the pause speculates normally again.
+    output = _step(scheduler)
+    assert output.num_spec_tokens_to_schedule == 2
+    assert not output.eagle_k0_hold
