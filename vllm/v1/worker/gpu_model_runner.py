@@ -907,6 +907,11 @@ class GPUModelRunner(
             self._num_valid_draft_tokens_copy_stream = torch.cuda.Stream()
 
         self._draft_token_req_ids: list[str] | None = None
+        # Eagle K=0 lifecycle: per-request propose inputs stashed while the
+        # batch holds at a K=0 tier (the drafter sync prefill is skipped);
+        # replayed as one gap catch-up prefill at the resume. req_id ->
+        # {"tokens"|"positions"|"hidden": [row tensors], "next": [scalars]}.
+        self._eagle_k0_stash: dict[str, dict[str, list[torch.Tensor]]] = {}
         self.transfer_event = torch.Event()
         self.sampled_token_ids_pinned_cpu = torch.empty(
             (self.max_num_reqs, 1),
@@ -5011,6 +5016,37 @@ class GPUModelRunner(
             else:
                 mm_embed_inputs = None
 
+            if num_spec_tokens_to_schedule == 0 and (
+                scheduler_output.eagle_k0_hold or scheduler_output.eagle_catchup_req_ids
+            ):
+                # Eagle K=0 lifecycle: hold = skip the drafter sync prefill
+                # and stash this step's propose inputs; catch-up = replay
+                # the stashed inputs as one gap prefill to re-sync the draft
+                # KV and GDN state before speculation resumes.
+                if scheduler_output.eagle_k0_hold:
+                    self._eagle_k0_capture(
+                        common_attn_metadata,
+                        target_token_ids,
+                        target_positions,
+                        target_hidden_states,
+                        next_token_ids,
+                    )
+                else:
+                    self._eagle_k0_catchup(
+                        scheduler_output,
+                        common_attn_metadata,
+                        target_token_ids,
+                        target_positions,
+                        target_hidden_states,
+                        next_token_ids,
+                        sampling_metadata,
+                    )
+                return torch.empty(
+                    (len(self.input_batch.req_ids), 0),
+                    dtype=torch.int64,
+                    device=self.device,
+                )
+
             draft_token_ids = self.drafter.propose(
                 num_speculative_tokens=num_spec_tokens_to_schedule,
                 target_token_ids=target_token_ids,
@@ -5031,6 +5067,157 @@ class GPUModelRunner(
                     self._draft_prob_req_ids = self.input_batch.req_ids.copy()
 
         return draft_token_ids
+
+    def _eagle_k0_capture(
+        self,
+        common_attn_metadata: CommonAttentionMetadata,
+        target_token_ids: torch.Tensor,
+        target_positions: torch.Tensor,
+        target_hidden_states: torch.Tensor,
+        next_token_ids: torch.Tensor,
+    ) -> None:
+        """Stash this step's propose inputs per request while holding at K=0.
+
+        Each stashed row is self-contained — (token, position, hidden state,
+        next token) — so the catch-up replay reproduces exactly the inputs
+        the skipped per-step sync prefill would have consumed, for any
+        chunk split of the replay.
+        """
+        req_ids = self.input_batch.req_ids
+        live = self.requests
+        for rid in list(self._eagle_k0_stash):
+            if rid not in live:
+                del self._eagle_k0_stash[rid]
+        qsl = common_attn_metadata.query_start_loc_cpu
+        for i, rid in enumerate(req_ids):
+            start = int(qsl[i])
+            end = int(qsl[i + 1])
+            if end <= start:
+                continue
+            entry = self._eagle_k0_stash.setdefault(
+                rid, {"tokens": [], "positions": [], "hidden": [], "next": []}
+            )
+            entry["tokens"].append(target_token_ids[start:end].clone())
+            entry["positions"].append(target_positions[start:end].clone())
+            entry["hidden"].append(target_hidden_states[start:end].clone())
+            entry["next"].append(next_token_ids[i : i + 1].clone())
+
+    def _eagle_k0_catchup(
+        self,
+        scheduler_output: "SchedulerOutput",
+        common_attn_metadata: CommonAttentionMetadata,
+        target_token_ids: torch.Tensor,
+        target_positions: torch.Tensor,
+        target_hidden_states: torch.Tensor,
+        next_token_ids: torch.Tensor,
+        sampling_metadata: SamplingMetadata,
+    ) -> None:
+        """Replay the stashed K=0 propose inputs as a gap catch-up prefill.
+
+        Runs the drafter forward over the held-back tokens (chunked to the
+        max-num-tokens budget) so the draft-group KV and the draft GDN state
+        advance exactly as they would have under per-step syncing. No draft
+        tokens are produced.
+        """
+        self._eagle_k0_capture(
+            common_attn_metadata,
+            target_token_ids,
+            target_positions,
+            target_hidden_states,
+            next_token_ids,
+        )
+        req_ids = self.input_batch.req_ids
+        num_reqs = len(req_ids)
+        stash = self._eagle_k0_stash
+        tokens = []
+        positions = []
+        hiddens = []
+        nexts = []
+        req_bounds: list[tuple[int, int]] = []
+        offset = 0
+        for rid in req_ids:
+            entry = stash.pop(rid, None)
+            assert entry is not None, f"no K=0 stash for scheduled request {rid}"
+            t = torch.cat(entry["tokens"])
+            tokens.append(t)
+            positions.append(torch.cat(entry["positions"]))
+            hiddens.append(torch.cat(entry["hidden"]))
+            nexts.append(torch.cat(entry["next"]))
+            req_bounds.append((offset, offset + t.shape[0]))
+            offset += t.shape[0]
+        stash.clear()
+        replay_tokens = torch.cat(tokens)
+        replay_positions = torch.cat(positions)
+        replay_hidden = torch.cat(hiddens)
+        replay_next = torch.cat(nexts)
+        total = int(replay_tokens.shape[0])
+
+        draft_gid = self.drafter.kv_cache_gid
+        block_table_obj = self.input_batch.block_table[draft_gid]
+        block_table = block_table_obj.get_device_tensor(num_reqs)
+        num_computed = self.input_batch.num_computed_tokens_cpu_tensor
+        scheduled = scheduler_output.num_scheduled_tokens
+        seq_lens_np = np.zeros(num_reqs, dtype=np.int32)
+        for i, rid in enumerate(req_ids):
+            seq_lens_np[i] = (
+                num_computed[self.input_batch.req_id_to_index[rid]] + scheduled[rid]
+            )
+        seq_lens = torch.from_numpy(seq_lens_np).to(self.device)
+        max_seq_len = int(seq_lens_np.max())
+
+        bounds_start = np.array([b[0] for b in req_bounds], dtype=np.int64)
+        bounds_end = np.array([b[1] for b in req_bounds], dtype=np.int64)
+
+        chunk_limit = self.max_num_tokens
+        for a in range(0, total, chunk_limit):
+            b = min(a + chunk_limit, total)
+            overlap_len = np.clip(
+                np.minimum(bounds_end, b) - np.maximum(bounds_start, a), 0, None
+            )
+            keep_np = overlap_len > 0
+            num_chunk_reqs = int(keep_np.sum())
+            chunk_qsl_np = np.zeros(num_chunk_reqs + 1, dtype=np.int32)
+            np.cumsum(overlap_len[keep_np], out=chunk_qsl_np[1:])
+            chunk_qsl_cpu = torch.from_numpy(chunk_qsl_np)
+            chunk_qsl = chunk_qsl_cpu.to(self.device)
+            keep = torch.from_numpy(keep_np).to(self.device)
+            block_table_obj.compute_slot_mapping(
+                num_chunk_reqs, chunk_qsl, replay_positions[a:b]
+            )
+            # One next token per cad request: the rotation shifts the
+            # chunk's rows left globally and overwrites each cad request's
+            # last row with its own next token — the last stashed row's
+            # next for every (possibly split) request part in this chunk.
+            chunk_next = replay_next[np.minimum(bounds_end, b)[keep_np] - 1]
+            chunk_cad = CommonAttentionMetadata(
+                query_start_loc=chunk_qsl,
+                query_start_loc_cpu=chunk_qsl_cpu,
+                seq_lens=seq_lens[keep],
+                num_reqs=num_chunk_reqs,
+                num_actual_tokens=b - a,
+                max_query_len=int(overlap_len[keep_np].max()),
+                max_seq_len=max_seq_len,
+                block_table_tensor=block_table[keep],
+                slot_mapping=block_table_obj.slot_mapping.gpu[: b - a],
+                causal=True,
+                positions=replay_positions[a:b],
+                is_prefilling=torch.ones(
+                    num_chunk_reqs, dtype=torch.bool, device=self.device
+                ),
+            )
+            self.drafter.propose(
+                num_speculative_tokens=0,
+                target_token_ids=replay_tokens[a:b],
+                target_positions=replay_positions[a:b],
+                target_hidden_states=replay_hidden[a:b],
+                next_token_ids=chunk_next,
+                token_indices_to_sample=None,
+                sampling_metadata=sampling_metadata,
+                common_attn_metadata=chunk_cad,
+                mm_embed_inputs=None,
+                num_rejected_tokens_gpu=None,
+                slot_mappings=None,
+            )
 
     @instrument(span_name="Loading (GPU)")
     def load_model(

@@ -405,6 +405,8 @@ class KVCacheCoordinator(ABC):
     def eagle_synced_tokens(self, request_id: str) -> int:
         """Tokens covered by the request's eagle (draft) group tables.
 
+        Counts only non-null blocks: the growth hold's trim releases the
+        tail back to the pool, so those slots no longer hold draft KV.
         Under the K=0 growth hold this lags `num_computed_tokens`; the
         difference is the catch-up prefill range at the K=0 -> K>0 resume.
 
@@ -412,8 +414,13 @@ class KVCacheCoordinator(ABC):
         """
         synced: int | None = None
         for gid in self.eagle_group_ids:
-            table = self.single_type_managers[gid].req_to_blocks.get(request_id)
-            tokens = len(table) * self.single_type_managers[gid].block_size
+            manager = self.single_type_managers[gid]
+            table = manager.req_to_blocks.get(request_id)
+            if table is None:
+                continue
+            null_block = manager.block_pool.null_block
+            num_blocks = sum(b != null_block for b in table)
+            tokens = num_blocks * manager.block_size
             synced = tokens if synced is None else min(synced, tokens)
         return synced if synced is not None else 0
 
@@ -422,7 +429,10 @@ class KVCacheCoordinator(ABC):
 
         The K=0 growth hold skips the drafter sync, so blocks allocated past
         the synced prefix hold no draft KV; trim them back so the pool
-        reuses them while the batch sits at the K=0 tier.
+        reuses them while the batch sits at the K=0 tier. The trimmed tail
+        is truncated (not left null): block allocation is length-based, so
+        retained nulls would make the resume's re-growth a no-op and the
+        catch-up prefill would write into null blocks.
         """
         for gid in self.eagle_group_ids:
             manager = self.single_type_managers[gid]
@@ -431,6 +441,7 @@ class KVCacheCoordinator(ABC):
                 continue
             first_block = cdiv(num_synced_tokens, manager.block_size)
             manager._remove_blocks_in_range(request_id, first_block, len(table))
+            del table[first_block:]
 
     def emit_cached_block_events(
         self, request: Request, computed_blocks: tuple[list[KVCacheBlock], ...]

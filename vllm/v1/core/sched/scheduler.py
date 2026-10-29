@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from dataclasses import replace
 from typing import Any
 
+import vllm.envs as envs
 from vllm.compilation.cuda_graph import CUDAGraphStat
 from vllm.config import KVEventsConfig, VllmConfig
 from vllm.distributed.aux_output_connector.connector import AuxOutputSchedulerConnector
@@ -331,6 +332,27 @@ class Scheduler(SchedulerInterface):
                     "This is experimental and may affect speculative-token "
                     "acceptance rates."
                 )
+
+        # Eagle K=0 draft-resource lifecycle (A'): at K=0 tiers skip the
+        # drafter sync prefill, hold draft-group growth via retroactive
+        # per-group block release at next-step entry, and on the K=0 -> K>0
+        # resume pause speculation one step while the runner replays a
+        # drafter catch-up prefill over the held-back gap. V1 runner only
+        # (V2 has its own skip machinery); classic eagle rotation pathway
+        # only (parallel-drafting methods pad the drafter batch and would
+        # extend the replay with per-request draft slots).
+        self.eagle_k0_lifecycle = (
+            speculative_config is not None
+            and speculative_config.method in ("eagle", "eagle3", "mtp")
+            and not speculative_config.parallel_drafting
+            and not vllm_config.use_v2_model_runner
+            and envs.VLLM_EAGLE_K0_LIFECYCLE
+        )
+        self._eagle_hold = False
+        self._eagle_force_resume = False
+        # request id -> draft-group tokens whose KV is actually written
+        # (frozen at the K>0 -> K=0 edge; the table above it is trimmed).
+        self._eagle_sync_points: dict[str, int] = {}
 
         self.num_hash_lookahead_tokens = vllm_config.num_hash_lookahead_tokens
         if self.num_hash_lookahead_tokens:
@@ -734,6 +756,31 @@ class Scheduler(SchedulerInterface):
 
         self.kv_cache_manager.new_step_starts()
 
+        # Eagle K=0 lifecycle: while holding, retroactively free the draft
+        # growth the skipped drafter never wrote (the trim is a no-op under
+        # the allocation cap; it bounds the edge step's transient growth).
+        if self.eagle_k0_lifecycle and self._eagle_hold:
+            coordinator = self.kv_cache_manager.coordinator
+            for req_id, sync_point in self._eagle_sync_points.items():
+                coordinator.remove_eagle_blocks(req_id, sync_point)
+            running_ids = {r.request_id for r in self.running}
+            self._eagle_sync_points = {
+                req_id: sync_point
+                for req_id, sync_point in self._eagle_sync_points.items()
+                if req_id in running_ids
+            }
+            # Stash cap: the runner buffers the per-step propose inputs
+            # (token ids, positions, target hidden states) for the catch-up
+            # replay. Past this budget the buffer cost outweighs the hold's
+            # memory win — force a catch-up and fall back to the ordinary
+            # per-step sync prefill.
+            total_gap = sum(
+                self.requests[req_id].num_computed_tokens - sync_point
+                for req_id, sync_point in self._eagle_sync_points.items()
+            )
+            if total_gap > 65536:
+                self._eagle_force_resume = True
+
         # Proactive KV valve: preempt from the tail before allocation failure
         # turns a full pool into continuous preempt/restore churn. One victim
         # per step keeps preemption episodic.
@@ -921,6 +968,11 @@ class Scheduler(SchedulerInterface):
                         request,
                         num_new_tokens,
                         num_lookahead_tokens=self.num_lookahead_tokens,
+                        eagle_table_cap_tokens=(
+                            self._eagle_sync_points.get(request.request_id, 0)
+                            if self._eagle_hold
+                            else None
+                        ),
                     )
 
                     if new_blocks is not None:
@@ -1066,6 +1118,12 @@ class Scheduler(SchedulerInterface):
                     step_skipped_waiting.appendleft(request_to_skip)
 
             while token_budget > 0:
+                # Eagle K=0 hold: defer admissions so no request enters with
+                # a draft-group prefix hit mid-hold (the catch-up replay must
+                # never rewrite adopted draft blocks shared with a source
+                # request). Admissions resume when the hold lifts.
+                if self._eagle_hold and not self.kv_holding_waiting:
+                    break
                 # Requests holding KV blocks are always drained first, and are
                 # the only ones admitted under PAUSED_NEW (e.g. async KV loads).
                 request_queue = self.kv_holding_waiting
@@ -1704,6 +1762,86 @@ class Scheduler(SchedulerInterface):
                 len(num_scheduled_tokens)
             ]
 
+        # Eagle K=0 lifecycle tier-edge state machine. The ladder result
+        # lands after the allocate calls, so the hold caps allocation via
+        # eagle_table_cap_tokens (the previous step's K is the predictor)
+        # and the resume re-grows the catch-up range before execution.
+        # _eagle_sync_points tracks each request's WRITTEN draft coverage
+        # (its post-rejection frontier, refreshed in update_from_output
+        # after every step where the drafter ran; unchanged while the
+        # drafter is skipped at K=0).
+        eagle_catchup_req_ids: dict[str, int] = {}
+        if self.eagle_k0_lifecycle and len(num_scheduled_tokens) > 0:
+            if self._eagle_hold:
+                if num_spec_tokens_to_schedule > 0 or self._eagle_force_resume:
+                    # Resume (ladder left the K=0 tier, or the stash cap
+                    # tripped): pause speculation for one step and let the
+                    # runner replay the drafter catch-up prefill over the
+                    # held-back gap before speculating again. The loop's
+                    # allocations were capped at the synced prefix, so the
+                    # catch-up range must be re-grown first — all-or-nothing:
+                    # a request whose table cannot grow must not speculate.
+                    coordinator = self.kv_cache_manager.coordinator
+                    empty_blocks = self.kv_cache_manager.empty_kv_cache_blocks.blocks
+                    targets = {
+                        req_id: (
+                            self.requests[req_id].num_computed_tokens
+                            + num_scheduled_tokens[req_id]
+                        )
+                        for req_id in num_scheduled_tokens
+                    }
+                    needed = sum(
+                        coordinator.get_num_blocks_to_allocate(
+                            request_id=req_id,
+                            num_tokens=target,
+                            new_computed_blocks=empty_blocks,
+                            num_encoder_tokens=0,
+                            total_computed_tokens=target,
+                            num_local_computed_tokens=target,
+                            num_tokens_main_model=target,
+                        )
+                        for req_id, target in targets.items()
+                    )
+                    if needed <= self.kv_cache_manager.block_pool.get_num_free_blocks():
+                        for req_id, target in targets.items():
+                            num_computed = self.requests[req_id].num_computed_tokens
+                            gap = num_computed - self._eagle_sync_points.get(req_id, 0)
+                            coordinator.allocate_new_blocks(
+                                req_id,
+                                target,
+                                target,
+                            )
+                            if gap > 0:
+                                eagle_catchup_req_ids[req_id] = gap
+                            # The catch-up (gap rows + this step's own
+                            # tokens) leaves the draft coverage exactly here;
+                            # trim the unwritten lookahead slots so a
+                            # re-entry into K=0 starts from an exact sync
+                            # point.
+                            coordinator.remove_eagle_blocks(req_id, target)
+                            self._eagle_sync_points[req_id] = target
+                        num_spec_tokens_to_schedule = 0
+                        self._eagle_hold = False
+                        self._eagle_force_resume = False
+                    else:
+                        # Pool cannot supply the catch-up growth: pause
+                        # without catch-up and retry next step (the drafter
+                        # stays skipped, so the capped tables stay safe).
+                        num_spec_tokens_to_schedule = 0
+                else:
+                    # Hold continues: stamp requests with no tracked write
+                    # (admitted at the edge step, drafter skipped) at zero.
+                    for req_id in num_scheduled_tokens:
+                        self._eagle_sync_points.setdefault(req_id, 0)
+            elif num_spec_tokens_to_schedule == 0:
+                # Entered the K=0 tier: stamp requests with no tracked write
+                # (newly admitted here, drafter skipped) at zero and hold.
+                # Tracked requests' sync points are already exact — they are
+                # refreshed in update_from_output after every drafter step.
+                for req_id in num_scheduled_tokens:
+                    self._eagle_sync_points.setdefault(req_id, 0)
+                self._eagle_hold = True
+
         scheduled_encoder_input_stats = None
         if (
             self.log_stats
@@ -1737,6 +1875,8 @@ class Scheduler(SchedulerInterface):
             kv_connector_block_state=kv_connector_block_state,
             num_spec_tokens_to_schedule=num_spec_tokens_to_schedule,
             skip_drafts=not drafts_needed,
+            eagle_catchup_req_ids=eagle_catchup_req_ids,
+            eagle_k0_hold=self._eagle_hold,
             ec_manager_metadata=self.encoder_cache_manager.get_manager_metadata(),
         )
 
@@ -2663,6 +2803,17 @@ class Scheduler(SchedulerInterface):
                 # outputs this step.
                 engine_core_outputs[0] = eco = EngineCoreOutputs()
             eco.scheduler_stats = stats
+
+        # Eagle K=0 lifecycle: the drafter ran this step (speculation or the
+        # catch-up replay), so each scheduled request's written draft
+        # coverage now extends to its post-rejection frontier.
+        if self.eagle_k0_lifecycle and (
+            scheduler_output.num_spec_tokens_to_schedule > 0
+            or scheduler_output.eagle_catchup_req_ids
+        ):
+            for req_id in scheduler_output.num_scheduled_tokens:
+                if req := self.requests.get(req_id):
+                    self._eagle_sync_points[req_id] = req.num_computed_tokens
 
         return engine_core_outputs
 
