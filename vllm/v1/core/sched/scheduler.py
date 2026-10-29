@@ -346,6 +346,7 @@ class Scheduler(SchedulerInterface):
             and speculative_config.method in ("eagle", "eagle3", "mtp")
             and not speculative_config.parallel_drafting
             and not vllm_config.use_v2_model_runner
+            and not vllm_config.model_config.supports_multimodal_inputs
             and envs.VLLM_EAGLE_K0_LIFECYCLE
         )
         self._eagle_hold = False
@@ -1687,74 +1688,6 @@ class Scheduler(SchedulerInterface):
             scheduled_running_reqs
         ) <= len(self.running)
 
-        # Construct the scheduler output.
-        if self.use_v2_model_runner:
-            scheduled_new_reqs.extend(scheduled_resumed_reqs)
-            scheduled_resumed_reqs.clear()
-            new_reqs_data = [
-                NewRequestData.from_request(
-                    req,
-                    req_to_new_blocks[req.request_id].get_block_ids(),
-                    req._all_token_ids,
-                    uses_mrope=self.model_uses_mrope,
-                )
-                for req in scheduled_new_reqs
-            ]
-        else:
-            new_reqs_data = [
-                NewRequestData.from_request(
-                    req,
-                    req_to_new_blocks[req.request_id].get_block_ids(),
-                    uses_mrope=self.model_uses_mrope,
-                )
-                for req in scheduled_new_reqs
-            ]
-
-        with record_function_or_nullcontext("schedule: make_cached_request_data"):
-            cached_reqs_data = self._make_cached_request_data(
-                scheduled_running_reqs,
-                scheduled_resumed_reqs,
-                num_scheduled_tokens,
-                scheduled_spec_decode_tokens,
-                req_to_new_blocks,
-            )
-
-        # Record the request ids that were scheduled in this step (MRV1-only).
-        if not self.use_v2_model_runner:
-            self.prev_step_scheduled_req_ids.clear()
-            self.prev_step_scheduled_req_ids.update(num_scheduled_tokens.keys())
-
-        # Mamba "align" boundary states must be handed off with exact block ids;
-        # they cannot be reconstructed from a connector's append-only block
-        # table. Drained every step so stale offers cannot accumulate.
-        boundary_state_offloads = self.kv_cache_manager.take_boundary_state_offloads()
-
-        kv_connector_block_state = None
-        if self.connector is not None:
-            # Any request scheduled this step can become a connector job now,
-            # not only the ones that were allocated blocks: a store save lands
-            # on the step that fills a block, which allocated none.
-            block_state_req_ids = set(num_scheduled_tokens)
-            block_state_req_ids.update(
-                req_id for req_id in boundary_state_offloads if req_id in self.requests
-            )
-            kv_connector_block_state = KVConnectorBlockState(
-                req_ids=block_state_req_ids,
-                resolve_block_ids=self.kv_cache_manager.get_block_ids,
-                boundary_state_offloads=boundary_state_offloads,
-            )
-
-        kv_cache_block_copies, cow_retained_blocks = (
-            self.kv_cache_manager.take_kv_cache_block_copies()
-        )
-        if kv_cache_block_copies:
-            # The copies run with this step's execution; the first non-empty
-            # step at or after it gets seq `sched_step_seq + 1` (0-token steps
-            # do not advance the seq), and its completion implies the copies
-            # have run.
-            self._free_cow_retained_blocks(cow_retained_blocks, self.sched_step_seq + 1)
-        pending_kv_cache_block_copies = kv_cache_block_copies or None
-
         # Dynamic speculative decoding: compute optimal K
         num_spec_tokens_to_schedule = self.num_spec_tokens
         if self.dynamic_sd_lookup is not None and len(num_scheduled_tokens) > 0:
@@ -1841,6 +1774,74 @@ class Scheduler(SchedulerInterface):
                 for req_id in num_scheduled_tokens:
                     self._eagle_sync_points.setdefault(req_id, 0)
                 self._eagle_hold = True
+
+        # Construct the scheduler output.
+        if self.use_v2_model_runner:
+            scheduled_new_reqs.extend(scheduled_resumed_reqs)
+            scheduled_resumed_reqs.clear()
+            new_reqs_data = [
+                NewRequestData.from_request(
+                    req,
+                    req_to_new_blocks[req.request_id].get_block_ids(),
+                    req._all_token_ids,
+                    uses_mrope=self.model_uses_mrope,
+                )
+                for req in scheduled_new_reqs
+            ]
+        else:
+            new_reqs_data = [
+                NewRequestData.from_request(
+                    req,
+                    req_to_new_blocks[req.request_id].get_block_ids(),
+                    uses_mrope=self.model_uses_mrope,
+                )
+                for req in scheduled_new_reqs
+            ]
+
+        with record_function_or_nullcontext("schedule: make_cached_request_data"):
+            cached_reqs_data = self._make_cached_request_data(
+                scheduled_running_reqs,
+                scheduled_resumed_reqs,
+                num_scheduled_tokens,
+                scheduled_spec_decode_tokens,
+                req_to_new_blocks,
+            )
+
+        # Record the request ids that were scheduled in this step (MRV1-only).
+        if not self.use_v2_model_runner:
+            self.prev_step_scheduled_req_ids.clear()
+            self.prev_step_scheduled_req_ids.update(num_scheduled_tokens.keys())
+
+        # Mamba "align" boundary states must be handed off with exact block ids;
+        # they cannot be reconstructed from a connector's append-only block
+        # table. Drained every step so stale offers cannot accumulate.
+        boundary_state_offloads = self.kv_cache_manager.take_boundary_state_offloads()
+
+        kv_connector_block_state = None
+        if self.connector is not None:
+            # Any request scheduled this step can become a connector job now,
+            # not only the ones that were allocated blocks: a store save lands
+            # on the step that fills a block, which allocated none.
+            block_state_req_ids = set(num_scheduled_tokens)
+            block_state_req_ids.update(
+                req_id for req_id in boundary_state_offloads if req_id in self.requests
+            )
+            kv_connector_block_state = KVConnectorBlockState(
+                req_ids=block_state_req_ids,
+                resolve_block_ids=self.kv_cache_manager.get_block_ids,
+                boundary_state_offloads=boundary_state_offloads,
+            )
+
+        kv_cache_block_copies, cow_retained_blocks = (
+            self.kv_cache_manager.take_kv_cache_block_copies()
+        )
+        if kv_cache_block_copies:
+            # The copies run with this step's execution; the first non-empty
+            # step at or after it gets seq `sched_step_seq + 1` (0-token steps
+            # do not advance the seq), and its completion implies the copies
+            # have run.
+            self._free_cow_retained_blocks(cow_retained_blocks, self.sched_step_seq + 1)
+        pending_kv_cache_block_copies = kv_cache_block_copies or None
 
         scheduled_encoder_input_stats = None
         if (
