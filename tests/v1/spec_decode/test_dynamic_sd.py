@@ -396,6 +396,17 @@ def test_eagle_k0_lifecycle_hold_resume_cycle(monkeypatch):
     for request in requests[1:]:
         gap = output.eagle_catchup_req_ids[request.request_id]
         assert 0 < gap <= request.num_computed_tokens
+    # The re-grown eagle blocks must reach the runner's append-only table:
+    # the resume step's cached delta carries them for the sync-0 request
+    # (the 2026-10-29 delta-review a1 finding — the live-view mechanism
+    # covers admissions only; running requests get the allocate_slots
+    # delta, so the fold is load-bearing exactly here).
+    cached = output.scheduled_cached_reqs
+    idx = cached.req_ids.index(fifth.request_id)
+    block_ids = cached.new_block_ids[idx]
+    assert block_ids is not None and block_ids[1], (
+        "re-grown eagle blocks missing from the resume step's delta"
+    )
     # The mid-hold admission catches up over its full context (every token
     # computed before the resume step; the pause step's own token is not
     # part of the gap).
@@ -473,6 +484,12 @@ def test_eagle_k0_lifecycle_midhold_admission(monkeypatch):
     output = _step(scheduler)
     assert not scheduler._eagle_hold
     assert output.eagle_catchup_req_ids[sixth.request_id] == sixth_nc
+    # The sync-0 admission's re-grown eagle blocks reach the runner's
+    # append-only table via the resume step's delta (the a1 finding's fold).
+    cached = output.scheduled_cached_reqs
+    idx = cached.req_ids.index(sixth.request_id)
+    block_ids = cached.new_block_ids[idx]
+    assert block_ids is not None and block_ids[1]
     # The step after the pause speculates normally again.
     output = _step(scheduler)
     assert output.num_spec_tokens_to_schedule == 2

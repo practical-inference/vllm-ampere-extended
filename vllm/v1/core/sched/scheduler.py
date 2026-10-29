@@ -1789,10 +1789,14 @@ class Scheduler(SchedulerInterface):
                         for req_id, target in targets.items()
                     )
                     if needed <= self.kv_cache_manager.block_pool.get_num_free_blocks():
+                        admitted_req_ids = {
+                            r.request_id
+                            for r in scheduled_new_reqs + scheduled_resumed_reqs
+                        }
                         for req_id, target in targets.items():
                             num_computed = self.requests[req_id].num_computed_tokens
                             gap = num_computed - self._eagle_sync_points.get(req_id, 0)
-                            coordinator.allocate_new_blocks(
+                            regrown = coordinator.allocate_new_blocks(
                                 req_id,
                                 target,
                                 target,
@@ -1806,6 +1810,23 @@ class Scheduler(SchedulerInterface):
                             # point.
                             coordinator.remove_eagle_blocks(req_id, target)
                             self._eagle_sync_points[req_id] = target
+                            # The re-grown eagle blocks must reach the
+                            # runner's append-only table before the replay
+                            # writes the gap. A running request's step delta
+                            # is the allocate_slots return (a fresh copy, not
+                            # a live view) — fold the re-grown blocks in per
+                            # group. New/resumed requests carry the full live
+                            # list (already reflecting the re-growth) and
+                            # need no fold.
+                            if req_id not in admitted_req_ids:
+                                delta = req_to_new_blocks.get(req_id)
+                                if delta is not None:
+                                    req_to_new_blocks[req_id] = KVCacheBlocks(
+                                        tuple(
+                                            list(d) + list(r)
+                                            for d, r in zip(delta.blocks, regrown)
+                                        )
+                                    )
                         num_spec_tokens_to_schedule = 0
                         self._eagle_hold = False
                         self._eagle_force_resume = False
