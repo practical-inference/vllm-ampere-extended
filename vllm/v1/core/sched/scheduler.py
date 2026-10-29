@@ -1757,6 +1757,9 @@ class Scheduler(SchedulerInterface):
         # after every step where the drafter ran; unchanged while the
         # drafter is skipped at K=0).
         eagle_catchup_req_ids: dict[str, int] = {}
+        # Resume-step requests whose runner block rows must be rebuilt (the
+        # hold-edge trim's stale tail) — routed through the resumed channel.
+        eagle_resume_replace: set[str] = set()
         if self.eagle_k0_lifecycle and len(num_scheduled_tokens) > 0:
             if self._eagle_hold:
                 if num_spec_tokens_to_schedule > 0 or self._eagle_force_resume:
@@ -1789,14 +1792,10 @@ class Scheduler(SchedulerInterface):
                         for req_id, target in targets.items()
                     )
                     if needed <= self.kv_cache_manager.block_pool.get_num_free_blocks():
-                        admitted_req_ids = {
-                            r.request_id
-                            for r in scheduled_new_reqs + scheduled_resumed_reqs
-                        }
                         for req_id, target in targets.items():
                             num_computed = self.requests[req_id].num_computed_tokens
                             gap = num_computed - self._eagle_sync_points.get(req_id, 0)
-                            regrown = coordinator.allocate_new_blocks(
+                            coordinator.allocate_new_blocks(
                                 req_id,
                                 target,
                                 target,
@@ -1810,23 +1809,15 @@ class Scheduler(SchedulerInterface):
                             # point.
                             coordinator.remove_eagle_blocks(req_id, target)
                             self._eagle_sync_points[req_id] = target
-                            # The re-grown eagle blocks must reach the
-                            # runner's append-only table before the replay
-                            # writes the gap. A running request's step delta
-                            # is the allocate_slots return (a fresh copy, not
-                            # a live view) — fold the re-grown blocks in per
-                            # group. New/resumed requests carry the full live
-                            # list (already reflecting the re-growth) and
-                            # need no fold.
-                            if req_id not in admitted_req_ids:
-                                delta = req_to_new_blocks.get(req_id)
-                                if delta is not None:
-                                    req_to_new_blocks[req_id] = KVCacheBlocks(
-                                        tuple(
-                                            list(d) + list(r)
-                                            for d, r in zip(delta.blocks, regrown)
-                                        )
-                                    )
+                            # The runner's per-request block rows are
+                            # append-only and the hold-edge trim freed blocks
+                            # those rows still reference (a stale tail). The
+                            # replay indexes positions through the row, so
+                            # the row must be rebuilt to match the
+                            # post-regrowth table: route these requests
+                            # through the resumed channel (remove from the
+                            # persistent batch, re-add with the full table).
+                            eagle_resume_replace.add(req_id)
                         num_spec_tokens_to_schedule = 0
                         self._eagle_hold = False
                         self._eagle_force_resume = False
@@ -1879,6 +1870,7 @@ class Scheduler(SchedulerInterface):
                 num_scheduled_tokens,
                 scheduled_spec_decode_tokens,
                 req_to_new_blocks,
+                eagle_resume_replace,
             )
 
         # Record the request ids that were scheduled in this step (MRV1-only).
@@ -2133,6 +2125,7 @@ class Scheduler(SchedulerInterface):
         num_scheduled_tokens: dict[str, int],
         spec_decode_tokens: dict[str, list[int]],
         req_to_new_blocks: dict[str, KVCacheBlocks],
+        eagle_resume_replace: set[str] = set(),
     ) -> CachedRequestData:
         req_ids: list[str] = []
         new_token_ids: list[list[int]] = []
@@ -2165,11 +2158,28 @@ class Scheduler(SchedulerInterface):
             if idx >= num_running_reqs:
                 resumed_req_ids.add(req_id)
             if not self.use_v2_model_runner:  # noqa: SIM102
-                if req_id not in self.prev_step_scheduled_req_ids:
+                if req_id not in self.prev_step_scheduled_req_ids or (
+                    req_id in eagle_resume_replace
+                ):
                     all_token_ids[req_id] = req.all_token_ids.copy()
-            new_block_ids.append(
-                req_to_new_blocks[req_id].get_block_ids(allow_none=True)
-            )
+            if req_id in eagle_resume_replace:
+                # K=0 resume: the hold-edge trim freed eagle blocks this
+                # request's runner row still references (a stale tail — the
+                # row is append-only and was never told). Route the request
+                # through the resumed channel: the runner removes it from
+                # the persistent batch and re-adds it with the FULL
+                # post-regrowth table sent here, so the row matches the
+                # scheduler's table exactly before the replay indexes it.
+                resumed_req_ids.add(req_id)
+                new_block_ids.append(
+                    self.kv_cache_manager.get_blocks(
+                        req_id
+                    ).get_block_ids(allow_none=True)
+                )
+            else:
+                new_block_ids.append(
+                    req_to_new_blocks[req_id].get_block_ids(allow_none=True)
+                )
             num_computed_tokens.append(req.num_computed_tokens)
             num_output_tokens.append(
                 req.num_output_tokens + req.num_output_placeholders
