@@ -5142,7 +5142,13 @@ class GPUModelRunner(
             tokens.append(t)
             positions.append(torch.cat(entry["positions"]))
             hiddens.append(torch.cat(entry["hidden"]))
-            nexts.append(torch.cat(entry["next"]))
+            # Row-aligned next tokens: the rotation feeds each row the next
+            # row's token and overwrites each (possibly split) request
+            # part's last row with its own next — the next row's token for
+            # every row but the request's last, whose next is the last
+            # step's sampled token. One per ROW, not per step: a held step
+            # can schedule multiple rows (a prefill chunk).
+            nexts.append(torch.cat((t[1:], entry["next"][-1:])))
             req_bounds.append((offset, offset + t.shape[0]))
             offset += t.shape[0]
         stash.clear()
