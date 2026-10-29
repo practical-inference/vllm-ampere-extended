@@ -38,15 +38,15 @@ Do not open one-off PRs for tiny edits (single typo, isolated style change, one 
 
 ### Local pre-submission gates (this machine)
 
-Drafts live in `.pr-drafts/<name>.md` with evidence in `.pr-drafts/evidence/<name>/`. Scaffold drafts with `new_draft.sh <name> "<title>"` (universal template — Overview/Claims/Validation/Details; `validate_pr.sh` gates the headings). Before any push to a public repo (drafts included) and before requesting re-review, run both:
+Drafts live in `.pr-drafts/<name>.md` with evidence in `.pr-drafts/evidence/<name>/` (per-checkout state, gitignored). The pipeline tooling is versioned in `~/source/llm-test-tools/pr-pipeline/` and operates on the checkout you're standing in (git-like; `--repo <path>` / `$PR_PIPELINE_REPO` / `$PR_DRAFTS_DIR` to override). Scaffold drafts with `new_draft.sh <name> "<title>"` (universal template — Overview/Claims/Validation/Details; `validate_pr.sh` gates the headings). Before any push to a public repo (drafts included) and before requesting re-review, run both:
 
 ```bash
-.pr-drafts/validate_pr.sh <draft> [--files <changed>]     # mechanical gates G1-G5c
-.pr-drafts/adversarial_review.sh <draft> --commit <sha>   # fresh-agent attacks; SURVIVES stamps
-                                                          # the Adversarial-Review trailer
+~/source/llm-test-tools/pr-pipeline/validate_pr.sh <draft> [--files <changed>]     # mechanical gates G1-G5c
+~/source/llm-test-tools/pr-pipeline/adversarial_review.sh <draft> --commit <sha>   # fresh-agent attacks; SURVIVES stamps
+                                                                                   # the Adversarial-Review trailer
 ```
 
-`adversarial_review.sh` runs two fresh agents in parallel (mechanism trace; differential audit + maintainer simulation) and on SURVIVES stamps the `Adversarial-Review` trailer that G5c and the forgejo pre-receive hook require. A truncated run exits INCOMPLETE — re-run with `--resume <ts>` to redo only the missing attacks. A follow-up commit on an already-SURVIVED tip: use `--delta <artifact>` (the script names the artifact when it detects this); full re-review only when the delta touches previously-verified mechanism. Full protocol: `.pr-drafts/VALIDATION.md`.
+`adversarial_review.sh` runs two fresh agents in parallel (mechanism trace; differential audit + maintainer simulation) and on SURVIVES stamps the `Adversarial-Review` trailer that G5c and the forgejo pre-receive hook require. A truncated run exits INCOMPLETE — re-run with `--resume <ts>` to redo only the missing attacks. A follow-up commit on an already-SURVIVED tip: use `--delta <artifact>` (the script names the artifact when it detects this); full re-review only when the delta touches previously-verified mechanism. Full protocol: `~/source/llm-test-tools/pr-pipeline/VALIDATION.md`.
 
 ### GitHub write gate
 
