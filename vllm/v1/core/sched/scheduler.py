@@ -1354,12 +1354,8 @@ class Scheduler(SchedulerInterface):
                     ):
                         new_computed_blocks = KVCacheBlocks(
                             tuple(
-                                ()
-                                if i in eagle_ids
-                                else blocks
-                                for i, blocks in enumerate(
-                                    new_computed_blocks.blocks
-                                )
+                                () if i in eagle_ids else blocks
+                                for i, blocks in enumerate(new_computed_blocks.blocks)
                             )
                         )
 
