@@ -172,6 +172,19 @@ def _make_draft_vllm_config(
         vllm_config,
         model_config=speculative_config.draft_model_config,
     )
+    # The draft SHARES the target's topk_indices_buffer (eagle/utils.py
+    # re-points every draft buffer reference at the target's before warmup),
+    # so the draft indexer must use the target's QSA geometry. Dict
+    # hf_overrides do not propagate to the draft (speculator_config.py
+    # composes callable overrides only), leaving the draft on the raw
+    # checkpoint's indexer_budget — warmup then dies with "QSA selection
+    # output has an invalid shape" (draft 2048+4 vs target 256+4 buffer;
+    # leoncca canary 2026-11-06). Bridge the geometry explicitly.
+    draft_text_config = draft_vllm_config.model_config.hf_text_config
+    target_text_config = vllm_config.model_config.hf_text_config
+    for attr in ("indexer_budget", "indexer_compress_ratio"):
+        if hasattr(target_text_config, attr):
+            setattr(draft_text_config, attr, getattr(target_text_config, attr))
     # VllmConfig post-init derives the target quant config, so restore the
     # independently resolved draft quant config after replacement.
     draft_vllm_config.quant_config = draft_quant_config
