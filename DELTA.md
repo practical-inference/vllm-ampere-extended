@@ -1,16 +1,16 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 35 source commits (70 files changed, 4368 insertions(+), 365 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 37 source commits (70 files changed, 4522 insertions(+), 376 deletions(-)).
 
-Diff base: upstream commit `ffdf26702a` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges ffdf26702a..590ac1862d -- vllm/ csrc/` and `git diff --stat ffdf26702a..590ac1862d -- vllm/ csrc/`.
+Diff base: upstream commit `a7a5d0919b` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges a7a5d0919b..a96bf9cb45 -- vllm/ csrc/` and `git diff --stat a7a5d0919b..a96bf9cb45 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
 | Area | Commits |
 |---|---|
-| general fixes | 13 |
+| general fixes | 15 |
 | spec-decode fixes | 11 |
 | sparse attention (TRITON_MLA_SPARSE) | 3 |
 | model bring-up (GLM5Next / Qwen4Exp / DSV41) | 3 |
@@ -22,6 +22,8 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- [Bugfix][Frontend] Thread excludes/max_whitespace_cnt into every or-branch leaf (9c2a2bd005)
+- [Bugfix][Frontend] Re-tighten any_order on the GLM-4.7 strict path (f424de6748)
 - fix: restore the decode-path SM80 triton fallback in the sparse indexer (aa7e5f011b)
 - fix: route the k=64/128 persistent-topk arms through the dtype wrapper after the upstream launcher split (0f03b25c08)
 - fix: restore the SM80 triton fallback + DeepGEMM gate in the sparse indexer after the upstream restructure (aeec9d9df2)
