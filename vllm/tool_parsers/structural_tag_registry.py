@@ -1137,12 +1137,25 @@ def get_glm_4_7_structural_tag(
             if tool.function.parameters is not None:
                 function["parameters"] = tool.function.parameters
             dumped_tools.append({"type": "function", "function": function})
-        return get_xgrammar_model_structural_tag(
+        built = get_xgrammar_model_structural_tag(
             model="glm_4_7",
             tools=dumped_tools,
             tool_choice=dumped_choice,
             reasoning=reasoning,
             any_order=True,
+        )
+        # Re-tighten (2026-11-02): xgrammar's any_order drops required-key
+        # presence and uniqueness (missing required args / duplicate keys are
+        # accepted) — the strict contract must hold on this path. The
+        # expansion rewrites each any_order node into an or-format over key
+        # permutations, one fully-validated branch per ordering. Loose
+        # semantics survive only above the permutation cap (recorded in-tag).
+        from vllm.tool_parsers.required_preserving import (
+            expand_loose_to_required_preserving,
+        )
+
+        return StructuralTag.model_validate_json(
+            expand_loose_to_required_preserving(built.model_dump_json())
         )
 
     tags = [
