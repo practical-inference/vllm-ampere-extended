@@ -1,10 +1,10 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 38 source commits (70 files changed, 4522 insertions(+), 380 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 39 source commits (71 files changed, 4535 insertions(+), 380 deletions(-)).
 
-Diff base: upstream commit `a7a5d0919b` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges a7a5d0919b..d0a2f67817 -- vllm/ csrc/` and `git diff --stat a7a5d0919b..d0a2f67817 -- vllm/ csrc/`.
+Diff base: upstream commit `0d5306aaca` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges 0d5306aaca..6a26b26466 -- vllm/ csrc/` and `git diff --stat 0d5306aaca..6a26b26466 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
@@ -12,8 +12,8 @@ Areas upstream does not ship for this hardware are what this distribution exists
 |---|---|
 | general fixes | 16 |
 | spec-decode fixes | 11 |
+| model bring-up (GLM5Next / Qwen4Exp / DSV41) | 4 |
 | sparse attention (TRITON_MLA_SPARSE) | 3 |
-| model bring-up (GLM5Next / Qwen4Exp / DSV41) | 3 |
 | fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 1 |
 | KV-cache / offload fixes | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + KV-cache / offload fixes) | 1 |
@@ -22,6 +22,7 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- fix: align MTP draft QSA geometry with the shared top-k buffer (ef7d022c42)
 - fix: drop upstream's duplicate process_weights_after_loading in qsa.py (d0a2f67817)
 - [Bugfix][Frontend] Thread excludes/max_whitespace_cnt into every or-branch leaf (9c2a2bd005)
 - [Bugfix][Frontend] Re-tighten any_order on the GLM-4.7 strict path (f424de6748)
