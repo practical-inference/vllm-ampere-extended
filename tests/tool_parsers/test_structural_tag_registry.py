@@ -56,6 +56,9 @@ from vllm.tool_parsers.mimo_tool_parser import MiMoToolParser
 from vllm.tool_parsers.minimax_m2_tool_parser import MinimaxM2ToolParser
 from vllm.tool_parsers.plamo3_engine_tool_parser import Plamo3EngineToolParser
 from vllm.tool_parsers.qwen3_engine_tool_parser import Qwen3EngineToolParser
+from vllm.tool_parsers.required_preserving import (
+    expand_loose_to_required_preserving,
+)
 from vllm.tool_parsers.step3p5_tool_parser import Step3p5ToolParser
 from vllm.tool_parsers.structural_tag_registry import (
     SUPPORTED_STRUCTURAL_TAG_MODELS,
@@ -1899,6 +1902,13 @@ def test_glm47_strict_only_matches_xgrammar_builtin(tool_choice: str, reasoning:
         reasoning=reasoning,
         any_order=True,
     )
+    # The registry re-tightens the builtin's loose any_order (xgrammar's
+    # any_order accepts missing required args and duplicate keys): the
+    # contract is the required-preserving expansion of the builtin, not
+    # the raw builtin.
+    expected = StructuralTag.model_validate_json(
+        expand_loose_to_required_preserving(expected.model_dump_json())
+    )
 
     assert isinstance(ours, StructuralTag)
     assert ours.model_dump() == expected.model_dump()
@@ -1930,6 +1940,10 @@ def test_glm47_parameter_level_pins_schemas_like_the_builtin(
         tool_choice="required",
         reasoning=False,
         any_order=True,
+    )
+    # Re-tightened contract, as in test_glm47_strict_only_matches_xgrammar_builtin.
+    expected = StructuralTag.model_validate_json(
+        expand_loose_to_required_preserving(expected.model_dump_json())
     )
 
     assert isinstance(ours, StructuralTag)
@@ -2152,7 +2166,12 @@ def test_glm47_operator_level_overrides_parser_default(
     content = json.loads(out.structured_outputs.structural_tag)["format"]["tags"][0][
         "content"
     ]
-    assert content["json_schema"] == sample_tools[0].function.parameters
+    # The registry re-tightens the builtin's loose any_order: the pinned
+    # schema ships as required-first or-permutations, one fully-validated
+    # branch per ordering. Each branch carries the full original schema.
+    assert content["type"] == "or"
+    for branch in content["elements"]:
+        assert branch["json_schema"] == sample_tools[0].function.parameters
 
 
 @pytest.mark.parametrize(
