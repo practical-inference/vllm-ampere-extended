@@ -157,11 +157,6 @@ def build_offloading_config(
                 f"'blocks_per_chunk' to express the chunk size in blocks."
             )
 
-    single_group_spec = (
-        kv_cache_config.kv_cache_groups[0].kv_cache_spec
-        if len(kv_cache_config.kv_cache_groups) == 1
-        else None
-    )
     groups = tuple(
         OffloadingGroupConfig(
             group_id=group_id,
