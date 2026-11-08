@@ -1,0 +1,59 @@
+# REDACTED TRANSCRIPT — fleet topology block and internal paths stripped mechanically; full capture internal.
+# manifest gate run: qwen3.8-flash on sm80 (GPU1, container vllm-ampere:smoke)
+# launch: vllm serve /models/qwen3.8-flash --max-model-len 262144 --language-model-only --kv-cache-dtype fp8 --kv-cache-memory 11000000000 --gpu-memory-utilization 0.965 --max-num-seqs 32 --max-num-batched-tokens 4096 --max-cudagraph-capture-size 32 --no-scheduler-reserve-full-isl --speculative-config {"method":"qwen4_exp_mtp","num_speculative_tokens":2} --enable-auto-tool-choice --tool-call-parser qwen3_coder
+# date: 2026-11-08 10:48:08 MST  host: <redacted>
+1, GPU-cb99124e-dd81-01d3-0101-82a664c7cbd5, NVIDIA PG506-230, 98304 MiB
+image: 28c8ae86b5d5 (15 minutes ago)
+content anchor: sha256:28c8ae86b5d5bed23022ab749d59e798e5fc5835b696c7b90b3225f96bfbb892
+19d372f55017cda89408cce44a11b0c4626639c987bdccc4764a80f24c275c7a
+[manifest-gate 2026-11-08 10:54:36] container healthy on :18017
+=== gates tier 1: http://127.0.0.1:18017 model=/models/qwen3.8-flash out=gates_20261108_105436 ===
+--- [1/4] needle (retrieval + drift, 6-seed aggregate) ---
+"per_round_recall": [true, true, true, true, true, true]
+"per_round_recall": [true, true, true, true, true, true]
+"per_round_recall": [true, true, true, true, true, true]
+"per_round_recall": [true, true, true, true, true, true]
+"per_round_recall": [true, true, true, true, true, true]
+"per_round_recall": [true, true, true, true, true, true]
+--- [2/4] gsm8k-32 (accuracy smoke) ---
+  gsm8k-32: 96.9% invalid 0.0%
+--- [3/4] standard conc curve ---
+  hello_short               1     80    1.610    80    49.7
+  code_few                  1    300    1.704   248   145.5
+  agent_tool_schema         1    500    0.818    90   110.0
+  long_context_pack         4    200    2.315   591   255.3
+  long_context_pack        16    200    8.728  2301   263.6
+  long_context_pack        32    200   17.048  4512   264.7
+--- [4/4] tier-1: cold context points + full gsm8k ---
+  ctx128000 s101 Total token throughput (tok/s):          8143.55   
+  ctx128000 s101 Median TTFT (ms):                        16624.85  
+  ctx128000 s101 Median TPOT (ms):                        222.78    
+  ctx128000 s101 P99 TPOT (ms):                           231.97    
+  ctx128000 s202 Total token throughput (tok/s):          8133.02   
+  ctx128000 s202 Median TTFT (ms):                        16020.47  
+  ctx128000 s202 Median TPOT (ms):                        129.06    
+  ctx128000 s202 P99 TPOT (ms):                           248.25    
+  ctx128000 s303 Total token throughput (tok/s):          8169.09   
+  ctx128000 s303 Median TTFT (ms):                        19727.15  
+  ctx128000 s303 Median TPOT (ms):                        177.06    
+  ctx128000 s303 P99 TPOT (ms):                           242.10    
+  ctx100000 s101 Total token throughput (tok/s):          8144.07   
+  ctx100000 s101 Median TTFT (ms):                        17499.22  
+  ctx100000 s101 Median TPOT (ms):                        109.12    
+  ctx100000 s101 P99 TPOT (ms):                           183.99    
+  ctx100000 s202 Total token throughput (tok/s):          8132.58   
+  ctx100000 s202 Median TTFT (ms):                        17457.23  
+  ctx100000 s202 Median TPOT (ms):                        109.26    
+  ctx100000 s202 P99 TPOT (ms):                           187.85    
+  ctx200000 s101 Total token throughput (tok/s):          8135.61   
+  ctx200000 s101 Median TTFT (ms):                        34688.99  
+  ctx200000 s101 Median TPOT (ms):                        219.52    
+  ctx200000 s101 P99 TPOT (ms):                           228.24    
+  ctx200000 s202 Total token throughput (tok/s):          8135.46   
+  ctx200000 s202 Median TTFT (ms):                        34972.70  
+  ctx200000 s202 Median TPOT (ms):                        198.13    
+  ctx200000 s202 P99 TPOT (ms):                           240.24    
+  gsm8k-1319: 97.0% invalid 0.0%
+=== done: gates_20261108_105436 ===
+# gate verdict: rc=0 (judge: see promote's judge_gates on the outdir)
+# gate outdir: gates_20261108_105436 (full capture internal — fleet topology block redacted)

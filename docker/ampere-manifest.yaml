@@ -10,10 +10,15 @@
 # prose. Consumers: image README, CI, humans, CI buddies.
 - model: qwen3.8-flash
   launch: >-
-    vllm serve /models/qwen3.8-flash --max-model-len 150000
+    vllm serve /models/qwen3.8-flash --max-model-len 262144 --language-model-only
+    --kv-cache-dtype fp8 --kv-cache-memory 11000000000 --gpu-memory-utilization 0.965
+    --max-num-seqs 32 --max-num-batched-tokens 4096 --max-cudagraph-capture-size 32
+    --no-scheduler-reserve-full-isl
+    --speculative-config '{"method":"qwen4_exp_mtp","num_speculative_tokens":2}'
     --enable-auto-tool-choice --tool-call-parser qwen3_coder
-  status: pending
-  evidence: []
+  status: validated
+  evidence:
+    - "arch: sm80 (A100-96G), image content anchor sha256:28c8ae86b5d5bed23022ab749d59e798e5fc5835b696c7b90b3225f96bfbb892 (revision 22714165b), 2026-11-08, tier-1 green (needle 36/36 rounds, gsm8k-1319 97.0% invalid 0.0%), transcript: evidence/2026-11-08-sm80-qwen3.8-flash.log"
 - model: glm5.3-flash
   launch: >-
     vllm serve /models/glm5.3-flash --max-model-len 393216
