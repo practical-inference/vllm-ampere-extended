@@ -416,6 +416,13 @@ def fp8_mqa_logits_triton(
         logits = torch.full((M, N), float("-inf"), dtype=torch.float32, device=q.device)
     else:
         logits = torch.empty((M, N), dtype=torch.float32, device=q.device)
+        # The early-exit tiles leave the post-window tail unwritten, and the
+        # downstream top-k reads the full row: the tail must be -inf even
+        # when the pre-fill is skipped (PR #38476 collapse).
+        cols = torch.arange(N, device=q.device)[None, :]
+        logits.masked_fill_(
+            cols >= (cu_seqlen_ke - cu_seqlen_ks)[:, None], float("-inf")
+        )
 
     BLOCK_H = max(16, triton.next_power_of_2(num_heads))
     BLOCK_D = triton.next_power_of_2(head_dim)

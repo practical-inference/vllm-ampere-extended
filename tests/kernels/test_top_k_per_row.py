@@ -1311,6 +1311,9 @@ def run_large_context_topk_test(
 
 
 @pytest.mark.skipif(not current_platform.is_cuda(), reason="This test requires CUDA")
+@pytest.mark.skipif(
+    not _has_cooperative_topk(), reason="cooperative_topk requires SM90+"
+)
 @pytest.mark.parametrize("top_k", [512, 1024, 2048])
 def test_cooperative_topk_cs2(top_k: int) -> None:
     """The 64-row dispatch uses the two-CTA cooperative kernel."""
@@ -2537,7 +2540,11 @@ def _has_flashinfer_topk() -> bool:
     # find_spec only: importing flashinfer initializes CUDA at import time.
     import importlib.util
 
-    return importlib.util.find_spec("flashinfer") is not None
+    # The top-k kernels live in flashinfer-cubin; the base package alone
+    # cannot run them (vLLM disables FlashInfer without it or without nvcc).
+    return importlib.util.find_spec("flashinfer") is not None and (
+        importlib.util.find_spec("flashinfer_cubin") is not None
+    )
 
 
 SPARSE_INDEXER_EXPLICIT_BACKENDS = [
@@ -2729,7 +2736,12 @@ def test_sparse_indexer_topk_backend_resolution() -> None:
             resolve("auto", k=512, num_rows=AUTO_COOPERATIVE_MAX_ROWS + 1)
             == "persistent"
         )
-        assert resolve("auto", k=512, num_rows=128) == "persistent"
+        assert resolve("auto", k=512, num_rows=128) == (
+            # SM80 tuning: per_row beyond the 6M-element persistent win zone.
+            "per_row"
+            if current_platform.is_device_capability_family(80)
+            else "persistent"
+        )
         # 16B-aligned (cooperative TMA ok) but not DeepSelect-aligned: the
         # same row-limit logic applies.
         assert (
@@ -2737,7 +2749,12 @@ def test_sparse_indexer_topk_backend_resolution() -> None:
             == "cooperative"
         )
     # ...and persistent past the row limit.
-    assert resolve("auto", unaligned_logits, num_rows=128) == "persistent"
+    assert resolve("auto", unaligned_logits, num_rows=128) == (
+            # The SM80 per_row zone applies to the unaligned stride too.
+            "per_row"
+            if current_platform.is_device_capability_family(80)
+            else "persistent"
+        )
     # Unsupported topk (outside {512, 1024, 2048} for the workspace kernels)
     # -> per_row fallback.
     assert resolve("auto", k=5000) == "per_row"

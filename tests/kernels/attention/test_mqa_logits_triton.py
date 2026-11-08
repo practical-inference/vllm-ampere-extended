@@ -67,7 +67,14 @@ def _fp8_mqa_logits_ref(
     mask = (arange >= cu_seqlen_ks[:, None]) & (arange < cu_seqlen_ke[:, None])
     score = torch.einsum("mhd,nd->hmn", q, k).float() * scale
     logits = (score.relu() * weights.unsqueeze(-1).transpose(0, 1)).sum(dim=0)
-    return logits.masked_fill(~mask, float("-inf"))
+    logits = logits.masked_fill(~mask, float("-inf"))
+    # The kernel writes DeepGEMM's left-justified compressed layout: row m's
+    # [ks, ke) span starts at column 0. Compress the reference to match.
+    cols = torch.arange(seq_len_kv, device=q.device)[None, :]
+    src = (cols + cu_seqlen_ks[:, None]).clamp(max=seq_len_kv - 1)
+    gathered = torch.gather(logits, 1, src)
+    valid = cols < (cu_seqlen_ke - cu_seqlen_ks)[:, None]
+    return torch.where(valid, gathered, float("-inf"))
 
 
 def _fp8_paged_mqa_logits_ref(
