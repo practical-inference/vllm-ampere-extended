@@ -2636,9 +2636,9 @@ def test_kv_cache_valve_preempts_proactively():
     assert len(scheduler.running) == 2
 
     def sampled(req: Request, index: int) -> ModelRunnerOutput:
+        # req_id_to_index removed upstream (#63373): req_ids order is the index.
         return ModelRunnerOutput(
             req_ids=[req.request_id],
-            req_id_to_index={req.request_id: index},
             sampled_token_ids=[[0]],
             logprobs=None,
             prompt_logprobs_dict={},
@@ -2650,10 +2650,6 @@ def test_kv_cache_valve_preempts_proactively():
         scheduler_output1,
         ModelRunnerOutput(
             req_ids=[requests[0].request_id, requests[1].request_id],
-            req_id_to_index={
-                requests[0].request_id: 0,
-                requests[1].request_id: 1,
-            },
             sampled_token_ids=[[0], [0]],
             logprobs=None,
             prompt_logprobs_dict={},

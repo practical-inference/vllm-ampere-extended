@@ -1,10 +1,10 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 39 source commits (64 files changed, 4513 insertions(+), 362 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 40 source commits (61 files changed, 4364 insertions(+), 335 deletions(-)).
 
-Diff base: upstream commit `308a3253c6` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 308a3253c6..cdc89702ca -- vllm/ csrc/` and `git diff --stat 308a3253c6..cdc89702ca -- vllm/ csrc/`.
+Diff base: upstream commit `794c9608f5` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges 794c9608f5..f3e27e6ef2 -- vllm/ csrc/` and `git diff --stat 794c9608f5..f3e27e6ef2 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
@@ -12,8 +12,8 @@ Areas upstream does not ship for this hardware are what this distribution exists
 |---|---|
 | general fixes | 16 |
 | spec-decode fixes | 11 |
+| sparse attention (TRITON_MLA_SPARSE) | 4 |
 | model bring-up (GLM5Next / Qwen4Exp / DSV41) | 4 |
-| sparse attention (TRITON_MLA_SPARSE) | 3 |
 | fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 1 |
 | KV-cache / offload fixes | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + KV-cache / offload fixes) | 1 |
@@ -22,6 +22,7 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- fix: sparse-indexer SM80 fallback validation fixes (781 passed on SM80) (22714165ba)
 - fix: align MTP draft QSA geometry with the shared top-k buffer (ef7d022c42)
 - fix: drop upstream's duplicate process_weights_after_loading in qsa.py (d0a2f67817)
 - [Bugfix][Frontend] Thread excludes/max_whitespace_cnt into every or-branch leaf (9c2a2bd005)
