@@ -135,13 +135,14 @@ class PleShortConvAttentionMetadataBuilder(ShortConvAttentionMetadataBuilder):
         super().__init__(kv_cache_spec, layer_names, vllm_config, device)
         self.num_spec = self.num_spec_tokens
         # K=0 ladder rows (draft count 0) take the regular decode path only
-        # when the V2 align preprocess folds their pending accepted-token
+        # when the align preprocess folds their pending accepted-token
         # offset into the running block; otherwise the speculative path is the
         # only reader that applies the offset (upstream routing).
+        # (use_v2_model_runner term dropped: upstream #63373 removed the V1
+        # runner — the V2 align preprocess is now the only path.)
         self._k0_regular_decode: bool = (
             self.num_spec > 0
             and self.vllm_config.cache_config.mamba_cache_mode == "align"
-            and self.vllm_config.use_v2_model_runner
         )
         self.checkpoint_builder = MambaPrefillCheckpointBuilder(
             vllm_config, kv_cache_spec
