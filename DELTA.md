@@ -1,10 +1,10 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 39 source commits (64 files changed, 4513 insertions(+), 362 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 41 source commits (61 files changed, 4359 insertions(+), 335 deletions(-)).
 
-Diff base: upstream commit `308a3253c6` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 308a3253c6..cdc89702ca -- vllm/ csrc/` and `git diff --stat 308a3253c6..cdc89702ca -- vllm/ csrc/`.
+Diff base: upstream commit `15166efabb` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges 15166efabb..59ce878a6e -- vllm/ csrc/` and `git diff --stat 15166efabb..59ce878a6e -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
@@ -12,16 +12,18 @@ Areas upstream does not ship for this hardware are what this distribution exists
 |---|---|
 | general fixes | 16 |
 | spec-decode fixes | 11 |
+| sparse attention (TRITON_MLA_SPARSE) | 4 |
 | model bring-up (GLM5Next / Qwen4Exp / DSV41) | 4 |
-| sparse attention (TRITON_MLA_SPARSE) | 3 |
+| KV-cache / offload fixes | 2 |
 | fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 1 |
-| KV-cache / offload fixes | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + KV-cache / offload fixes) | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + spec-decode fixes) | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + SM80 / pre-SM89 fp8 fallbacks + model bring-up (GLM5Next / Qwen4Exp / DSV41) + spec-decode fixes + KV-cache / offload fixes) | 1 |
 
 <details><summary>Full commit list</summary>
 
+- correction: f3e27e6ef2 'whitespace only' claim false — remove resurrected dead single_group_spec (d2c1a7fde9)
+- fix: sparse-indexer SM80 fallback validation fixes (781 passed on SM80) (22714165ba)
 - fix: align MTP draft QSA geometry with the shared top-k buffer (ef7d022c42)
 - fix: drop upstream's duplicate process_weights_after_loading in qsa.py (d0a2f67817)
 - [Bugfix][Frontend] Thread excludes/max_whitespace_cnt into every or-branch leaf (9c2a2bd005)
