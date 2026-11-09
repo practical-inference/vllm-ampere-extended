@@ -5,6 +5,7 @@ from typing import Any
 
 import torch
 
+from vllm import envs
 from vllm.logger import init_logger
 from vllm.model_executor.layers.mamba.abstract import MambaBase
 from vllm.model_executor.layers.mamba.mamba_utils import (
@@ -520,6 +521,7 @@ def preprocess_mamba_align_fused_kernel(
     BLOCK_SIZE: tl.constexpr,
     MAMBA_BLOCK_SIZE: tl.constexpr,
     HAS_IDX_MAPPING: tl.constexpr = True,
+    K0_FOLD_RESET: tl.constexpr = False,
 ):
     """Fused align preprocess: emit the pre-copy src column/offset AND advance
     state_idx in a single launch (V2 align).
@@ -532,8 +534,8 @@ def preprocess_mamba_align_fused_kernel(
       3. Advance state_idx to the new running block. Reset num_accepted to 1
          when the block changes: the migrated convolution state
          now sits at the start of the new block and must be read with the neutral
-         accepted-token bias. ReplaySSM ring cursors are migrated separately.
-         Also reset when the row is a draft-less decode row whose accepted
+         accepted-token bias. Also reset when K0_FOLD_RESET is armed and the
+         row is a draft-less decode row whose accepted
          offset the pre-copy folds into the running block (the regular decode
          kernels read offset 0 and would otherwise see a stale state).
     """
@@ -560,11 +562,15 @@ def preprocess_mamba_align_fused_kernel(
     tl.store(state_idx_ptr + req_indices, new_state_idx, mask=mask)
     # 0 = decode row scheduled without drafts (the K=0 ladder tier): the
     # pre-copy folds its pending accepted offset, so the neutral bias applies
-    # from this step on.
-    k0_fold = (
-        tl.load(num_decode_draft_tokens_ptr + offsets, mask=mask, other=-1) == 0
-    ) & (num_accepted > 1)
-    should_reset = ((state_idx >= 0) & (state_idx != new_state_idx)) | k0_fold
+    # from this step on. Armed only alongside the fold copy (same env knobs) —
+    # the reset without the copy would make the next read see stale state.
+    if K0_FOLD_RESET:
+        k0_fold = (
+            tl.load(num_decode_draft_tokens_ptr + offsets, mask=mask, other=-1) == 0
+        ) & (num_accepted > 1)
+        should_reset = ((state_idx >= 0) & (state_idx != new_state_idx)) | k0_fold
+    else:
+        should_reset = (state_idx >= 0) & (state_idx != new_state_idx)
     tl.store(num_accepted_tokens_ptr + req_indices, 1, mask=mask & should_reset)
 
 
@@ -1198,7 +1204,12 @@ class MambaSpecDecodeGPUContext:
             HAS_IDX_MAPPING=idx_mapping is not None,
             ZERO_TEMPORAL_TOKEN_BIAS=self.replayssm is not None,
             TEMPORAL_TILES=_TEMPORAL_TILES,
-            HAS_K0_FOLD=num_decode_draft_tokens is not None,
+            HAS_K0_FOLD=(
+                num_decode_draft_tokens is not None
+                and (
+                    envs.VLLM_MAMBA_K0_SLOT_RELEASE or envs.VLLM_MAMBA_PRICED_ADMISSION
+                )
+            ),
         )
 
     def run_fused_postprocess_align(
