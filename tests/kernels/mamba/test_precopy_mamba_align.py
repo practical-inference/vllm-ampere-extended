@@ -1,24 +1,24 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
-"""Equivalence test for ``precopy_mamba_align_fused_kernel``.
+"""Equivalence test for `precopy_mamba_align_fused_kernel`.
 
 The fused "align" pre-copy must migrate mamba state across block boundaries
 with byte-identical semantics to the scalar V1 copy specs
-(``get_conv_copy_spec`` / ``get_temporal_copy_spec``):
+(`get_conv_copy_spec` / `get_temporal_copy_spec`):
 
 * conv state (SD layout, conv_width > 0): shift the sliding window by
-  ``token_bias`` tokens -- ``state[bt[src_col], token_bias:]`` ->
-  ``state[bt[dst_col], :conv_width - token_bias]``.
-* temporal state (conv_width == 0): ``token_bias`` selects the accepted
-  speculative column -- ``state[bt[src_col + token_bias]]`` ->
-  ``state[bt[dst_col]]``.
+  `token_bias` tokens -- `state[bt[src_col], token_bias:]` ->
+  `state[bt[dst_col], :conv_width - token_bias]`.
+* temporal state (conv_width == 0): `token_bias` selects the accepted
+  speculative column -- `state[bt[src_col + token_bias]]` ->
+  `state[bt[dst_col]]`.
 
-The kernel must also no-op when ``src_col < 0`` (fresh request) or
-``src_col == dst_col`` (no boundary crossed) -- unless the row is a
+The kernel must also no-op when `src_col < 0` (fresh request) or
+`src_col == dst_col` (no boundary crossed) -- unless the row is a
 draft-less decode row (K=0 ladder tier) with a non-neutral staged bias:
 the K=0 fold then copies the accepted state into the running block so the
 regular decode kernels (which read offset 0) start from the accepted
-state. Callers pass an explicit ``idx_mapping``; ``idx_mapping=None``
+state. Callers pass an explicit `idx_mapping`; `idx_mapping=None`
 launches in batch order.
 """
 
