@@ -2631,8 +2631,17 @@ def test_kv_cache_valve_preempts_proactively():
     scheduler_output0 = scheduler.schedule()
     assert len(scheduler_output0.num_scheduled_tokens) == 1
     scheduler.add_request(requests[1])
+    # The valve arms only when requests are waiting (k0 slot-release
+    # forensics): park one oversized request so the valve has an admission
+    # to restore slack for. 420 tokens = 27 blocks of the 30-block pool —
+    # it cannot admit behind the two running rows and must stay waiting.
+    waiting_req = create_requests(
+        num_requests=1, num_tokens=420, block_size=16, req_ids=["parked"]
+    )[0]
+    scheduler.add_request(waiting_req)
     scheduler_output1 = scheduler.schedule()
-    # Both admitted: 10/30 blocks = 33% usage, above the valve threshold.
+    # Both size-80 rows admitted: 10/30 blocks = 33% usage, above the valve
+    # threshold; the 27-block row cannot fit and stays in waiting.
     assert len(scheduler.running) == 2
 
     def sampled(req: Request, index: int) -> ModelRunnerOutput:
