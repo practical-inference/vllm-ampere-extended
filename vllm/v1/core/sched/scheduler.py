@@ -763,12 +763,18 @@ class Scheduler(SchedulerInterface):
 
         # Proactive KV valve: preempt from the tail before allocation failure
         # turns a full pool into continuous preempt/restore churn. One victim
-        # per step keeps preemption episodic.
+        # per step keeps preemption episodic. Armed only when requests are
+        # actually waiting — the valve exists to restore slack FOR admissions;
+        # preempting with nothing waiting re-admits the victim into the same
+        # pressure and bounce-preempts it every step (measured: the c32 house
+        # wave at an 11e9 pin collapsed 1229->454 tok/s on the unguarded
+        # valve; the guard restored 1221).
         if (
             self.scheduler_config.kv_cache_valve_threshold > 0.0
             and self.kv_cache_manager.usage
             >= self.scheduler_config.kv_cache_valve_threshold
             and len(self.running) > 1
+            and self.waiting
         ):
             victim = self.running.pop()
             self._preempt_request(

@@ -2631,8 +2631,17 @@ def test_kv_cache_valve_preempts_proactively():
     scheduler_output0 = scheduler.schedule()
     assert len(scheduler_output0.num_scheduled_tokens) == 1
     scheduler.add_request(requests[1])
+    # The valve arms only when requests are waiting (k0 slot-release
+    # forensics): park one oversized request so the valve has an admission
+    # to restore slack for. 420 tokens = 27 blocks of the 30-block pool —
+    # it cannot admit behind the two running rows and must stay waiting.
+    waiting_req = create_requests(
+        num_requests=1, num_tokens=420, block_size=16, req_ids=["parked"]
+    )[0]
+    scheduler.add_request(waiting_req)
     scheduler_output1 = scheduler.schedule()
-    # Both admitted: 10/30 blocks = 33% usage, above the valve threshold.
+    # Both size-80 rows admitted: 10/30 blocks = 33% usage, above the valve
+    # threshold; the 27-block row cannot fit and stays in waiting.
     assert len(scheduler.running) == 2
 
     def sampled(req: Request, index: int) -> ModelRunnerOutput:
@@ -2665,6 +2674,58 @@ def test_kv_cache_valve_preempts_proactively():
     assert scheduler.running[0] == requests[0]
     assert len(scheduler_output2.num_scheduled_tokens) == 1
     assert requests[0].request_id in scheduler_output2.num_scheduled_tokens
+
+
+def test_kv_cache_valve_does_not_preempt_with_nothing_waiting():
+    # Regression lock (2026-11-09 c32 house-wave collapse): the unguarded
+    # valve bounce-preempts a running request every step once usage crosses
+    # the threshold, even with nothing waiting to admit — the victim
+    # re-admits into the same pressure and gets preempted again (measured
+    # 1229 -> 454 tok/s at c32 on an 11e9 pin; the `and self.waiting` guard
+    # restored 1221). With nothing waiting the valve must not fire.
+    scheduler = create_scheduler(
+        max_num_batched_tokens=100,
+        block_size=16,
+        num_blocks=31,  # 30 usable -> 480 tokens
+        enable_prefix_caching=False,
+        kv_cache_valve_threshold=0.3,
+    )
+    requests = create_requests(num_requests=2, num_tokens=80, block_size=16)
+
+    scheduler.add_request(requests[0])
+    scheduler_output0 = scheduler.schedule()
+    assert len(scheduler_output0.num_scheduled_tokens) == 1
+    scheduler.add_request(requests[1])
+    scheduler_output1 = scheduler.schedule()
+    assert len(scheduler.running) == 2
+
+    def sampled(req: Request, index: int) -> ModelRunnerOutput:
+        return ModelRunnerOutput(
+            req_ids=[req.request_id],
+            sampled_token_ids=[[0]],
+            logprobs=None,
+            prompt_logprobs_dict={},
+            pooler_output=[],
+        )
+
+    scheduler.update_from_output(scheduler_output0, sampled(requests[0], 0))
+    scheduler.update_from_output(
+        scheduler_output1,
+        ModelRunnerOutput(
+            req_ids=[requests[0].request_id, requests[1].request_id],
+            sampled_token_ids=[[0], [0]],
+            logprobs=None,
+            prompt_logprobs_dict={},
+            pooler_output=[],
+        ),
+    )
+
+    # 10/30 blocks = 33% usage, above the valve threshold, but the waiting
+    # queue is empty: the valve must leave both rows running.
+    scheduler_output2 = scheduler.schedule()
+    assert len(scheduler.running) == 2
+    assert requests[1].status == RequestStatus.RUNNING
+    assert len(scheduler_output2.num_scheduled_tokens) == 2
 
 
 def test_pending_hisparse_reclamation_defers_preemption(monkeypatch):
