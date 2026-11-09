@@ -209,6 +209,11 @@ class KVCacheManager:
         assert watermark >= 0.0, "watermark must be non-negative"
         self.watermark_blocks = int(watermark * kv_cache_config.num_blocks)
         self._admission_fail_count = 0
+        # Blocks the last failed admission asked for (0 if none is pending).
+        # The KV valve's demand trigger reads this to tell a shortage it can
+        # relieve (demand <= pool) from a same-step prefix-hit deferral or an
+        # over-pool request (demand > pool), which preempting cannot fix.
+        self.last_admission_demand_blocks = 0
         self.kv_cache_event_metadata = tuple(
             (
                 get_kv_cache_spec_kind(group.kv_cache_spec).value,
@@ -245,6 +250,7 @@ class KVCacheManager:
         full_fit: bool,
     ) -> None:
         self._admission_fail_count += 1
+        self.last_admission_demand_blocks = num_blocks_to_allocate
         if self._admission_fail_count != 1 and self._admission_fail_count % 50 != 0:
             return
         free_blocks = self.block_pool.get_num_free_blocks()
