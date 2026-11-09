@@ -10003,3 +10003,185 @@ def test_kv_cache_valve_preempts_only_for_waiting_requests():
     assert len(scheduler.running) == 2
     assert scheduler.running[0] == requests[0]
     assert requests[2].request_id in scheduler_output4.num_scheduled_tokens
+
+
+def test_kv_cache_valve_fires_on_admission_stall_below_threshold():
+    # The demand trigger is pool-size-insensitive: the valve fires when a
+    # waiting admission stalls on a block shortage the valve can relieve,
+    # even when usage never reaches the configured fraction. A fraction-only
+    # valve is inert when the threshold sits above the workload's structural
+    # fill and churns when it sits below — the value had to agree with the
+    # pool size and workload shape. Here usage pins at 6/30 = 20% while the
+    # valve threshold is 95%: only the demand path can fire.
+    scheduler = create_scheduler(
+        max_num_batched_tokens=8192,
+        block_size=16,
+        num_blocks=31,  # 30 usable -> 480 tokens
+        enable_prefix_caching=False,
+        kv_cache_valve_threshold=0.95,
+    )
+    requests = create_requests(num_requests=2, num_tokens=48, block_size=16)
+    # Here usage pins at 8/30 = 27% while the valve threshold is 95%: only
+    # the demand path can fire. 400 tokens demand cdiv(400, 16) = 25 blocks
+    # of the 30-block pool: after the two running rows decode one token each
+    # (4 blocks apiece, 22 free) the stall is real (22 < 25 <= 31) and one
+    # preemption closes it (25 <= 22 + 4), so the demand is relievable.
+    parked = create_requests(
+        num_requests=1, num_tokens=400, block_size=16, req_ids=["stalled"]
+    )[0]
+
+    scheduler.add_request(requests[0])
+    scheduler_output0 = scheduler.schedule()
+    assert len(scheduler_output0.num_scheduled_tokens) == 1
+    scheduler.add_request(requests[1])
+    scheduler_output1 = scheduler.schedule()
+    assert len(scheduler.running) == 2
+
+    def sampled(req: Request, index: int) -> ModelRunnerOutput:
+        return ModelRunnerOutput(
+            req_ids=[req.request_id],
+            sampled_token_ids=[[0]],
+            logprobs=None,
+            prompt_logprobs_dict={},
+            pooler_output=[],
+        )
+
+    scheduler.update_from_output(scheduler_output0, sampled(requests[0], 0))
+    scheduler.update_from_output(
+        scheduler_output1,
+        ModelRunnerOutput(
+            req_ids=[requests[0].request_id, requests[1].request_id],
+            sampled_token_ids=[[0], [0]],
+            logprobs=None,
+            prompt_logprobs_dict={},
+            pooler_output=[],
+        ),
+    )
+
+    # The stalled admission: the waiting loop cannot allocate for `parked`
+    # and breaks, arming the demand gate for the next step.
+    scheduler.add_request(parked)
+    scheduler_output2 = scheduler.schedule()
+    assert parked.status == RequestStatus.WAITING
+    scheduler.update_from_output(
+        scheduler_output2,
+        ModelRunnerOutput(
+            req_ids=[requests[0].request_id, requests[1].request_id],
+            sampled_token_ids=[[0], [0]],
+            logprobs=None,
+            prompt_logprobs_dict={},
+            pooler_output=[],
+        ),
+    )
+
+    # Usage is 20%, far below the 95% threshold: the valve fires anyway —
+    # the demand path — and preempts the tail row to restore slack.
+    assert scheduler.kv_cache_manager.usage < 0.95
+    scheduler_output3 = scheduler.schedule()
+    assert requests[1].status == RequestStatus.PREEMPTED
+    assert requests[1].num_preemptions == 1
+    assert len(scheduler.running) == 1
+    assert scheduler.running[0] == requests[0]
+    assert parked.status == RequestStatus.WAITING
+    assert len(scheduler_output3.num_scheduled_tokens) == 1
+
+
+def test_kv_cache_valve_ignores_over_pool_admission_stall():
+    # Anti-churn lock for the demand trigger: a request whose demand exceeds
+    # the whole pool (a same-step prefix-hit deferral reports pool+1 the same
+    # way) can never be relieved by preempting — the valve must stay out and
+    # let the stall resolve by retry or rejection. 600 tokens demand
+    # cdiv(600, 16) = 38 blocks of a 31-block pool at max_model_len 600, so
+    # every admission attempt fails with demand > pool.
+    scheduler = create_scheduler(
+        max_num_batched_tokens=8192,
+        block_size=16,
+        num_blocks=31,  # 30 usable
+        max_model_len=600,
+        enable_prefix_caching=False,
+        kv_cache_valve_threshold=0.95,
+    )
+    requests = create_requests(num_requests=2, num_tokens=48, block_size=16)
+    parked = create_requests(
+        num_requests=1, num_tokens=600, block_size=16, req_ids=["over-pool"]
+    )[0]
+
+    scheduler.add_request(requests[0])
+    scheduler_output0 = scheduler.schedule()
+    scheduler.add_request(requests[1])
+    scheduler_output1 = scheduler.schedule()
+    assert len(scheduler.running) == 2
+
+    def sampled(reqs: list[Request]) -> ModelRunnerOutput:
+        return ModelRunnerOutput(
+            req_ids=[r.request_id for r in reqs],
+            sampled_token_ids=[[0]] * len(reqs),
+            logprobs=None,
+            prompt_logprobs_dict={},
+            pooler_output=[],
+        )
+
+    scheduler.update_from_output(scheduler_output0, sampled(requests[:1]))
+    scheduler.update_from_output(scheduler_output1, sampled(requests))
+
+    scheduler.add_request(parked)
+    for _ in range(5):
+        output = scheduler.schedule()
+        # The over-pool row never admits; the running rows keep decoding.
+        assert parked.status == RequestStatus.WAITING
+        if output.num_scheduled_tokens:
+            scheduler.update_from_output(output, sampled(requests))
+
+    assert all(r.num_preemptions == 0 for r in requests)
+    assert len(scheduler.running) == 2
+
+
+def test_kv_cache_valve_does_not_fire_on_multi_victim_deficit():
+    # A stall whose deficit no single preemption closes must not arm the
+    # valve: the victim would re-admit into the freed slack while the
+    # stalled row keeps waiting, so firing would only churn. After the two
+    # running rows decode one token each (4 blocks apiece, 22 free), the
+    # 440-token row demands 28 blocks — the stall is real (22 < 28 <= 31)
+    # but not one-step-relievable (28 > 22 + 4): the valve stays out.
+    scheduler = create_scheduler(
+        max_num_batched_tokens=8192,
+        block_size=16,
+        num_blocks=31,  # 30 usable -> 480 tokens
+        enable_prefix_caching=False,
+        kv_cache_valve_threshold=0.95,
+    )
+    requests = create_requests(num_requests=2, num_tokens=48, block_size=16)
+    parked = create_requests(
+        num_requests=1, num_tokens=440, block_size=16, req_ids=["deep-stall"]
+    )[0]
+
+    scheduler.add_request(requests[0])
+    scheduler_output0 = scheduler.schedule()
+    scheduler.add_request(requests[1])
+    scheduler_output1 = scheduler.schedule()
+    assert len(scheduler.running) == 2
+
+    def sampled(reqs: list[Request]) -> ModelRunnerOutput:
+        return ModelRunnerOutput(
+            req_ids=[r.request_id for r in reqs],
+            sampled_token_ids=[[0]] * len(reqs),
+            logprobs=None,
+            prompt_logprobs_dict={},
+            pooler_output=[],
+        )
+
+    scheduler.update_from_output(scheduler_output0, sampled(requests[:1]))
+    scheduler.update_from_output(scheduler_output1, sampled(requests))
+
+    # 440 tokens demand 28 blocks; 24 are free and the tail holds 3, so the
+    # stall is real (24 < 28 <= 31) but not one-step-relievable
+    # (28 > 24 + 3): the valve must not fire on it.
+    scheduler.add_request(parked)
+    for _ in range(3):
+        output = scheduler.schedule()
+        assert parked.status == RequestStatus.WAITING
+        if output.num_scheduled_tokens:
+            scheduler.update_from_output(output, sampled(requests))
+
+    assert all(r.num_preemptions == 0 for r in requests)
+    assert len(scheduler.running) == 2

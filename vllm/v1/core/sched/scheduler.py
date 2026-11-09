@@ -797,20 +797,54 @@ class Scheduler(SchedulerInterface):
         # actually waiting — the valve exists to restore slack FOR admissions;
         # preempting with nothing waiting re-admits the victim into the same
         # pressure and bounce-preempts it every step.
+        #
+        # Primary trigger is demand, not a fraction: the previous step's
+        # waiting loop stalled on a block shortage, and preempting the tail
+        # row closes it in one step (free < demand <= free + the tail's held
+        # blocks). A same-step prefix-hit deferral or an over-pool request
+        # reports demand > pool — preempting cannot create those blocks. A
+        # deficit no single preemption closes does not fire either: the
+        # victim would re-admit into the freed slack and the stall would
+        # persist, so firing would only churn. The fire does not repeat
+        # immediately: once free >= demand the next step's check fails and
+        # the waiting loop runs. A queue-jumping victim can re-consume the
+        # freed slack and re-arm the stall, in which case the valve re-fires
+        # on the re-measured deficit — the same preempt/retry cycle the
+        # reactive path runs, attached to a measured deficit instead of a
+        # fraction. This keeps
+        # the valve correct at any threshold on any pool size; the usage
+        # fraction below is only a proactive extra for operators who want
+        # preemption before the first failed admission.
         if (
             self.scheduler_config.kv_cache_valve_threshold > 0.0
-            and self.kv_cache_manager.usage
-            >= self.scheduler_config.kv_cache_valve_threshold
             and len(self.running) > 1
             and self.waiting
         ):
-            victim = self.running.pop()
-            self._preempt_request(
-                victim,
-                scheduled_timestamp,
-                drop_stale_output=self.requires_kv_delivery,
+            demand = self.kv_cache_manager.last_admission_demand_blocks
+            free = self.kv_cache_manager.block_pool.get_num_free_blocks()
+            tail_blocks = len(
+                self.kv_cache_manager.get_blocks(
+                    self.running[-1].request_id
+                ).blocks[0]
             )
-            preempted_reqs.append(victim)
+            demand_stall = (
+                self._admission_block_stall
+                and 0 < demand
+                <= self.kv_cache_manager.kv_cache_config.num_blocks
+                and free < demand <= free + tail_blocks
+            )
+            if (
+                demand_stall
+                or self.kv_cache_manager.usage
+                >= self.scheduler_config.kv_cache_valve_threshold
+            ):
+                victim = self.running.pop()
+                self._preempt_request(
+                    victim,
+                    scheduled_timestamp,
+                    drop_stale_output=self.requires_kv_delivery,
+                )
+                preempted_reqs.append(victim)
 
         # DP prefill balancing: on a throttled (non-cadence-aligned) step, defer
         # all prefill compute unless saturated.

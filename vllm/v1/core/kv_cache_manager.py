@@ -213,6 +213,8 @@ class KVCacheManager:
         assert watermark >= 0.0, "watermark must be non-negative"
         self.watermark_blocks = int(watermark * kv_cache_config.num_blocks)
         self._admission_fail_count = 0
+        # Blocks the last failed admission asked for (0 if none is pending).
+        self.last_admission_demand_blocks = 0
         # Pool-pressure instrumentation (admission-failure logging, the
         # chunk-check state) serves the spec-tier mechanisms below; silent
         # when they are off (default config logs exactly what upstream logs).
@@ -254,6 +256,10 @@ class KVCacheManager:
         reserved_blocks: int,
         full_fit: bool,
     ) -> None:
+        # The KV valve's demand trigger reads this to tell a shortage it can
+        # relieve (demand <= pool) from a same-step prefix-hit deferral or an
+        # over-pool request (demand > pool), which preempting cannot fix.
+        self.last_admission_demand_blocks = num_blocks_to_allocate
         if not self._k0_diagnostics:
             return
         self._admission_fail_count += 1
