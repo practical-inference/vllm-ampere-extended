@@ -216,8 +216,30 @@ def run_case(runner, case: BenchCase, args: argparse.Namespace) -> dict[str, Any
     routing, fixture = install_routing(
         runner, args.routing, args.load_format == "dummy", batch.num_tokens, args.seed
     )
+    memprof = os.environ.get("VLLM_BENCH_MEMPROFILE") and profile_prefix
     try:
-        result = bench.run()
+        if memprof:
+            from torch.profiler import ProfilerActivity, profile
+
+            with profile(
+                activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                profile_memory=True,
+            ) as prof:
+                result = bench.run()
+            rows = [
+                {
+                    "op": ev.key,
+                    "self_device_mem": ev.self_device_memory_usage,
+                    "device_mem": ev.device_memory_usage,
+                    "count": ev.count,
+                }
+                for ev in prof.key_averages()
+                if ev.self_device_memory_usage
+            ]
+            with open(f"{profile_prefix}.mem.json", "w") as f:
+                json.dump(rows, f)
+        else:
+            result = bench.run()
         if fixture is not None:
             fixture.check_applied()
     finally:
