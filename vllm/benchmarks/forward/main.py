@@ -140,6 +140,8 @@ def _make_engine_args(args: argparse.Namespace, cases: list[BenchCase]):
 
 
 def run_case(runner, case: BenchCase, args: argparse.Namespace) -> dict[str, Any]:
+    torch.accelerator.reset_peak_memory_stats()
+    mem_base = torch.accelerator.memory_allocated()
     required_drafts = max((r.num_draft_tokens for r in case.requests), default=0)
     if required_drafts > runner.num_speculative_steps:
         raise ValueError(
@@ -226,6 +228,8 @@ def run_case(runner, case: BenchCase, args: argparse.Namespace) -> dict[str, Any
         "num_tokens": batch.num_tokens,
         "kv_blocks": batch.num_blocks,
         "routing": routing,
+        "mem_base_gib": round(mem_base / 2**30, 3),
+        "mem_peak_gib": round(torch.accelerator.max_memory_allocated() / 2**30, 3),
         **result,
     }
 
