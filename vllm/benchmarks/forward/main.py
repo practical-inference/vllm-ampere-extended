@@ -219,33 +219,32 @@ def run_case(runner, case: BenchCase, args: argparse.Namespace) -> dict[str, Any
     memprof = os.environ.get("VLLM_BENCH_MEMPROFILE") and profile_prefix
     try:
         if memprof:
-            from torch.profiler import ProfilerActivity, profile
+            from torch.cuda import memory as cuda_mem
 
-            with profile(
-                activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
-                profile_memory=True,
-            ) as prof:
-                result = bench.run()
-            rows = [
-                {
-                    "op": ev.key,
-                    "self_device_mem": ev.self_device_memory_usage,
-                    "device_mem": ev.device_memory_usage,
-                    "count": ev.count,
-                }
-                for ev in prof.key_averages()
-                if ev.device_memory_usage
-            ]
-            if not rows:
-                rows = [{
-                    "op": "DIAGNOSTIC: no device-memory events",
-                    "key_averages_count": len(prof.key_averages()),
-                    "table": prof.key_averages().table(
-                        sort_by="device_memory_usage", row_limit=15
-                    ),
-                }]
+            cuda_mem._record_memory_history(max_entries=500000)
+            result = bench.run()
+            snap = cuda_mem._snapshot()
+            cuda_mem._record_memory_history(None)
             with open(f"{profile_prefix}.mem.json", "w") as f:
-                json.dump(rows, f)
+                json.dump(
+                    {
+                        "segments": [
+                            {
+                                k: s.get(k)
+                                for k in (
+                                    "segment_type",
+                                    "segment_pool_id",
+                                    "total_size",
+                                    "allocated_size",
+                                    "active_size",
+                                )
+                            }
+                            for s in snap.get("segments", [])
+                        ],
+                        "device_traces": snap.get("device_traces", []),
+                    },
+                    f,
+                )
         else:
             result = bench.run()
         if fixture is not None:
