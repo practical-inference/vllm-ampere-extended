@@ -234,8 +234,16 @@ def run_case(runner, case: BenchCase, args: argparse.Namespace) -> dict[str, Any
                     "count": ev.count,
                 }
                 for ev in prof.key_averages()
-                if ev.self_device_memory_usage
+                if ev.device_memory_usage
             ]
+            if not rows:
+                rows = [{
+                    "op": "DIAGNOSTIC: no device-memory events",
+                    "key_averages_count": len(prof.key_averages()),
+                    "table": prof.key_averages().table(
+                        sort_by="device_memory_usage", row_limit=15
+                    ),
+                }]
             with open(f"{profile_prefix}.mem.json", "w") as f:
                 json.dump(rows, f)
         else:
