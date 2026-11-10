@@ -685,28 +685,76 @@ class Worker(WorkerBase):
         maybe_apply_startup_plan(self)
 
         if kv_cache_memory_bytes := self.cache_config.kv_cache_memory_bytes:
-            # still need a profile run which compiles the model for
-            # max_num_batched_tokens
-            with set_current_vllm_config(self.vllm_config):
+            # A pinned KV size buys manual control, not blindness: account for
+            # the same claims the unpinned path measures (transient peak +
+            # cudagraph footprint) so the pin is validated against what has
+            # to fit around it, and so a negative pin can be auto-sized from
+            # those measurements.
+            with (
+                memory_profiling(
+                    self.init_snapshot,
+                    weights_memory=int(self.model_runner.model_memory_usage),
+                ) as profile_result,
+                # See the unpinned path below: keeps large blocks releasable.
+                self._scoped_allocator_max_split(max_split_size_mb=20),
+                set_current_vllm_config(self.vllm_config),
+            ):
+                # Also compiles the model for max_num_batched_tokens.
                 self.model_runner.profile_run(
                     randomize_inputs=self.randomize_dummy_inputs
                 )
 
-            msg = (
-                f"Initial free memory {format_gib(self.init_snapshot.free_memory)} "
-                f"GiB, reserved {format_gib(kv_cache_memory_bytes)} GiB memory for "
-                "KV Cache as specified by kv_cache_memory_bytes config and "
-                "skipped memory profiling. This does not respect the "
-                "gpu_memory_utilization config. Only use kv_cache_memory_bytes "
-                "config when you want manual control of KV cache memory "
-                "size. If OOM'ed, check the difference of initial free "
-                "memory between the current run and the previous run "
-                "where kv_cache_memory_bytes is suggested and update it "
-                "correspondingly."
+            may_capture_graphs = current_platform.is_cuda_alike()
+            cudagraph_memory_estimate = 0
+            if may_capture_graphs and envs.VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS:
+                cudagraph_memory_estimate = self.model_runner.profile_cudagraph_memory()
+
+            self.total_consumed = profile_result.total_consumed
+            self.peak_activation_memory = (
+                profile_result.transient_peak_headroom + cudagraph_memory_estimate
             )
-            logger.info(msg)
+            self.cudagraph_memory_estimate = cudagraph_memory_estimate
+
+            safe_pin = (
+                self.init_snapshot.free_memory
+                - profile_result.non_kv_cache_memory
+                - cudagraph_memory_estimate
+            )
+            if kv_cache_memory_bytes < 0:
+                # Auto-pin: the measured safe maximum is the pin, minus
+                # |pin| as margin — every VRAM claim is boot-accounted and
+                # the remainder goes to KV.
+                margin = -kv_cache_memory_bytes
+                kv_cache_memory_bytes = max(safe_pin - margin, 0)
+                logger.info(
+                    "KV cache auto-pinned from boot accounting: safe maximum "
+                    "%s GiB, margin %s GiB, pinning %s GiB for KV Cache.",
+                    format_gib(safe_pin),
+                    format_gib(margin),
+                    format_gib(kv_cache_memory_bytes),
+                )
+            elif kv_cache_memory_bytes > safe_pin:
+                logger.warning(
+                    "kv_cache_memory %s GiB exceeds the measured safe maximum "
+                    "%s GiB (non-KV %s GiB including transient peak %s GiB, "
+                    "cudagraph estimate %s GiB); clamping to avoid OOM.",
+                    format_gib(kv_cache_memory_bytes),
+                    format_gib(safe_pin),
+                    format_gib(profile_result.non_kv_cache_memory),
+                    format_gib(profile_result.transient_peak_headroom),
+                    format_gib(cudagraph_memory_estimate),
+                )
+                kv_cache_memory_bytes = max(safe_pin, 0)
+            else:
+                logger.info(
+                    "kv_cache_memory %s GiB fits the measured safe maximum "
+                    "%s GiB (slack %s GiB).",
+                    format_gib(kv_cache_memory_bytes),
+                    format_gib(safe_pin),
+                    format_gib(safe_pin - kv_cache_memory_bytes),
+                )
             return reserve_mm_ipc_gpu_memory(
-                kv_cache_memory_bytes,
+                int(kv_cache_memory_bytes),
                 self.model_config.multimodal_config,
                 getattr(self.parallel_config, "_api_process_count", 1),
             )
