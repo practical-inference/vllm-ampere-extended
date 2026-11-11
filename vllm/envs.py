@@ -325,6 +325,7 @@ if TYPE_CHECKING:
     VLLM_DEBUG_MFU_METRICS: bool = False
     VLLM_WEIGHT_OFFLOADING_DISABLE_PIN_MEMORY: bool = False
     VLLM_WEIGHT_OFFLOADING_DISABLE_UVA: bool = False
+    VLLM_VISION_CPU_OFFLOAD_GB: float = 0.0
     VLLM_RELOAD_MODE: Literal["layerwise", "direct"] = "layerwise"
     VLLM_KV_OFFLOAD_MAX_BATCH_DESCRIPTORS: int = 0
     VLLM_WSL2_ENABLE_PIN_MEMORY: bool = False
@@ -2276,6 +2277,12 @@ environment_variables: dict[str, Callable[[], Any]] = {
     # Disable using UVA (Unified Virtual Addressing) for CPU offloading.
     "VLLM_WEIGHT_OFFLOADING_DISABLE_UVA": lambda: bool(
         int(os.getenv("VLLM_WEIGHT_OFFLOADING_DISABLE_UVA", "0"))
+    ),
+    # Vision tower bulk weights in host RAM (GiB budget). 0 = off. The tower's
+    # blocks/merger are offloaded through the UVA offloader's bulk-copy path;
+    # image forwards pay one PCIe copy of the tower per call.
+    "VLLM_VISION_CPU_OFFLOAD_GB": lambda: float(
+        os.getenv("VLLM_VISION_CPU_OFFLOAD_GB", "0")
     ),
     # How weight updates reload the model: "layerwise" rebuilds each layer
     # from the checkpoint tensors; "direct" writes them into the live
