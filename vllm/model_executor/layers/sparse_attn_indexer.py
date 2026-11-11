@@ -48,10 +48,6 @@ from vllm.model_executor.layers.quantization.utils.quant_utils import (
 )
 from vllm.platforms import current_platform
 from vllm.triton_utils import tl, triton
-from vllm.v1.attention.ops.mqa_logits_triton import (
-    fp8_mqa_logits_triton,
-    fp8_paged_mqa_logits_triton,
-)
 from vllm.utils.deep_gemm import (
     fp8_fp4_mqa_logits,
     fp8_fp4_paged_mqa_logits,
@@ -76,6 +72,10 @@ from vllm.v1.attention.backends.mla.indexer import (
     dense_logits_rows,
 )
 from vllm.v1.attention.ops.common import pack_seq_triton, unpack_seq_triton
+from vllm.v1.attention.ops.mqa_logits_triton import (
+    fp8_mqa_logits_triton,
+    fp8_paged_mqa_logits_triton,
+)
 from vllm.v1.attention.ops.pcp import maybe_gather_indexer_k
 from vllm.v1.worker.workspace import current_workspace_manager
 
@@ -886,7 +886,9 @@ def sparse_attn_indexer(
                         if use_deep_gemm:
                             q_scale_rows, chunk_weights = mqa_logits_mx_inputs(
                                 q_slice_cast[rows],
-                                q_scale_slice[rows] if q_scale_slice is not None else None,
+                                q_scale_slice[rows]
+                                if q_scale_slice is not None
+                                else None,
                                 prefill_weights[tokens],
                                 logits_dtype,
                             )

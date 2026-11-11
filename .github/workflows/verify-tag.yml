@@ -51,7 +51,7 @@ jobs:
           sha = subprocess.check_output(
               ["git", "rev-parse", f"{tag}^{{commit}}"], text=True
           ).strip()
-          gsha = re.search(r"\+g([0-9a-f]+)", ver)
+          gsha = re.search(r"[+. ]g([0-9a-f]+)", ver)
           assert gsha, f"no commit segment in wheel version: {ver}"
           assert sha.startswith(gsha.group(1)), (
               f"provenance mismatch: wheel built from {gsha.group(1)}, "

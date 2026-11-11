@@ -33,32 +33,32 @@ from __future__ import annotations
 import itertools
 import json
 import warnings
-from typing import Any, Dict, List
+from typing import Any
 
 REQUIRED_PRESERVING_MAX_KEYS = 6
 _MARKER_KEY = "x-required-preserving-marker"
 _FALLBACK_KEY = "x-any-order-loose-fallback"
 
 
-def _reordered(schema: Dict[str, Any], order: List[str]) -> Dict[str, Any]:
+def _reordered(schema: dict[str, Any], order: list[str]) -> dict[str, Any]:
     out = dict(schema)
     props = schema.get("properties", {})
     out["properties"] = {k: props[k] for k in order if k in props}
     return out
 
 
-def _object_keys(schema: Dict[str, Any]) -> List[str]:
+def _object_keys(schema: dict[str, Any]) -> list[str]:
     props = schema.get("properties", {})
     return list(props.keys()) if isinstance(props, dict) else []
 
 
 def _node_to_format(
-    leaf_schema: Dict[str, Any],
+    leaf_schema: dict[str, Any],
     style: str,
     any_order: bool,
     max_whitespace_cnt: Any,
-    excludes: List[str],
-) -> Dict[str, Any]:
+    excludes: list[str],
+) -> dict[str, Any]:
     return {
         "type": "json_schema",
         "json_schema": leaf_schema,
@@ -69,7 +69,7 @@ def _node_to_format(
     }
 
 
-def _expand_format_node(node: Dict[str, Any]) -> Dict[str, Any]:
+def _expand_format_node(node: dict[str, Any]) -> dict[str, Any]:
     """Expand every marked (loose any_order:true) json_schema node.
 
     Recursion covers every parent shape that can nest a json_schema node:
@@ -91,7 +91,8 @@ def _expand_format_node(node: Dict[str, Any]) -> Dict[str, Any]:
                     f"required-preserving expansion capped: {len(keys)} keys > "
                     f"{REQUIRED_PRESERVING_MAX_KEYS}; node keeps loose "
                     "any_order semantics (required keys may be missing, "
-                    "duplicates accepted)"
+                    "duplicates accepted)",
+                    stacklevel=2,
                 )
                 leaf = {k: v for k, v in marked.items() if k != _MARKER_KEY}
                 out = _node_to_format(leaf, style, True, ws, excludes)
@@ -100,7 +101,9 @@ def _expand_format_node(node: Dict[str, Any]) -> Dict[str, Any]:
                 out = {
                     "type": "or",
                     "elements": [
-                        _node_to_format(_reordered(stripped, list(perm)), style, False, ws, excludes)
+                        _node_to_format(
+                            _reordered(stripped, list(perm)), style, False, ws, excludes
+                        )
                         for perm in itertools.permutations(keys)
                     ],
                 }
@@ -133,6 +136,8 @@ def expand_loose_to_required_preserving(structural_tag_json: str) -> str:
     any_order:true on the fallback node for structural auditors).
     """
     parsed = json.loads(structural_tag_json)
-    if parsed.get("type") == "structural_tag" and isinstance(parsed.get("format"), dict):
+    if parsed.get("type") == "structural_tag" and isinstance(
+        parsed.get("format"), dict
+    ):
         parsed["format"] = _expand_format_node(parsed["format"])
     return json.dumps(parsed)

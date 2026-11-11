@@ -2336,7 +2336,9 @@ def test_workspace_topk(test_config: dict, top_k: int, backend: str) -> None:
     )
 
 
-@pytest.mark.skipif(not current_platform.is_cuda_alike(), reason="This test requires CUDA or ROCM")
+@pytest.mark.skipif(
+    not current_platform.is_cuda_alike(), reason="This test requires CUDA or ROCM"
+)
 @pytest.mark.parametrize("top_k", [64, 128])
 @torch.inference_mode()
 def test_persistent_topk_small_k(top_k: int) -> None:
@@ -2351,7 +2353,9 @@ def test_persistent_topk_small_k(top_k: int) -> None:
     )
 
 
-@pytest.mark.skipif(not current_platform.is_cuda_alike(), reason="This test requires CUDA or ROCM")
+@pytest.mark.skipif(
+    not current_platform.is_cuda_alike(), reason="This test requires CUDA or ROCM"
+)
 @pytest.mark.skipif(
     not current_platform.is_cuda_alike(), reason="This test requires CUDA or ROCm"
 )
@@ -2815,11 +2819,9 @@ def test_sparse_indexer_topk_backend_resolution() -> None:
         )
     # ...and persistent past the row limit.
     assert resolve("auto", unaligned_logits, num_rows=128) == (
-            # The SM80 per_row zone applies to the unaligned stride too.
-            "per_row"
-            if current_platform.is_device_capability_family(80)
-            else "persistent"
-        )
+        # The SM80 per_row zone applies to the unaligned stride too.
+        "per_row" if current_platform.is_device_capability_family(80) else "persistent"
+    )
     # Unsupported topk (outside {512, 1024, 2048} for the workspace kernels)
     # -> per_row fallback.
     assert resolve("auto", k=5000) == "per_row"
