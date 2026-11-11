@@ -100,7 +100,7 @@ Hybrid-state (mamba + full-attention) models running MTP speculative decoding re
 
 Both default to off. The release is demand-gated: it fires when admissions actually stall on blocks, not on the tier alone.
 
-The hybrid-mamba pool is shared between the attention and mamba groups; when it runs full, the multi-group allocation raises instead of routing through preemption. `--kv-cache-valve-threshold <fraction>` (default `0.0`, disabled) proactively preempts the most-recently-scheduled running request when KV cache usage reaches the fraction AND requests are waiting, restoring slack before allocation failure — with these mechanisms enabled it is part of the recommended configuration under pressure.
+The hybrid-mamba pool is shared between the attention and mamba groups; when it runs full, the multi-group allocation raises instead of routing through preemption. `--kv-cache-valve-threshold <fraction>` (default `0.0`, disabled) preempts the most-recently-scheduled running request to restore slack before allocation failure. Its primary trigger is admission demand: the previous step's waiting admission stalled on a block shortage that one preemption relieves (`free < demand <= free + tail_blocks`, demand recorded at the failed admission) — independent of pool size and workload fill. The fraction adds a proactive trigger (preempt once KV usage reaches it, before any admission fails) for operators who want earlier preemption; its value needs no relation to the pool size or workload. With these mechanisms enabled the valve is part of the recommended configuration under pressure.
 
 ## Multi-modal input limits
 

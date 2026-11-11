@@ -1,0 +1,13 @@
+# User-facing features of the vllm-ampere-extended delta, one per line.
+# Format:  name | landing-commit-sha OR since:<tag> | doc-path | one-line summary
+#   landing-commit-sha — first tag (oldest-first) whose commit contains this
+#                        sha is the feature's first release
+#   since:<tag>        — pin availability directly (upstream-merged features
+#                        whose landing commit is a merge, not a single sha)
+# The generated docs/ampere/availability.md is committed to main by the
+# release flow; this file is the editable source of truth.
+triton-mla-sparse | since:v2026.10.1+ae.1 | README.md | Sparse-MLA attention on SM80/SM121 (TRITON_MLA_SPARSE, auto-selected for MLA models)
+dynamic-spec-tier | since:v2026.10.1+ae.1 | docs/features/speculative_decoding/dynamic_speculative_decoding.md | Draft-K by concurrency (num_speculative_tokens_per_batch_size)
+mamba-priced-admission | b51baae430 | docs/configuration/conserving_memory.md | Admit at the K=0 tier under pool pressure (VLLM_MAMBA_PRICED_ADMISSION)
+mamba-k0-slot-release | b51baae430 | docs/configuration/conserving_memory.md | Release idle spec windows at the K=0 crossing (VLLM_MAMBA_K0_SLOT_RELEASE)
+kv-valve | b51baae430 | docs/configuration/conserving_memory.md | Demand-armed preemption guard (--kv-cache-valve-threshold)
