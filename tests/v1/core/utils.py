@@ -82,14 +82,15 @@ def create_scheduler(
     use_ec_connector: bool = False,
     ec_role: str | None = None,
     kv_cache_spec: KVCacheSpec | None = None,
+    kv_cache_groups: list[KVCacheGroupSpec] | None = None,
     runner: RunnerOption = "auto",
     per_request_spec_decode_metrics: str = "none",
     cache_aware_admission_window: int = 0,
     cache_aware_admission_threshold: float = 0.5,
-    prefill_schedule_interval: int = 1,
     scheduling_policy: SchedulerPolicy = "fcfs",
     diffusion_canvas_length: int | None = None,
     scheduler_cls: type[Scheduler] | None = None,
+    scheduler_reserve_full_isl: bool = True,
     kv_cache_valve_threshold: float = 0.0,
     lora_config: LoRAConfig | None = None,
     speculative_config: SpeculativeConfig | None = None,
@@ -141,9 +142,9 @@ def create_scheduler(
         is_encoder_decoder=model_config.is_encoder_decoder,
         cache_aware_admission_window=cache_aware_admission_window,
         cache_aware_admission_threshold=cache_aware_admission_threshold,
-        prefill_schedule_interval=prefill_schedule_interval,
         # Ensure admission/preemption mechanics are deterministic
         watermark=0.0,
+        scheduler_reserve_full_isl=scheduler_reserve_full_isl,
         kv_cache_valve_threshold=kv_cache_valve_threshold,
         policy=scheduling_policy,
     )
@@ -234,10 +235,12 @@ def create_scheduler(
             head_size=1,
             dtype=torch.float32,
         )
+    if kv_cache_groups is None:
+        kv_cache_groups = [KVCacheGroupSpec(["layer"], kv_cache_spec)]
     kv_cache_config = KVCacheConfig(
         num_blocks=num_blocks,  # A large number of blocks to hold all requests
         kv_cache_tensors=[],
-        kv_cache_groups=[KVCacheGroupSpec(["layer"], kv_cache_spec)],
+        kv_cache_groups=kv_cache_groups,
     )
     cache_config.num_gpu_blocks = num_blocks
     register_all_kvcache_specs(vllm_config)

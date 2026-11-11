@@ -91,6 +91,17 @@ If you run out of CPU RAM, try the following options:
 - (Multi-modal models only) you can set the size of multi-modal cache by setting `mm_processor_cache_gb` engine argument (default 4 GiB).
 - (CPU backend only) you can set the size of KV cache using `VLLM_CPU_KVCACHE_SPACE` environment variable, in GiB (default 0, meaning vLLM doesn't override the KV cache size through this variable).
 
+## Speculative-window memory for hybrid mamba models
+
+Hybrid-state (mamba + full-attention) models running MTP speculative decoding reserve a per-request speculative window even when the dynamic spec-tier table (`num_speculative_tokens_per_batch_size`) resolves the step to K=0 at high batch counts. Two opt-in environment variables make that memory reclaimable:
+
+- `VLLM_MAMBA_PRICED_ADMISSION` (default `0`): when a waiting request cannot admit at its scheduled tier's state footprint, retry the admission at the K=0 tier (the speculative window as null row slots) before stalling. The admitted tier is pinned per request and promoted back when the count-based tier rises.
+- `VLLM_MAMBA_K0_SLOT_RELEASE` (default `0`): release running rows' idle speculative windows back to the pool at the K=0 crossing; released rows promote (their windows refill) when the batch drains and the tier rises. Requires a mamba spec-tier table.
+
+Both default to off. The release is demand-gated: it fires when admissions actually stall on blocks, not on the tier alone.
+
+The hybrid-mamba pool is shared between the attention and mamba groups; when it runs full, the multi-group allocation raises instead of routing through preemption. `--kv-cache-valve-threshold <fraction>` (default `0.0`, disabled) proactively preempts the most-recently-scheduled running request when KV cache usage reaches the fraction AND requests are waiting, restoring slack before allocation failure — with these mechanisms enabled it is part of the recommended configuration under pressure.
+
 ## Multi-modal input limits
 
 You can allow a smaller number of multi-modal items per prompt to reduce the memory footprint of the model:
@@ -166,6 +177,7 @@ For backward compatibility, passing an integer works as before and is interprete
 !!! note
     - The size hints affect memory profiling only. They shape the dummy inputs used to compute reserved activation sizes. They do not change how inputs are actually processed at inference time.
     - If a hint exceeds what the model can accept, vLLM clamps it to the model's effective maximum and may log a warning.
+    - For Qwen2-VL-family models, increasing `max_model_len` can increase the profiled video size and reduce the memory available for the KV cache. Profiling remains subject to the processor's pixel limits and the frame cap. Set `video` hints to profile the videos you expect instead.
 
 !!! warning
     These size hints currently only affect activation memory profiling. Encoder cache size is determined by the actual inputs at runtime and is not limited by these hints.

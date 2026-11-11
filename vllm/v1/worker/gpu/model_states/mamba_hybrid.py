@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from vllm import envs
 from vllm.config import VllmConfig
 from vllm.config.compilation import CUDAGraphMode
 from vllm.model_executor.layers.mamba.mamba_utils import MambaStateCopyFuncsByType
@@ -274,6 +275,9 @@ class MambaHybridModelState(DefaultModelState):
             num_reqs,
             BLOCK_SIZE=block,
             MAMBA_BLOCK_SIZE=mamba_spec.block_size,
+            K0_FOLD_RESET=(
+                envs.VLLM_MAMBA_K0_SLOT_RELEASE or envs.VLLM_MAMBA_PRICED_ADMISSION
+            ),
         )
 
         if replayssm is not None:

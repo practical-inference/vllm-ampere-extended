@@ -61,6 +61,8 @@ if TYPE_CHECKING:
     VLLM_XLA_CHECK_RECOMPILATION: bool = False
     VLLM_USE_FUSED_MQA_TOPK: bool = True
     VLLM_SPARSE_INDEXER_MAX_LOGITS_MB: int = 512
+    VLLM_MAMBA_PRICED_ADMISSION: bool = False
+    VLLM_MAMBA_K0_SLOT_RELEASE: bool = False
     VLLM_SPARSE_INDEXER_MAX_DECODE_LOGITS_MB: int = 2048
     VLLM_ADAPTIVE_VERIFICATION_PROFILE_CONTEXT_LEN: int = 8192
     VLLM_XPU_PP_MICROBATCH: bool = True
@@ -267,6 +269,7 @@ if TYPE_CHECKING:
     VLLM_SSM_CONV_STATE_LAYOUT: Literal["SD", "DS"] | None = None
     VLLM_COMPUTE_NANS_IN_LOGITS: bool = False
     VLLM_RAISE_ON_LOGIT_NANS: bool = False
+    VLLM_CONFIDENTIAL_COMPUTE: str | None = None
     VLLM_ROCM_QUICK_REDUCE_QUANTIZATION: Literal[
         "FP", "INT8", "INT6", "INT4", "INT3", "NONE"
     ] = "NONE"
@@ -1149,6 +1152,21 @@ environment_variables: dict[str, Callable[[], Any]] = {
     "VLLM_SPARSE_INDEXER_MAX_LOGITS_MB": lambda: int(
         os.getenv("VLLM_SPARSE_INDEXER_MAX_LOGITS_MB", "512")
     ),
+    # Pool-priced spec-tier admission for hybrid-state models: when a waiting
+    # request cannot admit at its scheduled spec tier's state footprint, retry
+    # the admission at the K=0 tier (the speculative window as null row slots)
+    # before stalling. The admitted tier is pinned per request and promoted
+    # (priced) when the count-based tier rises above it. Default: off
+    "VLLM_MAMBA_PRICED_ADMISSION": lambda: bool(
+        int(os.getenv("VLLM_MAMBA_PRICED_ADMISSION", "0"))
+    ),
+    # Release the running rows' idle speculative windows at the K=0
+    # crossing (the born-null row shape); the admission check prices the
+    # freed blocks automatically. Requires a mamba spec-tier table
+    # (num_speculative_tokens_per_batch_size). Default: off
+    "VLLM_MAMBA_K0_SLOT_RELEASE": lambda: bool(
+        int(os.getenv("VLLM_MAMBA_K0_SLOT_RELEASE", "0"))
+    ),
     # Per-chunk decode logits budget (MiB) for the SM100 sparse indexer;
     # 0 disables decode chunking.
     "VLLM_SPARSE_INDEXER_MAX_DECODE_LOGITS_MB": lambda: int(
@@ -1531,7 +1549,7 @@ environment_variables: dict[str, Callable[[], Any]] = {
     "VLLM_RUST_FRONTEND_PATH": lambda: _resolve_rust_cli_path(),
     # If set, vllm will run in development mode, which will enable
     # some additional endpoints for developing and debugging,
-    # e.g. `/reset_prefix_cache`
+    # e.g. `/reset_prefix_cache`, and default `--enable-scale-out` to on
     "VLLM_SERVER_DEV_MODE": lambda: bool(int(os.getenv("VLLM_SERVER_DEV_MODE", "0"))),
     # Controls the maximum number of requests to handle in a
     # single asyncio task when processing per-token outputs in the
@@ -1993,6 +2011,10 @@ environment_variables: dict[str, Callable[[], Any]] = {
     "VLLM_RAISE_ON_LOGIT_NANS": lambda: bool(
         int(os.getenv("VLLM_RAISE_ON_LOGIT_NANS", "0"))
     ),
+    # Override NVIDIA Confidential Computing detection. Unset (default)
+    # auto-detects via NVML; "1" forces it on, "0" forces it off. Gates the
+    # Confidential Computing copy paths (see vllm.v1.conf_compute_utils).
+    "VLLM_CONFIDENTIAL_COMPUTE": lambda: os.getenv("VLLM_CONFIDENTIAL_COMPUTE"),
     # Timeout (in seconds) for MooncakeConnector in PD disaggregated setup.
     "VLLM_MOONCAKE_ABORT_REQUEST_TIMEOUT": lambda: int(
         os.getenv("VLLM_MOONCAKE_ABORT_REQUEST_TIMEOUT", "480")

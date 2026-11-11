@@ -5,6 +5,7 @@ from typing import Any
 
 import torch
 
+from vllm import envs
 from vllm.config import VllmConfig
 from vllm.model_executor.layers.mamba.checkpoint import (
     MambaPrefillCheckpointBuilder,
@@ -143,6 +144,7 @@ class PleShortConvAttentionMetadataBuilder(ShortConvAttentionMetadataBuilder):
         self._k0_regular_decode: bool = (
             self.num_spec > 0
             and self.vllm_config.cache_config.mamba_cache_mode == "align"
+            and (envs.VLLM_MAMBA_K0_SLOT_RELEASE or envs.VLLM_MAMBA_PRICED_ADMISSION)
         )
         self.checkpoint_builder = MambaPrefillCheckpointBuilder(
             vllm_config, kv_cache_spec

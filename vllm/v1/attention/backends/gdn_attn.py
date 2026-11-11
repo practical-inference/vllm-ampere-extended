@@ -8,6 +8,7 @@ from typing import Literal
 
 import torch
 
+from vllm import envs
 from vllm._aiter_ops import rocm_aiter_ops
 from vllm.config import VllmConfig
 from vllm.model_executor.layers.mamba.checkpoint import (
@@ -208,6 +209,7 @@ class GDNAttentionMetadataBuilder(AttentionMetadataBuilder[GDNAttentionMetadata]
         self._k0_regular_decode: bool = (
             self.use_spec_decode
             and self.vllm_config.cache_config.mamba_cache_mode == "align"
+            and (envs.VLLM_MAMBA_K0_SLOT_RELEASE or envs.VLLM_MAMBA_PRICED_ADMISSION)
         )
         self._init_reorder_batch_threshold(1, self.use_spec_decode)
 
