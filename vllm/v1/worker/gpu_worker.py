@@ -690,6 +690,19 @@ class Worker(WorkerBase):
             # cudagraph footprint) so the pin is validated against what has
             # to fit around it, and so a negative pin can be auto-sized from
             # those measurements.
+            # Let compilation settle before the measured pass: on a cold
+            # compile cache the first profile_run carries torch.compile and
+            # Triton JIT scratch inside the measured window, so the transient
+            # peak reads the compiler's peak, not the model's (syv-ai
+            # memory-profile-after-warmup). Run one uncounted pass, then
+            # release the allocator's cached blocks so the measured pass sees
+            # the warm figure every later request produces.
+            with set_current_vllm_config(self.vllm_config):
+                self.model_runner.profile_run(
+                    randomize_inputs=self.randomize_dummy_inputs
+                )
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
             with (
                 memory_profiling(
                     self.init_snapshot,
@@ -704,6 +717,13 @@ class Worker(WorkerBase):
                     randomize_inputs=self.randomize_dummy_inputs
                 )
 
+            # The KV cache is allocated right after this, on top of whatever
+            # the measured pass left in the allocator's cache (torch.compile
+            # and Triton autotune scratch). Release it so the pool does not
+            # stack on stale cache (syv-ai pinned-kv-empty-cache, vllm
+            # #59893).
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
             may_capture_graphs = current_platform.is_cuda_alike()
             cudagraph_memory_estimate = 0
             if may_capture_graphs and envs.VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS:
