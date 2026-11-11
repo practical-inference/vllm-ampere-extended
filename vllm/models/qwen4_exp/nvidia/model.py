@@ -55,6 +55,13 @@ from vllm.model_executor.models.qwen3_vl import (
     Qwen3VLMultiModalProcessor,
     Qwen3VLProcessingInfo,
 )
+import vllm.envs as envs
+from vllm.logger import init_logger
+from vllm.utils.torch_utils import (
+    get_accelerator_view_from_cpu_tensor,
+)
+
+logger = init_logger(__name__)
 from vllm.model_executor.models.utils import (
     AutoWeightsLoader,
     PPMissingLayer,
@@ -165,6 +172,38 @@ _EXTRA_WEIGHTS_MAPPER = WeightsMapper(
         "ple.value_proj": ("ple.kv_proj", 1),
     }
 )
+
+
+def _offload_embedding_to_uva(embedding: nn.Module, tied: bool) -> None:
+    """VLLM_EMBED_UVA=1: keep the token embedding in pinned host RAM.
+
+    The table is read through a CUDA UVA view, so a decode step pulls one row
+    per request over PCIe and the freed VRAM goes to the KV pool. Skipped for
+    tied embeddings, whose lm_head would read the whole table from host RAM
+    every step. Handles both quantized (weight_packed) and plain weights.
+    """
+    if not envs.VLLM_EMBED_UVA:
+        return
+    if tied:
+        logger.info_once(
+            "VLLM_EMBED_UVA=1 but the embedding is tied to lm_head; "
+            "leaving it in VRAM."
+        )
+        return
+    weight = getattr(embedding, "weight_packed", None)
+    if weight is None:
+        weight = getattr(embedding, "weight", None)
+    if weight is None:
+        logger.warning_once("VLLM_EMBED_UVA=1 but no embedding weight found.")
+        return
+    if getattr(weight, "_vllm_is_uva_offloaded", False):
+        return
+
+    cpu_weight = weight.data.to("cpu").pin_memory()
+    weight.data = get_accelerator_view_from_cpu_tensor(cpu_weight)
+    weight._vllm_is_uva_offloaded = True
+
+    torch.cuda.empty_cache()
 
 
 class Qwen4ExpSparseMoeBlock(Qwen3NextSparseMoeBlock):
@@ -705,6 +744,10 @@ class Qwen4ExpModel(nn.Module):
         loaded = loader.load_weights(
             weights,
             mapper=mapper,
+        )
+        _offload_embedding_to_uva(
+            self.embed_tokens,
+            getattr(self.config, "tie_word_embeddings", False),
         )
         return loaded
 
