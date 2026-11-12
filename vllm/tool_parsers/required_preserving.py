@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+
 """Required-preserving expansion for strict tool grammars (fork delta).
 
 Deployed context (2026-11-02 adversarial review): `any_order=True` on the

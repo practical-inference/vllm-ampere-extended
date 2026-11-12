@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
-"""Tests for the opt-in ``skip_draft_when_k0`` speculative config option.
+"""Tests for the opt-in `skip_draft_when_k0` speculative config option.
 
 The option skips the draft-model forward on engine steps whose
-dynamically resolved ``num_speculative_tokens`` is 0 (the ``DSD K=0``
+dynamically resolved `num_speculative_tokens` is 0 (the `DSD K=0`
 prefill normally kept to sync draft KV state for a possible K>0
 resume). It is refused for EAGLE-family methods: a full-attention
 drafter's acceptance collapses non-recovering after unsynced K=0 steps

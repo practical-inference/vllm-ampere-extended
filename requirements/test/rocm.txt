@@ -7650,7 +7650,10 @@ uvloop==0.22.1 \
     --hash=sha256:ea721dd3203b809039fcc2983f14608dae82b212288b346e0bfe46ec2fab0b7c \
     --hash=sha256:ef6f0d4cc8a9fa1f6a910230cd53545d9a14479311e87e3cb225495952eb672c \
     --hash=sha256:fe94b4564e865d968414598eea1a6de60adba0c040ba4ed05ac1300de402cd42
-    # via uvicorn
+    # via
+    #   -c requirements/common.txt
+    #   -r requirements/test/../common.txt
+    #   uvicorn
 vector-quantize-pytorch==1.28.0 \
     --hash=sha256:c182d4400f4c65f97349efb3c2547850b5f9304032ed13c575be207a89354f7e \
     --hash=sha256:f04fcfcecffa9a250a4663474a799cfc7a7901d87899e519ea80814d94425046

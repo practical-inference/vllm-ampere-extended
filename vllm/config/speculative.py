@@ -594,8 +594,8 @@ class SpeculativeConfig:
 
     skip_draft_when_k0: bool = False
     """Opt-in: on engine steps whose dynamically resolved
-    ``num_speculative_tokens`` is 0, skip the draft-model forward entirely
-    (the ``DSD K=0`` prefill normally kept to sync draft KV state for a
+    `num_speculative_tokens` is 0, skip the draft-model forward entirely
+    (the `DSD K=0` prefill normally kept to sync draft KV state for a
     possible later K>0 resume).
 
     Measured (see the linked issue): the sync forward costs 4-11% decode
@@ -1515,7 +1515,7 @@ class SpeculativeConfig:
         return self
 
     def _validate_dflash_dynamic_schedule(self) -> None:
-        """DFlash propose() drafts its fixed ``num_speculative_tokens``
+        """DFlash propose() drafts its fixed `num_speculative_tokens`
         block width regardless of the per-step schedule, so tier rungs
         must resolve to that width or skip drafting entirely.
         """

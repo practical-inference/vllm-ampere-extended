@@ -748,9 +748,11 @@ class DPSharedEngramStorage:
         num_bytes = weight_bytes + scale_bytes
 
         def split_table(table: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-            weight = table[:weight_bytes].view(
-                torch.uint8 if int4 else torch.float8_e4m3fn
-            ).view(-1, weight_width)
+            weight = (
+                table[:weight_bytes]
+                .view(torch.uint8 if int4 else torch.float8_e4m3fn)
+                .view(-1, weight_width)
+            )
             scales = table[weight_bytes:]
             if int4:
                 scales = scales.view(torch.float16)

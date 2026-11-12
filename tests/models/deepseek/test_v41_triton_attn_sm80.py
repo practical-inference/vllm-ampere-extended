@@ -2,10 +2,10 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """SM80 Triton decode attention composition for DeepSeek V4.1.
 
-Exercises the pieces ``DeepseekV4TritonAttention._forward_decode`` wires
+Exercises the pieces `DeepseekV4TritonAttention._forward_decode` wires
 together — 584B legacy-record gathers (software e4m3 dequant) into the
-``[T*W, T*W + T*K)`` workspace, the ``_decode_ws_ids`` row mapping, and
-``triton_mla_sparse_attention`` with attn_sink — against a plain-torch fp32
+`[T*W, T*W + T*K)` workspace, the `_decode_ws_ids` row mapping, and
+`triton_mla_sparse_attention` with attn_sink — against a plain-torch fp32
 reference (formula dequant + full softmax over the masked SWA/topk union with
 the sink as an extra denominator term).
 """

@@ -379,7 +379,9 @@ def sparse_attn_indexer_kpool(
                 logits = q_slice.new_empty((num_rows, 0), dtype=torch.float32)
             elif use_deep_gemm:
                 q_scale_slice, chunk_weights = mqa_logits_mx_inputs(
-                    q_slice_cast, q_scale_slice, prefill_weights[row_start:row_end],
+                    q_slice_cast,
+                    q_scale_slice,
+                    prefill_weights[row_start:row_end],
                     logits_dtype,
                 )
                 # Compressed: row i starts at K position cu_seqlen_ks[i].

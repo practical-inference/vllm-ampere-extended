@@ -87,7 +87,7 @@ gen_availability() {
   echo "\"unreleased\" = in source on main, not yet in any release tag."
   echo
   echo "| Feature | What it does | Doc | First release | In $LATEST_TAG |"
-  echo "|---|---|---|---|---|"
+  echo "| --- | --- | --- | --- | --- |"
   local name ref doc summary first status
   while IFS='|' read -r name ref doc summary; do
     name=$(echo "$name" | xargs); ref=$(echo "$ref" | xargs); doc=$(echo "$doc" | xargs)

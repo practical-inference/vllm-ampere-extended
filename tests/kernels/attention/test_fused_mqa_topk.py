@@ -374,6 +374,16 @@ def _run_kpool_indexer(monkeypatch, inputs, fused_mqa_topk, budget_mb=512):
     """Run the GLM-5.3-Flash kpool indexer prefill on one packed chunk."""
     import vllm.models.glm5next.nvidia.sparse_indexer as kpool_indexer
 
+    fused_prefill = getattr(kpool_indexer, "fused_mqa_topk_prefill", None)
+    if fused_prefill is None:
+        pytest.skip(
+            "the kpool indexer's inline fused-mqa prefill path is gone from "
+            "vllm/models/glm5next/nvidia/sparse_indexer.py (top-k moved to "
+            "the SparseIndexerTopk backend dispatcher); the spy point this "
+            "test monitors no longer exists"
+        )
+    assert fused_prefill is not None
+
     q, k, scales, weights, starts, ends, positions = inputs
     rows, keys = q.shape[0], k.shape[0]
     chunk = DeepseekV32IndexerPrefillChunkMetadata(
@@ -414,7 +424,7 @@ def _run_kpool_indexer(monkeypatch, inputs, fused_mqa_topk, budget_mb=512):
     monkeypatch.setattr(envs, "VLLM_USE_FUSED_MQA_TOPK", fused_mqa_topk)
     monkeypatch.setattr(envs, "VLLM_SPARSE_INDEXER_MAX_LOGITS_MB", budget_mb)
     calls: list[torch.Size] = []
-    fused_fn = kpool_indexer.fused_mqa_topk_prefill
+    fused_fn = fused_prefill
 
     def spy(*a, **kw):
         calls.append(a[-1].shape)  # the output buffer: [rows, top-k pools]

@@ -196,7 +196,6 @@ def build_offloading_config(
             _group_kv_bytes_per_block(group) for _, group in selected_groups
         )
 
-
     replicated_layout = (
         vllm_config.model_config.use_mla
         and parallel_config.tensor_parallel_size > 1

@@ -654,12 +654,12 @@ def _dequant_ds_mla_slots_kernel(
       [512, 528): 4 float32 scale factors (one per 128 fp8 elements)
       [528, 656): 64 bfloat16 values (RoPE, not quantized)
 
-    With ``segregated_scale`` (DeepSeek-V4 legacy 584B record, per-page
+    With `segregated_scale` (DeepSeek-V4 legacy 584B record, per-page
     regions instead of per-token): data region [0, bs*576) holds per-token
-    [nope fp8][rope bf16] (no interleaved scales); scale region
+    `[nope fp8][rope bf16]` (no interleaved scales); scale region
     [bs*576, bs*584) holds per-token (num_tiles + 1) uint8 UE8M0 bytes,
-    scale = 2^(byte - 127). ``cache_bytes`` is the per-token data stride
-    (576) and ``nope_dim`` the fp8-byte count (448) there.
+    scale = 2^(byte - 127). `cache_bytes` is the per-token data stride
+    (576) and `nope_dim` the fp8-byte count (448) there.
 
     Output per token (576 bf16 = 1152 bytes):
       [0, 512):   dequantized NoPE

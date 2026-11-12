@@ -790,14 +790,11 @@ class Scheduler(SchedulerInterface):
             demand = self.kv_cache_manager.last_admission_demand_blocks
             free = self.kv_cache_manager.block_pool.get_num_free_blocks()
             tail_blocks = len(
-                self.kv_cache_manager.get_blocks(
-                    self.running[-1].request_id
-                ).blocks[0]
+                self.kv_cache_manager.get_blocks(self.running[-1].request_id).blocks[0]
             )
             demand_stall = (
                 self._admission_block_stall
-                and 0 < demand
-                <= self.kv_cache_manager.kv_cache_config.num_blocks
+                and 0 < demand <= self.kv_cache_manager.kv_cache_config.num_blocks
                 and free < demand <= free + tail_blocks
             )
             if (
@@ -2057,9 +2054,7 @@ class Scheduler(SchedulerInterface):
             if self._priced_admission or self._slot_release:
                 num_spec_tokens_to_schedule = step_tier
             else:
-                num_spec_tokens_to_schedule = self.dynamic_sd_lookup[
-                    len(self.running)
-                ]
+                num_spec_tokens_to_schedule = self.dynamic_sd_lookup[len(self.running)]
 
         scheduled_encoder_input_stats = None
         if (
