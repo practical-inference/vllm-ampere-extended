@@ -18,6 +18,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/practical-inference/vllm-ampere-extended/pkgs/container/vllm-ampere-extended"><img alt="Docker image on GHCR" src="https://img.shields.io/badge/ghcr.io-vllm--ampere--extended-2496ED?logo=docker&logoColor=white"></a>
   <a href="https://github.com/practical-inference/vllm-ampere-extended/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/practical-inference/vllm-ampere-extended?include_prereleases"></a>
   <a href="https://github.com/practical-inference/vllm-ampere-extended/issues"><img alt="Issues" src="https://img.shields.io/github/issues/practical-inference/vllm-ampere-extended"></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.12-blue">
@@ -101,7 +102,18 @@ validation, and data it took.
 
 ## Installation
 
-Wheels (Linux x86_64, Python 3.12, CUDA 13.2) are attached to each release:
+**Run with Docker** (the fastest path — no host Python setup):
+
+```bash
+docker run --gpus all --ipc=host -p 127.0.0.1:8000:8000 \
+  -v /data/models:/models:ro \
+  ghcr.io/practical-inference/vllm-ampere-extended:v2026.10.1-ae.1 \
+  --model /models/<model> --api-key "$VLLM_API_KEY"
+```
+
+Pin an immutable tag for anything that restarts unattended (`latest` floats). Copy-paste systemd/shell service templates, the arguments that matter, and per-feature availability: [runbooks/run-container.md](runbooks/run-container.md) · container details and tag policy: [docker/ampere-image.md](docker/ampere-image.md).
+
+**Or install the wheel** (Linux x86_64, Python 3.12, CUDA 13.2) — attached to each release:
 
 ```bash
 pip install https://github.com/practical-inference/vllm-ampere-extended/releases/download/<tag>/vllm-<version>.whl
@@ -109,6 +121,16 @@ pip install https://github.com/practical-inference/vllm-ampere-extended/releases
 
 Browse builds on the [Releases](https://github.com/practical-inference/vllm-ampere-extended/releases)
 page. Every release notes the upstream vLLM commit it was built from.
+
+### Docs & runbooks
+
+| | |
+|---|---|
+| [Run the container](runbooks/run-container.md) | systemd/shell templates, arguments that matter, verify-alive |
+| [Container image](docker/ampere-image.md) | tags, what's inside, security notes |
+| [Feature availability](docs/ampere/availability.md) | what each release tag carries (generated) |
+| [Recipes](recipes/README.md) | model + GPU configs with measured numbers |
+| [DELTA.md](DELTA.md) | the source delta vs upstream, per area |
 
 ## Support matrix
 

@@ -6,6 +6,10 @@ A5000-class), 8.9 (RTX 40xx / L40 / Ada), 9.0a (Hopper), 10.0f (Blackwell
 sm100/sm103 family) and 12.0 (RTX 50xx); unknown future architectures JIT
 from the included PTX instead of failing.
 
+Running it as a long-running service — systemd/shell templates, the
+arguments that matter, and per-feature availability by tag:
+[runbooks/run-container.md](../runbooks/run-container.md).
+
 ## Requirements
 
 - NVIDIA driver >= 580 (the image runs CUDA 13 user-space). Ampere setups on
@@ -14,7 +18,7 @@ from the included PTX instead of failing.
 
 ## Run (fail-closed defaults)
 
-```
+```bash
 docker run --gpus all --ipc=host -p 127.0.0.1:8000:8000 \
   -v /path/to/models:/models:ro \
   ghcr.io/practical-inference/vllm-ampere-extended:<tag> \
