@@ -127,6 +127,8 @@ page. Every release notes the upstream vLLM commit it was built from.
 | | |
 |---|---|
 | [Run the container](runbooks/run-container.md) | systemd/shell templates, arguments that matter, verify-alive |
+| [Boot OOM on Ampere](runbooks/boot-oom-on-ampere.md) | stock vLLM fails at KV-cache init — the fork's software-fp8 fix |
+| [Upgrading between tags](runbooks/upgrade-between-tags.md) | how releases are cut, upgrade + rollback procedure |
 | [Sparse attention](docs/ampere/sparse-attention.md) | the TRITON_MLA_SPARSE backend — selection, fp8 KV cache, constraints |
 | [Container image](docker/ampere-image.md) | tags, what's inside, security notes |
 | [Feature availability](docs/ampere/availability.md) | what each release tag carries (generated) |
