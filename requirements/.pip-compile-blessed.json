@@ -1,0 +1,8 @@
+{
+  "requirements/docs.txt": "fb5baaba15e63ccea00a1a268144f11509f63555d19fc5bdb704444293a8a331",
+  "requirements/test/cpu.txt": "54c8869c268e1a538228b09f6198bef30d77cce2c65697d2481090a14b934ac1",
+  "requirements/test/cuda.txt": "b658cc11c8371a02cc8a9e9515a8065411ac0fdb07d469c9b90f25be6510e0ba",
+  "requirements/test/kv_connectors_cuda.txt": "4a18db0e64fc27febab90be8fdb14dcf464b6cf939ecbae961c559de59614951",
+  "requirements/test/rocm.txt": "447aeac0cedf663c9fde1842f29ae6d40af02f375d28c17c5af2511850a6652c",
+  "requirements/test/xpu.txt": "7e610cf18d31c8094606366417425a8061f6155b9d2cf81596a1e1ab6f6b0681"
+}
