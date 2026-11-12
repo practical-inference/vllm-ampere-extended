@@ -7,7 +7,7 @@ What a release tag gives you, per user-facing feature of our delta.
 
 | Feature | What it does | Doc | First release | In v2026.10.2.dev135-ae.1 |
 |---|---|---|---|---|
-| triton-mla-sparse | Sparse-MLA attention on SM80/SM121 (TRITON_MLA_SPARSE, auto-selected for MLA models) | [README.md](../../README.md) | v2026.10.1+ae.1 | yes (since v2026.10.1+ae.1) |
+| triton-mla-sparse | Sparse-MLA attention on SM80/SM121 (TRITON_MLA_SPARSE, auto-selected for MLA models) | [docs/ampere/sparse-attention.md](../../docs/ampere/sparse-attention.md) | v2026.10.1+ae.1 | yes (since v2026.10.1+ae.1) |
 | dynamic-spec-tier | Draft-K by concurrency (num_speculative_tokens_per_batch_size) | [docs/features/speculative_decoding/dynamic_speculative_decoding.md](../../docs/features/speculative_decoding/dynamic_speculative_decoding.md) | v2026.10.1+ae.1 | yes (since v2026.10.1+ae.1) |
 | mamba-priced-admission | Admit at the K=0 tier under pool pressure (VLLM_MAMBA_PRICED_ADMISSION) | [docs/configuration/conserving_memory.md](../../docs/configuration/conserving_memory.md) | v2026.10.2.dev135-ae.1 | **new in v2026.10.2.dev135-ae.1** |
 | mamba-k0-slot-release | Release idle spec windows at the K=0 crossing (VLLM_MAMBA_K0_SLOT_RELEASE) | [docs/configuration/conserving_memory.md](../../docs/configuration/conserving_memory.md) | v2026.10.2.dev135-ae.1 | **new in v2026.10.2.dev135-ae.1** |
