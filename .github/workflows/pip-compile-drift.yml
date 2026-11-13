@@ -22,11 +22,11 @@ jobs:
         python-version: "3.12"
     - name: Re-resolve all lockfiles (retries index errors)
       env:
-        # Bypass the blessed-hash fast path: this workflow exists to
-        # re-resolve against the live indexes. Network-class failures are
-        # fail-open inside the hook (warn + pass), so this workflow goes
-        # red only on real drift.
-        PIP_COMPILE_BLESSED: force
+        # Strict mode: skip the blessed-hash fast path and fail closed on
+        # network-class errors, so this workflow reds on real drift AND
+        # while an index stays unreachable — a deferral in a push run is
+        # always re-checked here.
+        PIP_COMPILE_BLESSED: strict
       run: |
         for attempt in 1 2 3; do
           if uvx pre-commit run pip-compile --hook-stage manual --all-files --show-diff-on-failure --color=always; then
