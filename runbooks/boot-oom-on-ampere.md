@@ -47,8 +47,9 @@ docker run --gpus all --ipc=host -p 127.0.0.1:8000:8000 \
   [docs/ampere/sparse-attention.md](../docs/ampere/sparse-attention.md)
   for what the backend does with it).
 - `--kv-cache-memory-bytes` — pins the KV pool explicitly instead of
-  deriving it from `--gpu-memory-utilization`; use the registered spelling
-  (the manifest's `--kv-cache-memory` works only as a prefix abbreviation).
+  deriving it from `--gpu-memory-utilization`; always use the registered
+  spelling (a shortened form works only as a prefix abbreviation and
+  breaks if another flag ever shares the prefix).
 
 This is the mechanism that boots the Qwen3.8-Flash-Next checkpoint stock
 vLLM cannot: the fork-vs-stock comparison, the pool math, and the measured

@@ -90,7 +90,7 @@ sudo systemctl enable --now vllm-ampere
 journalctl -u vllm-ampere -f          # server logs
 ```
 
-The launch flags above are the **validated qwen3.8-flash configuration** from [docker/ampere-manifest.yaml](../docker/ampere-manifest.yaml) (SM80, tier-1 green) — the manifest's `launch:` lines are bare-metal form starting with `vllm serve`; inside the container the entrypoint supplies `vllm serve`, so you pass only the flags. One spelling note: the manifest writes `--kv-cache-memory` (accepted as a prefix abbreviation of the registered `--kv-cache-memory-bytes`); the templates use the registered spelling — prefer it, abbreviations break when another flag with the same prefix lands. Swap the model line for your model's manifest entry — do not invent flags; the manifest entries are the ones we run.
+The launch flags above are the **validated qwen3.8-flash configuration** from [docker/ampere-manifest.yaml](../docker/ampere-manifest.yaml) (SM80, tier-1 green) — the manifest's `launch:` lines are bare-metal form starting with `vllm serve`; inside the container the entrypoint supplies `vllm serve`, so you pass only the flags. One spelling note: the manifest and the templates both use the registered spelling `--kv-cache-memory-bytes`; prefer it — a shortened form works only as a prefix abbreviation and breaks when another flag with the same prefix lands. Swap the model line for your model's manifest entry — do not invent flags; the manifest entries are the ones we run.
 
 ## Shell-script alternative (no systemd)
 
