@@ -4,6 +4,7 @@
 
 import copy
 import gc
+import json
 import os
 import time
 from collections.abc import Callable, Iterable
@@ -556,7 +557,50 @@ class Worker(WorkerBase):
         else:
             raise RuntimeError(f"Unsupported device type: {self.device_config.device}")
 
+        self._maybe_arm_oom_snapshot()
         self._init_workspace_and_model_runner()
+
+    def _maybe_arm_oom_snapshot(self) -> None:
+        """Env-gated forensic tooling; INERT unless VLLM_OOM_SNAPSHOT_DIR is set.
+
+        Arms the allocator history with python+C++ stacks (`stacks="all"`) so
+        an OOM snapshot's block frames are attributable — C++-only recording
+        collapses every block's frames onto the snapshot gather path. On the
+        first CUDA OOM, dumps `torch.cuda.memory._snapshot()` per rank as
+        JSON into VLLM_OOM_SNAPSHOT_DIR.
+        """
+        self._oom_snapshot_dir = os.environ.get("VLLM_OOM_SNAPSHOT_DIR", "")
+        self._oom_snapshot_done = False
+        if not self._oom_snapshot_dir:
+            return
+        max_entries = int(os.environ.get("VLLM_OOM_SNAPSHOT_MAX_ENTRIES", "200000"))
+        torch.cuda.memory._record_memory_history(
+            enabled="all",
+            context="alloc",
+            stacks="all",
+            max_entries=max_entries,
+        )
+        logger.warning(
+            "OOM snapshot tooling armed: dir=%s max_entries=%d (stacks=all)",
+            self._oom_snapshot_dir,
+            max_entries,
+        )
+
+    def _dump_oom_snapshot(self) -> None:
+        if self._oom_snapshot_done or not self._oom_snapshot_dir:
+            return
+        self._oom_snapshot_done = True
+        try:
+            snap = torch.cuda.memory._snapshot()
+            path = os.path.join(
+                self._oom_snapshot_dir,
+                f"oom_snapshot_{int(time.time())}_rank{self.rank}.json",
+            )
+            with open(path, "w") as f:
+                json.dump(snap, f, default=str)
+            logger.warning("OOM snapshot written: %s", path)
+        except Exception:
+            logger.exception("OOM snapshot dump failed")
 
     def _init_workspace_and_model_runner(self) -> None:
         """Set up the workspace manager, build the model runner, report usage."""
@@ -1461,9 +1505,13 @@ class Worker(WorkerBase):
             )
 
         with self.annotate_profile(scheduler_output):
-            output = self.model_runner.execute_model(
-                scheduler_output, intermediate_tensors
-            )
+            try:
+                output = self.model_runner.execute_model(
+                    scheduler_output, intermediate_tensors
+                )
+            except torch.OutOfMemoryError:
+                self._dump_oom_snapshot()
+                raise
             if self.model_runner.is_pooling_model and output is None:
                 output = self.model_runner.pool()
             if isinstance(
