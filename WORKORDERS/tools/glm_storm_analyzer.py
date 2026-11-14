@@ -17,14 +17,21 @@ def main():
     txt = open(log, errors="replace").read()
     hb = []
     for m in re.finditer(
-        r"11-1\d (\d\d:\d\d:\d\d).*?Avg prompt throughput: ([\d.]+) tokens/s, "
+        r"(11-1\d) (\d\d:\d\d:\d\d).*?Avg prompt throughput: ([\d.]+) tokens/s, "
         r"Avg generation throughput: ([\d.]+) tokens/s, Running: (\d+) reqs, "
         r"Waiting: (\d+) reqs(?:, Deferred: (\d+) reqs)?, GPU KV cache usage: ([\d.]+)%", txt):
-        t = m.group(1)
-        if t < since:
-            continue
-        hb.append((t, float(m.group(2)), float(m.group(3)), int(m.group(4)),
-                   int(m.group(5)), int(m.group(6) or 0), float(m.group(7))))
+        # --since accepts "HH:MM:SS" (time-of-day only) or "MM-DD HH:MM:SS"
+        if len(since) > 8:
+            key = m.group(1) + " " + m.group(2)
+            if key < since:
+                continue
+            t = m.group(2)
+        else:
+            t = m.group(2)
+            if t < since:
+                continue
+        hb.append((t, float(m.group(3)), float(m.group(4)), int(m.group(5)),
+                   int(m.group(6)), int(m.group(7) or 0), float(m.group(8))))
     if not hb:
         print("no heartbeats in range"); return
     print(f"heartbeats: {len(hb)}  span {hb[0][0]} -> {hb[-1][0]}")
