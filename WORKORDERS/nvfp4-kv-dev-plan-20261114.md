@@ -2,6 +2,7 @@
 
 Status: SPEC REVIEWED — 2026-11-14 (supersedes DRAFT-for-spec-review; 3/3 attacks)
 Adversarial-Review: SURVIVES (adversarial-20261114-143436.log)
+Evidence: /home/columbo/source/vllm-nightly/.pr-drafts/evidence/nvfp4-kv-dev-plan-20261114/run-20261114-143436/adversarial-20261114-143436.log
 Companion: nvfp4-kv-requirements-20261114.md (FR/NFR/gates referenced by ID)
 
 ## 0. Incremental strategy
