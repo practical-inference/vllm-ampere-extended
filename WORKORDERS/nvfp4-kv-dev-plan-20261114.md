@@ -1,6 +1,7 @@
 # Development Plan: NVFP4 (4-bit) KV Cache for vllm-ampere-extended
 
-Status: DRAFT for spec review — 2026-11-14
+Status: SPEC REVIEWED — 2026-11-14 (supersedes DRAFT-for-spec-review; 3/3 attacks)
+Adversarial-Review: SURVIVES (adversarial-20261114-143436.log)
 Companion: nvfp4-kv-requirements-20261114.md (FR/NFR/gates referenced by ID)
 
 ## 0. Incremental strategy

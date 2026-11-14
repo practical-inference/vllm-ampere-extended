@@ -1,6 +1,7 @@
 # Requirements Specification: NVFP4 (4-bit) KV Cache for vllm-ampere-extended
 
-Status: DRAFT for spec review — 2026-11-14
+Status: SPEC REVIEWED — 2026-11-14 (supersedes DRAFT-for-spec-review)
+Adversarial-Review: SURVIVES (adversarial-20261114-150135.log)
 Owner: columbo (vllm-nightly fork)
 Target repo: vllm-project/vllm fork (`vllm-ampere-extended`)
 
