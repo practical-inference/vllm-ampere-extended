@@ -27,6 +27,7 @@ Runbook: glm-night-window-runbook-20261113.md. Outcome: PROMOTED
 | E7 | L2 + ladder K=2 | WORKS | wall 320.1s, 16.1/1.26/1.61; acceptance run-mean 2.93, final 2.77 (drop 0.10 < 0.15) |
 | E6 | E7 + seqs=96 | WORKS (stack verified) | wall 320.3s, 18.0/1.26/1.58 — identical profile, ~9.4 GiB freed |
 | E8 | MBT=16384 | NON-BOOTABLE at 1M ctx/0.965 | KV pool lands at 2.78 GiB < 6.67 GiB floor; bootable only at max-model-len <= ~428k or fewer seqs |
+| GA1 | guarded admission cap=1/step (max_new_admissions_per_step) | doesn't work — REJECTED | identical staircase (311-320 vs 312-320s), wall 319.9 vs 319.8s, collapse 650s/3w both, wait/defer 0% both (door never binds here); canary max worse (3.67s vs 1.59s, 1 run). The ~320s wall is prefill-throughput-bound, not admission-concurrency-bound. Feature left INERT (default None) in fork: 1588ddc3e6 |
 | FIN | promoted boot | GREEN | repro matches L2/E7/E6; 2h15m soak: 120/120 samples 200, 0 dead, storm ramp alive=True through soak |
 
 ## Known limits / what remains open
@@ -37,11 +38,15 @@ Runbook: glm-night-window-runbook-20261113.md. Outcome: PROMOTED
   (1.88s -> 1.26s p90) and preserves the median; it does not flatten aggregate collapse.
 - The morning's "Deferred 10 at KV 11-30%" signature never fired under the repro
   (0 defer events) — L2 was validated against Waiting-backpressure starvation only.
-- Code levers NOT developed (flag-level equivalents already exist or the storm is
-  compute-bound, not admission-bound): guarded admission == max_num_active_seqs
-  (in fork, tested: test_max_num_active_seqs_caps_admission); (b) dequant-ws lane
-  EV (+6.4% prefill question) remains a port-days decision, not measurable at
-  MBT>=16384 on the 1M recipe (E8 non-bootable).
+- Guarded admission WAS developed in the fork (max_new_admissions_per_step, 1588ddc3e6,
+  env-cap armed at 05:14, GA1 above) and measured REJECTED: the collapse is
+  prefill-throughput-bound, so no admission pacing helps. Feature stays INERT.
+  (b) dequant-ws lane EV (+6.4% prefill question) remains a port-days decision,
+  not measurable at MBT>=16384 on the 1M recipe (E8 non-bootable).
+- Onset history (full-log bucketing, 54K heartbeats): Nov 1-2 storms were WORSE
+  (161 windows) than the Nov 13 spike (101) under the same serving recipe, and
+  predate the current wheel (Nov 8 build). The storms are traffic-shaped —
+  group arrivals of big cold prefills — not introduced by any config change.
 - SSM int8/int4, mamba_page_size_padded, expandable_segments: dead per pin forensics
   (glm_pin_forensics_verdict_20261113.md) — unchanged.
 
