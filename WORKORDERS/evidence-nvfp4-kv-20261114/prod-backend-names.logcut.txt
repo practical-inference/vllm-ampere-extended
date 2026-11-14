@@ -1,0 +1,2 @@
+# Production :8080 attention-backend names (2026-10-01 boot) — TRITON_MLA_SPARSE lives in ampere/main, not the dsd-tier tree.
+(Worker_TP0 pid=4017392) INFO 10-01 14:56:37 [cuda.py:527] Using TRITON_MLA_SPARSE attention backend out of potential backends: ['TRITON_MLA_SPARSE'].
