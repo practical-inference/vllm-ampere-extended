@@ -494,6 +494,22 @@ def test_max_num_active_seqs_caps_admission():
     assert scheduler.max_num_running_reqs == 16
 
 
+def test_max_new_admissions_per_step_caps_burst_admission():
+    """A per-step cap holds waiting requests at the door instead of letting
+    a whole storm burst-admit together the moment headroom opens."""
+    scheduler = create_scheduler(max_num_seqs=16)
+    scheduler.scheduler_config.max_new_admissions_per_step = 2
+    requests = create_requests(num_requests=10)
+    for request in requests:
+        scheduler.add_request(request)
+
+    output = scheduler.schedule()
+
+    assert len(output.scheduled_new_reqs) == 2
+    assert len(scheduler.running) == 2
+    assert len(scheduler.waiting) == 8
+
+
 def _bind_hisparse_connector(scheduler):
     connector = object.__new__(HiSparseConnector)
     connector.connector_scheduler = HiSparseConnectorScheduler(async_speculative=False)
