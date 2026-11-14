@@ -1,0 +1,25 @@
+{"phase": "populate-0", "ttft_s": 96.378, "wall_s": 97.938, "n_chunks": 4, "tok_s": 2.6}
+{"phase": "populate-1", "ttft_s": 97.904, "wall_s": 97.904, "n_chunks": 2, "tok_s": 36609.9}
+{"phase": "populate-2", "ttft_s": 97.206, "wall_s": 98.721, "n_chunks": 4, "tok_s": 2.6}
+{"phase": "populate-3", "ttft_s": 98.721, "wall_s": 98.721, "n_chunks": 2, "tok_s": 52205.8}
+{"phase": "populate-4", "ttft_s": 97.474, "wall_s": 99.107, "n_chunks": 4, "tok_s": 2.5}
+{"phase": "populate-5", "ttft_s": 99.103, "wall_s": 99.106, "n_chunks": 2, "tok_s": 739.7}
+{"phase": "round0-0", "ttft_s": 0.471, "wall_s": 1.581, "n_chunks": 11, "tok_s": 9.9}
+{"phase": "round0-1", "ttft_s": 0.948, "wall_s": 5.503, "n_chunks": 13, "tok_s": 2.9}
+{"phase": "round0-3", "ttft_s": 2.467, "wall_s": 7.193, "n_chunks": 14, "tok_s": 3.0}
+{"phase": "round0-5", "ttft_s": 2.392, "wall_s": 7.467, "n_chunks": 15, "tok_s": 3.0}
+{"phase": "round0-4", "ttft_s": 2.995, "wall_s": 8.481, "n_chunks": 16, "tok_s": 2.9}
+{"phase": "round0-2", "ttft_s": 61.566, "wall_s": 61.727, "n_chunks": 11, "tok_s": 68.6}
+{"phase": "round1-0", "ttft_s": 0.497, "wall_s": 1.546, "n_chunks": 11, "tok_s": 10.5}
+{"phase": "round1-1", "ttft_s": 0.954, "wall_s": 2.574, "n_chunks": 13, "tok_s": 8.0}
+{"phase": "round1-2", "ttft_s": 1.473, "wall_s": 2.662, "n_chunks": 14, "tok_s": 11.8}
+{"phase": "round1-3", "ttft_s": 2.008, "wall_s": 2.627, "n_chunks": 13, "tok_s": 21.0}
+{"phase": "round1-4", "ttft_s": 1.971, "wall_s": 2.591, "n_chunks": 13, "tok_s": 21.0}
+{"phase": "round1-5", "ttft_s": 2.301, "wall_s": 2.646, "n_chunks": 15, "tok_s": 43.5}
+{"phase": "storm-0", "ttft_s": 312.001, "wall_s": 315.668, "n_chunks": 4, "tok_s": 1.1}
+{"phase": "storm-1", "ttft_s": 319.179, "wall_s": 319.672, "n_chunks": 4, "tok_s": 8.1}
+{"phase": "storm-2", "ttft_s": 319.124, "wall_s": 319.617, "n_chunks": 4, "tok_s": 8.1}
+{"phase": "storm-3", "ttft_s": 319.556, "wall_s": 319.564, "n_chunks": 2, "tok_s": 255.2}
+{"phase": "storm-wall", "wall_s": 319.8}
+{"phase": "canary", "ttft_s": 0.082, "wall_s": 688.298, "n_chunks": 1348, "tok_s": 2.0}
+{"phase": "canary-gaps", "n": 1347, "p50_ms": 16.5, "p90_ms": 1260.1, "max_s": 1.59}

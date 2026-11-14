@@ -1,0 +1,39 @@
+{
+ "boot": "GLM TP4 window 2026-11-11 (owner: window granted 09:16 MST)",
+ "B1_loader_delta": "DEAD \u2014 dev229 venv loads 61.31 GiB/GPU vs dev48+ae 61.39 on identical serve line; 52.74-era was config not wheel; no 1.2M recovery (see glm_loaderdelta_B1_20261111.json)",
+ "B2_tcurve": "torchrun external_launcher bench hangs at case exec on TP4 (GPU idle, NCCL socket inprogress) \u2014 transient curve instead measured by serving-boot MBT probe",
+ "pin_landing": "KV_CACHE_MEM=-1000000000 + boot-order patch live on unit: safe max 26.27-26.29 GiB (rank spread 0.02), margin 0.93, pool 3,980,957 tok (+229K/+6.1% vs static 3,751,723), 3.80x @1M",
+ "B4b_stability": "CONFIRMED \u2014 boots 09:50:10 and 09:53:47 identical per-rank safe max + identical pool",
+ "B3_vision_glm": "VERIFIED \u2014 4px image described correctly through :8080 with VLLM_VISION_CPU_OFFLOAD_GB=2 (eb067aa792 GLM wiring works)",
+ "MBT_retune_verdict": "REJECT \u2014 MBT 16384 leaves 6.04 GiB avail < 6.67 GiB needed for ONE 1M request (full_sequence_must_fit); superlinear staging confirmed (25.35 to 6.04 GiB); keep 8192; monster concurrency needs mixed-granularity runner port",
+ "rollback": "delete unit Environment lines (KV_CACHE_MEM, VLLM_VISION_CPU_OFFLOAD_GB) + daemon-reload + restart; venv files restore from *.pre-glmwindow-20261111",
+ "b5_parity_spotprobe": {
+  "c1_tok_s": 134.6,
+  "c1_banked": "122.6-126.4",
+  "c64_tok_s": 1417.7,
+  "note": "tiny-prompt decode, no regression; c64 816 banked = monster-wave workload (not comparable); official band = overnight sweep grid on this config"
+ },
+ "post_window": {
+  "finding": "pinned+vision config DIED AT RUNTIME after window: boots at 10:01:58 (105s after serving came up), 10:05:55, 10:12:42 \u2014 all torch.OutOfMemoryError ~134 MiB at 65-83 MiB free; engine process resident 94.57 GiB",
+  "differentiator": ":8006 qwen runs SAME vision+offload on STATIC 0.965 and has been stable since 06:04 \u2014 pinned-KV is the suspect (0.93 GiB margin too small vs the documented ~2.45 GiB first-prefill plateau spike; the pre-window static path kept enough card room for the spike to plateau)",
+  "action": "ROLLED BACK at ~10:18: unit Environment lines (KV_CACHE_MEM, VLLM_VISION_CPU_OFFLOAD_GB) deleted + daemon-reload + restart -> pre-window known-good config (static 0.965, 2-day uptime prior era)",
+  "in_window_caveat": "the 3 boot-verification checks (09:50/09:53/10:00) all sampled within the first ~1-2 min after pool line and saw no spike-kill; determinism-at-boot claim stands, service-stability claim does NOT",
+  "next_session_lane": "if pin is re-attempted: larger negative pin (|pin| >= ~2.5 GiB to cover first-prefill spike) or keep static-util path; re-validate under soak, not boot-only",
+  "correction_2": {
+   "retracted": "margin-too-small theory (0.93 GiB < 2.45 GiB spike) as THE cause",
+   "counter_evidence": "pinned boot keeps MORE free VRAM than static (KV 25.35 vs 27.08); static ran 1M monster waves 2 days without torch-kill",
+   "leading_suspect": "fragmentation from auto-pin window machinery: _scoped_allocator_max_split(max_split_size_mb=20) + double profile_run; death signature (65-83 MiB free, 134 MiB alloc fail, process 94.57 GiB resident) matches fragmentation not exhaustion",
+   "next_experiment": "widen/drop the scoped max_split policy in the auto-pin window, re-soak paired monster waves; the durable lane remains the mixed-granularity runner port"
+  }
+ },
+ "experiment_a_result": {
+  "date": "2026-11-11 10:44-10:57",
+  "change": "auto-pin measured window without _scoped_allocator_max_split(max_split_size_mb=20); pin re-armed via unit Environment",
+  "boot_result": "pinned boot healthy: safe max 26.32-26.33 (spread 0.01), pool 3,987,766 (+6.8%)",
+  "soak_result": "DEATH #4 at 10:57:15 \u2014 engine died again in pinned path WITHOUT the scoped policy (soak wave 0 hit 500 on already-dead engine; health 000)",
+  "falsified": "fragmentation-from-scoped-policy theory; also margin-too-small and raw-headroom theories (all three theories now dead)",
+  "surviving_common_factor": "the auto-pin block machinery itself (double profile_run / pin allocation path) \u2014 needs deeper forensics before any re-arm",
+  "action": "FULL ROLLBACK at ~11:00: venv restored from pre-pinA backup, unit Environment lines deleted, daemon-reload + restart -> stable static config",
+  "b_plan": "/tmp/opencode/glm_b_port_plan.md \u2014 scope reduced (indexer-chunking already in GLM: glm5next/nvidia/sparse_indexer.py:186); OPEN CONTRADICTION flagged for owner: Nov-10 mempalace close says mixed-granularity was KILLED as not worth co... (truncated) \u2014 owner must resolve before code days are spent"
+ }
+}

@@ -1,0 +1,3 @@
+# Verbatim capture: MemPalace recall_project_context (2026-11-14), wing dsv41-flash
+# drawer_4 (attempt-9 record) — provenance for the 0.967-OOM / util-ceiling claims:
+SESSION:2026-10-05 00:50|dsv41 :8210 UP verified attempt-8+mknobs|ROOTCAUSE:v41-target eager temps (mid_out fp32 split-KV ~1GiB@8192tok chunk; sink!=None kills fast path) NOT KV-pool|FIX:DSV41_PREFILL_ATTN_CHUNK=1024+VLLM_SPARSE_INDEXER_MAX_LOGITS_MB=128 opt-in (champion zero-impact)|GATES:accept 2.51-realtext PASS|GSM8K 0.895/0-invalid PASS (0.665 was contention)|decode:1K -9% 100K -22% FAIL, 300K +36% PASS|ATTEMPT-9 524K+draft:boots 0.967 but 300K OOM _fused_qnorm_rope_kv_insert;0.960 boot-blo
