@@ -1,0 +1,5 @@
+# DS41F champion :8210 pool composition (2026-10-04 01:17 boots)
+# 3.57 GiB/rank over 1,414,344 tok = 2.71 KiB/token/rank; 656 B latent record = ~24%.
+(Worker_TP0 pid=369864) INFO 10-04 01:17:02 [gpu_worker.py:719] Available KV cache memory: 3.57 GiB
+(EngineCore pid=369537) INFO 10-04 01:17:02 [kv_cache_utils.py:2476] GPU KV cache size: 1,414,344 tokens, Maximum concurrency for 524,288 tokens per request: 2.70x
+(EngineCore pid=369537) INFO 10-04 01:17:09 [kv_cache_utils.py:786] kv cache group sizes [32, 32, 32, 32, 128, 8]

@@ -1,0 +1,10 @@
+# GLM-5.3-Flash prod :8080 pool composition (promoted config, 2026-11-14 boots)
+# Per-rank KV budget, block count, and pool size — the fp4 MLA slice is ~9-10% of per-token cost.
+(Worker_TP1 pid=814024) INFO 11-14 05:16:43 [extensible_kv_cache.py:497] Extended KV cache to 3407 blocks (24.61 GiB).
+(Worker_TP0 pid=1135533) INFO 11-14 05:30:46 [gpu_worker.py:837] Available KV cache memory: 27.49 GiB
+(EngineCore pid=1131599) INFO 11-14 05:30:46 [kv_cache_utils.py:861] kv cache group sizes (1152, 1152, 1152, 1152, 8)
+(EngineCore pid=1131599) INFO 11-14 05:31:17 [kv_cache_utils.py:1168] GPU KV cache size: 3,866,340 tokens, Maximum concurrency for 1,048,576 tokens per request: 3.69x
+(Worker_TP1 pid=1135531) INFO 11-14 05:31:17 [extensible_kv_cache.py:497] Extended KV cache to 3407 blocks (24.61 GiB).
+(Worker_TP0 pid=1135533) INFO 11-14 05:31:17 [extensible_kv_cache.py:497] Extended KV cache to 3407 blocks (24.61 GiB).
+(Worker_TP2 pid=1135528) INFO 11-14 05:31:17 [extensible_kv_cache.py:497] Extended KV cache to 3407 blocks (24.61 GiB).
+(Worker_TP3 pid=1135530) INFO 11-14 05:31:17 [extensible_kv_cache.py:497] Extended KV cache to 3407 blocks (24.61 GiB).
