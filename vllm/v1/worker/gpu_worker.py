@@ -575,7 +575,7 @@ class Worker(WorkerBase):
             return
         max_entries = int(os.environ.get("VLLM_OOM_SNAPSHOT_MAX_ENTRIES", "200000"))
         torch.cuda.memory._record_memory_history(
-            enabled=True,
+            enabled="all",
             context="alloc",
             stacks="all",
             max_entries=max_entries,
