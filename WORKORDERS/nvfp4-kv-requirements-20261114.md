@@ -169,9 +169,9 @@ the dev plan about tree scope):
 | number | pinned capture |
 |---|---|
 | fp8_ds_mla=656 B, nvfp4_ds_mla=352 B | source of truth: `vllm/v1/kv_cache_interface.py:32` (production tree); cross-ref night report §"Remaining 2× gap" |
-| GLM-Flash pool 3,751,723 tok; storm-wall 319.8s; collapse 650s/3w; canary 16.5ms/1.26s/1.59s | `night-FIN-repro.jsonl`, `night-FIN-runner.log` (ANALYZER block) |
-| E7 ladder gate: acceptance 2.93 (run-mean) vs 2.87, wall 320.1s | `night-E7-runner.log` |
-| GA1 admission-cap rejection (identical profile, canary max worse) | `night-GA1-runner.log` |
-| B0 defer staircase 72-91s/index (storm shape reference) | `night-B0-runner.log` |
-| DS41F: 1,414,344 tok pool; 68 tok/s decode; TTFT 16.4/41.7/0.4s; needle round1 True / **round2 False** / round3 True | `longctx_perf9.log`, `dsv41_night_report.md` |
+| GLM-Flash pool 3,751,723 tok; storm-wall 319.8s; collapse 650s/3w; canary 16.5ms/1.26s/1.59s | `night-FIN-repro.jsonl`, `night-FIN-runner.logcut.txt` (ANALYZER block) |
+| E7 ladder gate: acceptance 2.93 (run-mean) vs 2.87, wall 320.1s | `night-E7-runner.logcut.txt` |
+| GA1 admission-cap rejection (identical profile, canary max worse) | `night-GA1-runner.logcut.txt` |
+| B0 defer staircase 72-91s/index (storm shape reference) | `night-B0-runner.logcut.txt` |
+| DS41F: 1,414,344 tok pool; 68 tok/s decode; TTFT 16.4/41.7/0.4s; needle round1 True / **round2 False** / round3 True | `longctx_perf9.logcut.txt`, `dsv41_night_report.md` |
 | util ceiling .9594 / 0.967 OOM at 300K; pin_landing +6.1% pool | `glm_window_verdicts_20261111.json` |

@@ -1,0 +1,22 @@
+[B0] boot marker 21:29:21; waiting health http://127.0.0.1:8080 ...
+[B0] healthy at 21:38:48; running repro
+[B0] repro rc=1 done 21:43:19
+=== ANALYZER (since boot) ===
+no heartbeats in range
+=== CANARY/GAP LINES ===
+[B0] RUN-DONE 21:43:19
+[B0] boot marker 21:44:49; waiting health http://127.0.0.1:8080 ...
+[B0] healthy at 21:44:49; running repro
+[B0] repro rc=0 done 21:50:40
+=== ANALYZER (since boot) ===
+no heartbeats in range
+=== CANARY/GAP LINES ===
+{"phase": "canary", "ttft_s": 0.069, "wall_s": 350.437, "n_chunks": 931, "tok_s": 2.7}
+{"phase": "canary-gaps", "n": 930, "p50_ms": 14.8, "p90_ms": 1880.2, "max_s": 2.41}
+{"phase": "canary-gaps", "n": 930, "p50_ms": 14.8, "p90_ms": 1880.2, "max_s": 2.41}
+{"phase": "storm-0", "ttft_s": 74.98, "wall_s": 79.644, "n_chunks": 4, "tok_s": 0.9}
+{"phase": "storm-1", "ttft_s": 146.886, "wall_s": 151.478, "n_chunks": 4, "tok_s": 0.9}
+{"phase": "storm-2", "ttft_s": 218.964, "wall_s": 223.581, "n_chunks": 4, "tok_s": 0.9}
+{"phase": "storm-3", "ttft_s": 290.337, "wall_s": 290.34, "n_chunks": 2, "tok_s": 578.5}
+{"phase": "storm-wall", "wall_s": 290.6}
+[B0] RUN-DONE 21:50:40
