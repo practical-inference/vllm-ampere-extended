@@ -33,7 +33,8 @@ Consequences this spec makes achievable:
 | GLM-Flash pool (fp8, util .965, 1M ctx, TP4) | 3,751,723 tok | service log, 2026-11-13/14 boots |
 | DS41F champion pool (fp8, util .9594, 524K, TP4 0/1/2/6) | 1,414,344 tok | dsv41_night_report.md |
 | DS41F prefill / decode | ~8.5K tok/s / 68 tok/s/stream (GLM: ~110-120) | dsv41_night_report.md |
-| fp8 KV quality on DS41F | GSM8K 0.895/0.001-inv (bf16 0.897); needle exact @140K,300K | gsm8k_final_full, longctx_perf9 |
+| fp8 KV quality on DS41F | GSM8K 0.895/0.001-inv (bf16 0.897); needle round1@140K True, **round2 restate False**, round3@300K True — fp8 has no round-2 pass precedent | longctx_perf9.log:1-5 |
+| over-admission raise site | `ValueError(f"Cannot get {num_blocks} free blocks from the pool")` — runtime-formatted; source-literal greps never match, log greps need the regex | vllm/v1/core/block_pool.py:694 |
 | fp4 primitives in tree | reshape_and_cache fp4 dispatch (both dtypes); triton MLA whitelists nvfp4_ds_mla warmup; selector arm precedent (Gemma4, TRITON_ATTN) | csrc/cache_kernels.cu:954, triton_mla.py:299, test_attention_selector.py:845 |
 | CUDA fp4 backends | flashmla_sparse: major==10 only; flashinfer: prims_ts kernel only | flashmla_sparse.py:261, flashinfer_mla_sparse.py:152 |
 | recurrent state gates | SSM int8/int4 dead: recurrent error compounding, no kernels | glm_pin_forensics_verdict_20261113.md |
@@ -76,8 +77,10 @@ Consequences this spec makes achievable:
   no dtype-assumption coupling.
 - **FR-6 (admission parity):** reserve-full-isl, watermark, K-scaled mamba
   admission pages, max-num-seqs semantics unchanged; fp4 must not shift
-  over-admission death-mode boundaries (re-verify against the known
-  'Cannot get 2 free blocks' signature at saturation).
+  over-admission death-mode boundaries — re-verify at saturation by log
+  grep `Cannot get \d+ free blocks from the pool` (raise site:
+  vllm/v1/core/block_pool.py:694; the message is runtime-formatted, so
+  source-literal greps can never match — grep the logs, not the code).
 - **FR-7 (graphs/async):** CUDA-graph capture (FULL_AND_PIECEWISE + breakable
   + max_cudagraph_capture_size) captures fp4 strides correctly; async
   scheduling path unaffected.
@@ -112,8 +115,12 @@ Consequences this spec makes achievable:
 ## 7. Quality and performance gates (acceptance)
 
 Per model, measured on the dev slot with greedy/seeded sampling:
-- Q1 needle recall at 140K and 300K ctx with fp4 KV: exact-match, including
-  round-2 restate (DS41F fp8 precedent = pass bar).
+- Q1 needle recall at 140K and 300K ctx with fp4 KV: exact-match on
+  cold-prefill rounds. Round-2 restate is its own hard gate
+  (exact-match, hit=True required): the fp8 measured run shows
+  round2 needle_hit=False (longctx_perf9.log:3), i.e. this gate has no
+  fp8 pass precedent — fp4 is being asked to clear a bar fp8 itself
+  missed, and a miss is a documented rejection, not a ship.
 - Q2 GSM8K full set: drop ≤ 0.5 pp vs bf16 reference and invalid < 0.5 %.
 - Q3 MTP acceptance length (where a head exists): drop ≤ 0.15 vs fp8 (E7 gate).
 - Q4 storm-repro metrics: collapse windows count ≤ fp8 baseline, total
@@ -132,6 +139,12 @@ models may still promote.
   the posted #66647 head checkout; DCO `-s` commits with Co-authored-by.
 - C4 single fork, no upstream public writes in this project without gate
   approval (out of scope anyway: G1-G3 are fork-scope).
+- C5 **tree scope:** all source anchors in this spec are verified against
+  the production fork tree (dsd-tier head — the posted #66647 head
+  checkout), which is where the fp4 machinery lives. `forgejo/main` at
+  time of writing does NOT carry it; Phase 0 must land or rebase the
+  anchor set onto the working lane, and every later phase re-verifies
+  its own anchors in the tree it runs against.
 
 ## 9. Open questions (Phase 0 answers them)
 
@@ -145,3 +158,20 @@ models may still promote.
 - O3 quantization-error sensitivity of *RoPE* dims: tree's fp4_ds_mla keeps
   RoPE fp8 — is fp8 RoPE (not fp4) the design answer for sm80 parity, or is
   bf16 RoPE needed on Ampere (no fp8 HW, software cvt)?
+
+## 10. Evidence manifest
+
+Load-bearing numbers, each pinned as a capture in
+`WORKORDERS/evidence-nvfp4-kv-20261114/` (copied 2026-11-14 from the
+live instrument output of this session — see the review tooling note in
+the dev plan about tree scope):
+
+| number | pinned capture |
+|---|---|
+| fp8_ds_mla=656 B, nvfp4_ds_mla=352 B | source of truth: `vllm/v1/kv_cache_interface.py:32` (production tree); cross-ref night report §"Remaining 2× gap" |
+| GLM-Flash pool 3,751,723 tok; storm-wall 319.8s; collapse 650s/3w; canary 16.5ms/1.26s/1.59s | `night-FIN-repro.jsonl`, `night-FIN-runner.log` (ANALYZER block) |
+| E7 ladder gate: acceptance 2.93 (run-mean) vs 2.87, wall 320.1s | `night-E7-runner.log` |
+| GA1 admission-cap rejection (identical profile, canary max worse) | `night-GA1-runner.log` |
+| B0 defer staircase 72-91s/index (storm shape reference) | `night-B0-runner.log` |
+| DS41F: 1,414,344 tok pool; 68 tok/s decode; TTFT 16.4/41.7/0.4s; needle round1 True / **round2 False** / round3 True | `longctx_perf9.log`, `dsv41_night_report.md` |
+| util ceiling .9594 / 0.967 OOM at 300K; pin_landing +6.1% pool | `glm_window_verdicts_20261111.json` |

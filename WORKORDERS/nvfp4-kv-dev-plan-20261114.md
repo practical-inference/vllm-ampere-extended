@@ -18,6 +18,8 @@ may drop it entirely.
 - Audit per (model × backend × dtype): store dispatch, Triton reader arms,
   selector admission, group-sizing accounting (DS_MLA_STATE_CONTENT_BYTES
   vs 352 B actual), eviction bytes-per-token, graph-capture strides.
+  Every anchor checked for presence in the tree being audited (requirement
+  C5): an anchor that does not resolve is a finding, not an assumption.
 - Confirm FR-1/FR-2 status; measure DS41F and GLM-Flash pool footprints on
   dev slot to validate the 80 GB-fit hypothesis (§1, O1) — record whether
   activations+graphs+margin truly fit 80 GiB.
@@ -53,7 +55,10 @@ count ≥ 1.8× fp8 on same TP4 (G2 acceptance); boot at fp4 + batch-ramp
 *documented rejected with evidence*.
 **Note:** acceptance-length N/A here (no MTP head in checkpoint) — if
 Phase 0 shows an ngram/V2-runner path cheap to enable, it is a *separate
-follow-on workorder*, never folded into this one.
+follow-on workorder*, never folded into this one. Q1's round-2 restate
+gate is new work, not re-verification: the one measured fp8 run
+*missed* it (longctx_perf9.log:3 needle_hit=False), so the pass/fail
+baseline must come from Q1's own definition, not a "precedent" claim.
 
 ## Phase 3 — GLM-5.3-Flash slice (1-2 days) — the cost case
 
@@ -90,7 +95,9 @@ per Gemma4 precedent (FR-8).
 - capacity: pool token count vs G2 on the boot log
 - stability: storm repro (populate 6x200k → multiround 2x → storm 4x300k,
   looping canary) + batch ramp to approved max conc
-- death-signature: saturation probe, scheduler.py:988 grep = 0
+- death-signature: saturation probe; log grep `Cannot get \d+ free blocks
+    from the pool` = 0 (raise site vllm/v1/core/block_pool.py:694 — the
+    message is runtime-formatted, so grep logs, never source literals)
 - graphs: capture/replay of all configured graph modes
 
 **Rollback:** per phase — fp4 dtype env removed = byte-identical default
@@ -109,7 +116,10 @@ matrix, landed with each promotion PR, not at the end.
 
 **Risks & mitigations:**
 - R1 fp4 retrieval quality below Q1/Q2 on some checkpoint → per-model gate,
-  documented rejection, others unaffected (by design).
+  documented rejection, others unaffected (by design). Sharpened by
+  review: even fp8 missed round-2 restate in the one measured run, so
+  retrieval quality is the project's dominant risk, not a solved base —
+  Q1/Q3/Q5 are gates with teeth, and a single miss is a *rejection*.
 - R2 dequant ALU cost breaches NFR-3 (+15% wall) → measured every storm
   repro; if it binds, ship fp4 as an opt-in capacity mode, not a default.
 - R3 indexer/engram dtype coupling surprises (FR-5) → Phase 0 audit reads
