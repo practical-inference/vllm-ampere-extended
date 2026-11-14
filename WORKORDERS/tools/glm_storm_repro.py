@@ -11,7 +11,7 @@ Phases:
 Emits one JSON line per event: {phase, session, ttft_s, wall_s, tok_s, ...}
 Canary emits: {phase: "canary", t_s, chunk_i, gap_s, tok_s_window}
 """
-import argparse, json, random, sys, threading, time
+import argparse, json, queue, random, sys, threading, time
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -51,7 +51,8 @@ def stream_one(base, model, prompt, max_tokens, timeout, label, out,
                     continue
                 chunk = json.loads(line[5:])
                 delta = chunk.get("choices", [{}])[0].get("delta", {})
-                if delta.get("content") or delta.get("reasoning_content"):
+                if (delta.get("content") or delta.get("reasoning_content")
+                        or delta.get("reasoning")):
                     now = time.perf_counter()
                     if ttft is None:
                         ttft = now - t0
@@ -88,17 +89,24 @@ def main():
     ap.add_argument("--timeout", type=float, default=3600.0)
     args = ap.parse_args()
 
-    out = []
-    emit = lambda rec: (out.append(json.dumps(rec)), print(json.dumps(rec), flush=True))
+    out = queue.Queue()
+
+    def pump():
+        while True:
+            print(out.get(), flush=True)
+
+    threading.Thread(target=pump, daemon=True).start()
+    emit = lambda rec: out.put(json.dumps(rec))
 
     stop = threading.Event()
-    canary_out = []
+    canary_out = queue.Queue()
     def canary():
-        # continuous light decode: short prompt, long generation, gap recording
-        stream_one(args.base_url, args.model,
-                   "Count from 1 to 999 slowly, one number per line.",
-                   args.canary_max_tokens, args.timeout, "canary",
-                   canary_out, stop=stop, record_gaps=True)
+        # continuous light decode, looped so it survives into the storm phase
+        while not stop.is_set():
+            stream_one(args.base_url, args.model,
+                       "Count from 1 to 999 slowly, one number per line.",
+                       args.canary_max_tokens, args.timeout, "canary",
+                       canary_out, stop=stop, record_gaps=True)
     canary_t = threading.Thread(target=canary, daemon=True)
     canary_t.start()
     time.sleep(3)
@@ -137,8 +145,8 @@ def main():
     time.sleep(5)
     stop.set()
     canary_t.join(timeout=30)
-    for rec in canary_out:
-        print(rec, flush=True)
+    while not canary_out.empty():
+        print(canary_out.get(), flush=True)
     print("STORM-DONE", file=sys.stderr)
 
 
