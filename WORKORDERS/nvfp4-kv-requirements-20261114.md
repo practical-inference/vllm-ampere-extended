@@ -173,7 +173,8 @@ what each capture contains; derived quantities name their computation.
 | storm-wall 319.8s; collapse 650s/3w; canary 16.5ms/1.26s/1.59s (FIN boot) | `night-FIN-runner.logcut.txt` (ANALYZER block), `night-FIN-repro.jsonl` |
 | E7 acceptance per-interval lines (99 samples incl. 2.86/3.00 at 23:49); run-mean 2.93 = arithmetic mean over the 70 post-boot samples of that capture; L2/B0 reference 2.87 from their ANALYZER blocks | `e7-acceptance.logcut.txt` |
 | GA1 admission-cap rejection: identical staircase, canary max 3.67s | `night-GA1-runner.logcut.txt` |
-| B0 defer staircase 72-91s/index | `night-B0-runner.logcut.txt` |
+| B0 admission-queue staircase ≈72 s/index (TTFT 74.99/146.89/218.96/290.34) | `night-B0-repro.logcut.txt` (+ ANALYZER block in `night-B0-runner.logcut.txt`) |
+| E4 throttled-slope staircase ≈91 s/index (TTFT 92.4/183.2/274.2/364.2) | `night-E4-repro.logcut.txt` |
 | DS41F: 1,414,344 tok pool; 68 tok/s decode; TTFT 16.4/41.7/0.4s; needle round1 True / round2 False / round3 True | `longctx_perf9.logcut.txt` (raw beats report — see note) |
 | util ceiling 0.9594; 0.967 boots but OOMs at 300K in `_fused_qnorm_rope_kv_insert`; decode gates 1K -9% / 100K -22% FAIL, 300K +36% PASS | `drawer-attempt9.logcut.txt` (verbatim MemPalace recall, 2026-11-14) |
 
