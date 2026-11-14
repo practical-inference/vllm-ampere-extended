@@ -3,7 +3,13 @@
 KV demand (~65K tok each, ~5.7M total) beyond the 5.33M pool, monitor
 'Cannot get 2 free blocks' death signature. Canary = chat stream, gaps =
 the starvation gauge. Mirrors ab_ramp.py shape."""
-import json, queue, random, sys, threading, time, urllib.request
+import json
+import queue
+import random
+import sys
+import threading
+import time
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -13,16 +19,20 @@ MODEL = "glm-5.3-flash"
 N = int(sys.argv[2]) if len(sys.argv) > 2 else 88
 CTX = 65000
 GEN = 1536
-WORDS = ("alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo "
-         "lima mike november oscar papa quebec romeo sierra tango uniform "
-         "victor whiskey xray yankee zulu one two three four five six seven "
-         "eight nine").split()
+WORDS = [
+    "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel",
+    "india", "juliet", "kilo", "lima", "mike", "november", "oscar", "papa",
+    "quebec", "romeo", "sierra", "tango", "uniform", "victor", "whiskey",
+    "xray", "yankee", "zulu", "one", "two", "three", "four", "five", "six",
+    "seven", "eight", "nine",
+]
 
 
 def kv_usage():
     try:
         m = urllib.request.urlopen(BASE + "/metrics", timeout=5).read().decode()
-        v = [l for l in m.splitlines() if "kv_cache_usage_perc" in l and not l.startswith("#")]
+        v = [s for s in m.splitlines()
+             if "kv_cache_usage_perc" in s and not s.startswith("#")]
         return float(v[-1].split()[-1]) if v else -1
     except Exception:
         return -1
@@ -66,9 +76,12 @@ def canary(out, stop):
         gaps = []
         last = None
         ttft = None
-        payload = {"model": MODEL,
-                   "messages": [{"role": "user", "content": "Count from 1 to 999 slowly."}],
-                   "max_tokens": 2000, "temperature": 0, "stream": True}
+        payload = {
+            "model": MODEL,
+            "messages": [{"role": "user",
+                          "content": "Count from 1 to 999 slowly."}],
+            "max_tokens": 2000, "temperature": 0, "stream": True,
+        }
         try:
             with requests.post(f"{BASE}/v1/chat/completions", json=payload,
                                stream=True, timeout=3600) as r:
@@ -110,15 +123,19 @@ def main():
     threading.Thread(target=canary, args=(out, stop), daemon=True).start()
     time.sleep(3)
 
-    print(f"E1b: c={N} x {CTX}-tok sessions ({N * CTX / 1e6:.1f}M tok demand)", flush=True)
+    print(f"E1b: c={N} x {CTX}-tok sessions "
+          f"({N * CTX / 1e6:.1f}M tok demand)", flush=True)
     t0 = time.time()
     with ThreadPoolExecutor(max_workers=N) as ex:
-        futs = [ex.submit(session, i, out) for i in range(N)]
+        for i in range(N):
+            ex.submit(session, i, out)
     # with-block exit waits for all sessions to finish
-    print(f"all {N} sessions complete t+{time.time() - t0:.0f}s; holding 300s", flush=True)
+    print(f"all {N} sessions complete t+{time.time() - t0:.0f}s; "
+          "holding 300s", flush=True)
     for _ in range(60):
         time.sleep(5)
-        print(f"  [t+{time.time() - t0:6.1f}s] kv={kv_usage() * 100:.1f}% alive={alive()}", flush=True)
+        print(f"  [t+{time.time() - t0:6.1f}s] "
+              f"kv={kv_usage() * 100:.1f}% alive={alive()}", flush=True)
     print(f"E1b FINAL: alive={alive()} kv={kv_usage() * 100:.1f}%", flush=True)
     stop.set()
     print("E1b RUN-DONE", flush=True)
