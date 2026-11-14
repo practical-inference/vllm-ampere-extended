@@ -161,17 +161,26 @@ models may still promote.
 
 ## 10. Evidence manifest
 
-Load-bearing numbers, each pinned as a capture in
-`WORKORDERS/evidence-nvfp4-kv-20261114/` (copied 2026-11-14 from the
-live instrument output of this session — see the review tooling note in
-the dev plan about tree scope):
+Load-bearing numbers, each pinned to a capture in
+`WORKORDERS/evidence-nvfp4-kv-20261114/` (this lane). Pins state exactly
+what each capture contains; derived quantities name their computation.
 
 | number | pinned capture |
 |---|---|
-| fp8_ds_mla=656 B, nvfp4_ds_mla=352 B | source of truth: `vllm/v1/kv_cache_interface.py:32` (production tree); cross-ref night report §"Remaining 2× gap" |
-| GLM-Flash pool 3,751,723 tok; storm-wall 319.8s; collapse 650s/3w; canary 16.5ms/1.26s/1.59s | `night-FIN-repro.jsonl`, `night-FIN-runner.logcut.txt` (ANALYZER block) |
-| E7 ladder gate: acceptance 2.93 (run-mean) vs 2.87, wall 320.1s | `night-E7-runner.logcut.txt` |
-| GA1 admission-cap rejection (identical profile, canary max worse) | `night-GA1-runner.logcut.txt` |
-| B0 defer staircase 72-91s/index (storm shape reference) | `night-B0-runner.logcut.txt` |
-| DS41F: 1,414,344 tok pool; 68 tok/s decode; TTFT 16.4/41.7/0.4s; needle round1 True / **round2 False** / round3 True | `longctx_perf9.logcut.txt`, `dsv41_night_report.md` |
-| util ceiling .9594 / 0.967 OOM at 300K; pin_landing +6.1% pool | `glm_window_verdicts_20261111.json` |
+| fp8_ds_mla=656 B, nvfp4_ds_mla=352 B | source anchor: `vllm/v1/kv_cache_interface.py:32` (production tree, requirement C5); restated in `dsv41_night_report.md` "Remaining 2× gap" |
+| GLM-Flash pool, fp8, **baseline (128-seq)** = 3,751,723 tok | `glm-pool-size.logcut.txt` (grep `GPU KV cache size` of the service log) |
+| GLM-Flash pool, fp8, **promoted (96-seq)** = 3,866,340 tok (+3.05% from the seqs lever itself) | same capture — this is measured capacity, not a hypothesis |
+| storm-wall 319.8s; collapse 650s/3w; canary 16.5ms/1.26s/1.59s (FIN boot) | `night-FIN-runner.logcut.txt` (ANALYZER block), `night-FIN-repro.jsonl` |
+| E7 acceptance per-interval lines (99 samples incl. 2.86/3.00 at 23:49); run-mean 2.93 = arithmetic mean over the 70 post-boot samples of that capture; L2/B0 reference 2.87 from their ANALYZER blocks | `e7-acceptance.logcut.txt` |
+| GA1 admission-cap rejection: identical staircase, canary max 3.67s | `night-GA1-runner.logcut.txt` |
+| B0 defer staircase 72-91s/index | `night-B0-runner.logcut.txt` |
+| DS41F: 1,414,344 tok pool; 68 tok/s decode; TTFT 16.4/41.7/0.4s; needle round1 True / round2 False / round3 True | `longctx_perf9.logcut.txt` (raw beats report — see note) |
+| util ceiling 0.9594; 0.967 boots but OOMs at 300K in `_fused_qnorm_rope_kv_insert`; decode gates 1K -9% / 100K -22% FAIL, 300K +36% PASS | `drawer-attempt9.logcut.txt` (verbatim MemPalace recall, 2026-11-14) |
+
+**Flagged contradiction (adjudicated):** `dsv41_night_report.md:36` claims
+fp8 needle recall hits "incl. restate in round 2", but the raw capture
+`longctx_perf9.logcut.txt:3` shows `round2 needle_hit=False` — the raw
+log is authoritative; the report line is an overstatement and must not be
+cited as pass precedent anywhere in this project. Q1's round-2 gate
+therefore has no prior pass in any measured config (fp8 included) — see
+dev plan R1.
