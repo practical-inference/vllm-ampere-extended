@@ -2,6 +2,7 @@
 
 Status: SPEC REVIEWED — 2026-11-14 (supersedes DRAFT-for-spec-review)
 Adversarial-Review: SURVIVES (adversarial-20261114-150135.log)
+Evidence: /home/columbo/source/vllm-nightly/.pr-drafts/evidence/nvfp4-kv-requirements-20261114/run-20261114-150135/adversarial-20261114-150135.log
 Owner: columbo (vllm-nightly fork)
 Target repo: vllm-project/vllm fork (`vllm-ampere-extended`)
 
@@ -36,7 +37,7 @@ Consequences this spec makes achievable:
 | DS41F prefill / decode | ~8.5K tok/s / 68 tok/s/stream (GLM: ~110-120) | dsv41_night_report.md |
 | fp8 KV quality on DS41F | GSM8K 0.895/0.001-inv (bf16 0.897); needle round1@140K True, **round2 restate False**, round3@300K True — fp8 has no round-2 pass precedent | longctx_perf9.log:1-5 |
 | over-admission raise site | `ValueError(f"Cannot get {num_blocks} free blocks from the pool")` — runtime-formatted; source-literal greps never match, log greps need the regex | vllm/v1/core/block_pool.py:694 |
-| fp4 primitives in tree | reshape_and_cache fp4 dispatch (both dtypes); triton MLA whitelists nvfp4_ds_mla warmup; selector arm precedent (Gemma4, TRITON_ATTN) | csrc/cache_kernels.cu:954, triton_mla.py:299, test_attention_selector.py:845 |
+| fp4 primitives in tree | reshape_and_cache fp4 dispatch (both dtypes); triton MLA whitelists nvfp4_ds_mla warmup; selector arm precedent (Gemma4, TRITON_ATTN) | csrc/cache_kernels.cu:954, vllm/v1/attention/backends/mla/triton_mla.py:299, tests/kernels/attention/test_attention_selector.py:845 |
 | CUDA fp4 backends | flashmla_sparse: major==10 only; flashinfer: prims_ts kernel only | flashmla_sparse.py:261, flashinfer_mla_sparse.py:152 |
 | recurrent state gates | SSM int8/int4 dead: recurrent error compounding, no kernels | glm_pin_forensics_verdict_20261113.md |
 
