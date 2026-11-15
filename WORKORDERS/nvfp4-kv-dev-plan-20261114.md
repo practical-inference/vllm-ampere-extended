@@ -1,6 +1,9 @@
 # Development Plan: NVFP4 (4-bit) KV Cache for vllm-ampere-extended
 
 Status: SPEC REVIEWED — 2026-11-14 (supersedes DRAFT-for-spec-review; 3/3 attacks)
+Project: **CLOSED** 2026-11-14 — see nvfp4-kv-CLOSED-20261114.md; Phases 2-5
+resized by the Phase 0 audit (nvfp4-kv-phase0-audit-20261114.md); only the
+DS41F slice (Phases 1-2) is a live re-entry path.
 Adversarial-Review: SURVIVES (adversarial-20261114-143436.log)
 Companion: nvfp4-kv-requirements-20261114.md (FR/NFR/gates referenced by ID)
 
