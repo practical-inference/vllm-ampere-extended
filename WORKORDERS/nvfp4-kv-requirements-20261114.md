@@ -1,6 +1,9 @@
 # Requirements Specification: NVFP4 (4-bit) KV Cache for vllm-ampere-extended
 
 Status: SPEC REVIEWED — 2026-11-14 (supersedes DRAFT-for-spec-review)
+Project: **CLOSED** 2026-11-14 — see nvfp4-kv-CLOSED-20261114.md; the §1/§6
+capacity numbers (×1.86, 6.97M tok, 80 GB-fit-via-fp4) are corrected by the
+Phase 0 audit (nvfp4-kv-phase0-audit-20261114.md).
 Adversarial-Review: SURVIVES (adversarial-20261114-150135.log)
 Evidence: /home/columbo/source/vllm-nightly/.pr-drafts/evidence/nvfp4-kv-requirements-20261114/run-20261114-150135/adversarial-20261114-150135.log
 Owner: columbo (vllm-nightly fork)
