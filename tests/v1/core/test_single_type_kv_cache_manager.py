@@ -108,10 +108,8 @@ def _align_manager(
     num_gpu_blocks: int = 16,
     mode: str = "align",
 ) -> tuple[MambaManager, BlockPool]:
-    spec = MambaSpec(
-        block_size=4,
-        shapes=((1, 1),),
-        dtypes=(torch.float32,),
+    spec = MambaManager.layer_config(
+        MambaSpec(block_size=4, shapes=((1, 1),), dtypes=(torch.float32,)),
         mamba_cache_mode=mode,
         num_speculative_blocks=num_spec_blocks,
     )
@@ -119,7 +117,7 @@ def _align_manager(
         num_gpu_blocks=num_gpu_blocks, enable_caching=False, hash_block_size=4
     )
     manager = MambaManager(
-        spec,
+        new_kv_cache_group(["layer"], spec),
         block_pool=pool,
         enable_caching=False,
         kv_cache_group_id=0,

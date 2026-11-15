@@ -256,10 +256,10 @@ class KVCacheManager:
         reserved_blocks: int,
         full_fit: bool,
     ) -> None:
-        if not self._k0_diagnostics:
-            return
         self._admission_fail_count += 1
         self.last_admission_demand_blocks = num_blocks_to_allocate
+        if not self._k0_diagnostics:
+            return
         if self._admission_fail_count != 1 and self._admission_fail_count % 50 != 0:
             return
         free_blocks = self.block_pool.get_num_free_blocks()
