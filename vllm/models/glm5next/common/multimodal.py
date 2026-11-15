@@ -44,6 +44,7 @@ from vllm.model_executor.models.vision import (
     get_vit_attn_backend,
     is_vit_use_data_parallel,
 )
+import vllm.envs as envs
 from vllm.models.common.ops import fused_q_kv_rmsnorm
 from vllm.multimodal.parse import ImageSize, MultiModalDataItems
 from vllm.utils.torch_utils import async_tensor_h2d
@@ -406,19 +407,33 @@ class Glm5NextVisionTransformer(nn.Module):
             is_neox_style=True,
             rope_parameters={"partial_rotary_factor": 0.5},
         )
+        vision_offloader = None
+        if envs.VLLM_VISION_CPU_OFFLOAD_GB > 0:
+            from vllm.model_executor.offloader.uva import UVAOffloader
+
+            vision_offloader = UVAOffloader(
+                int(envs.VLLM_VISION_CPU_OFFLOAD_GB * 1024**3)
+            )
+            # Bulk-copy each module for its forward. UVA zero-copy makes every
+            # GEMM reread operand tiles over PCIe and is much slower here.
+            vision_offloader.uva_offloading = False
+
+        blocks_iter = (
+            Glm5NextVisionBlock(
+                dim=self.hidden_size,
+                num_heads=self.num_heads,
+                mlp_hidden_dim=vision_config.intermediate_size,
+                swiglu_limit=swiglu_limit,
+                norm_layer=norm_layer,
+                quant_config=quant_config,
+                prefix=f"{prefix}.blocks.{layer_idx}",
+            )
+            for layer_idx in range(depth)
+        )
         self.blocks = nn.ModuleList(
-            [
-                Glm5NextVisionBlock(
-                    dim=self.hidden_size,
-                    num_heads=self.num_heads,
-                    mlp_hidden_dim=vision_config.intermediate_size,
-                    swiglu_limit=swiglu_limit,
-                    norm_layer=norm_layer,
-                    quant_config=quant_config,
-                    prefix=f"{prefix}.blocks.{layer_idx}",
-                )
-                for layer_idx in range(depth)
-            ]
+            vision_offloader.wrap_modules(blocks_iter)
+            if vision_offloader is not None
+            else list(blocks_iter)
         )
         # GLM-5.3-Flash merger bottleneck width.
         self.merger = Glm5NextPatchMerger(
@@ -429,6 +444,8 @@ class Glm5NextVisionTransformer(nn.Module):
             bias=False,
             prefix=f"{prefix}.merger",
         )
+        if vision_offloader is not None:
+            vision_offloader.wrap_modules(iter([self.merger]))
 
         self.downsample = Conv2dLayer(
             in_channels=vision_config.hidden_size,

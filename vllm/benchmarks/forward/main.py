@@ -140,6 +140,8 @@ def _make_engine_args(args: argparse.Namespace, cases: list[BenchCase]):
 
 
 def run_case(runner, case: BenchCase, args: argparse.Namespace) -> dict[str, Any]:
+    torch.accelerator.reset_peak_memory_stats()
+    mem_base = torch.accelerator.memory_allocated()
     required_drafts = max((r.num_draft_tokens for r in case.requests), default=0)
     if required_drafts > runner.num_speculative_steps:
         raise ValueError(
@@ -214,8 +216,37 @@ def run_case(runner, case: BenchCase, args: argparse.Namespace) -> dict[str, Any
     routing, fixture = install_routing(
         runner, args.routing, args.load_format == "dummy", batch.num_tokens, args.seed
     )
+    memprof = os.environ.get("VLLM_BENCH_MEMPROFILE") and profile_prefix
     try:
-        result = bench.run()
+        if memprof:
+            from torch.cuda import memory as cuda_mem
+
+            cuda_mem._record_memory_history(max_entries=500000)
+            result = bench.run()
+            snap = cuda_mem._snapshot()
+            cuda_mem._record_memory_history(None)
+            with open(f"{profile_prefix}.mem.json", "w") as f:
+                json.dump(
+                    {
+                        "segments": [
+                            {
+                                k: s.get(k)
+                                for k in (
+                                    "segment_type",
+                                    "segment_pool_id",
+                                    "total_size",
+                                    "allocated_size",
+                                    "active_size",
+                                )
+                            }
+                            for s in snap.get("segments", [])
+                        ],
+                        "device_traces": snap.get("device_traces", []),
+                    },
+                    f,
+                )
+        else:
+            result = bench.run()
         if fixture is not None:
             fixture.check_applied()
     finally:
@@ -226,6 +257,8 @@ def run_case(runner, case: BenchCase, args: argparse.Namespace) -> dict[str, Any
         "num_tokens": batch.num_tokens,
         "kv_blocks": batch.num_blocks,
         "routing": routing,
+        "mem_base_gib": round(mem_base / 2**30, 3),
+        "mem_peak_gib": round(torch.accelerator.max_memory_allocated() / 2**30, 3),
         **result,
     }
 

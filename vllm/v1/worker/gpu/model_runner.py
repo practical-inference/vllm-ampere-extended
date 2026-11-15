@@ -236,6 +236,9 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         self.is_encoder_decoder = self.model_config.is_encoder_decoder
 
         self.output_copy_stream = torch.cuda.Stream(self.device)
+        # Copy event of the last AsyncOutput produced; the next execute_model
+        # waits on it before its own work (see execute_model).
+        self._pending_output_copy_event: torch.cuda.Event | None = None
 
         # Pipeline parallelism.
         self.use_pp = self.parallel_config.pipeline_parallel_size > 1
@@ -1835,6 +1838,13 @@ class GPUModelRunner(LoRAModelRunnerMixin):
         valid_dummy_state_slots: bool = False,
         randomize_inputs: bool = False,
     ) -> ModelRunnerOutput | IntermediateTensors | None:
+        # Order this step's work behind the previous step's async D2H output
+        # copies: under async scheduling the next step starts before the
+        # previous step's output has been copied out.
+        pending_copy_event = self._pending_output_copy_event
+        if pending_copy_event is not None:
+            pending_copy_event.wait()
+            self._pending_output_copy_event = None
         if not dummy_run:
             self.draft_tokens_handler.begin_step(scheduler_output)
             # Update the request states.
@@ -2318,6 +2328,8 @@ class GPUModelRunner(LoRAModelRunnerMixin):
             check_ep_fault=self.check_ep_fault,
             pending_aux_output=pending_aux_output,
         )
+        # The next execute_model waits on this event before its own work.
+        self._pending_output_copy_event = async_output.copy_event
 
         # Collect KV transfer results now; finalize saves after the drafter runs.
         defer_kv_finalize = self.speculator is not None
