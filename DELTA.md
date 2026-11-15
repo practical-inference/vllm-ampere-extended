@@ -1,29 +1,43 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 41 source commits (61 files changed, 4359 insertions(+), 335 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 55 source commits (71 files changed, 5636 insertions(+), 418 deletions(-)).
 
-Diff base: upstream commit `15166efabb` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 15166efabb..59ce878a6e -- vllm/ csrc/` and `git diff --stat 15166efabb..59ce878a6e -- vllm/ csrc/`.
+Diff base: upstream commit `919d45fc3a` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges 919d45fc3a..32b6d37607 -- vllm/ csrc/` and `git diff --stat 919d45fc3a..32b6d37607 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
 | Area | Commits |
 |---|---|
-| general fixes | 16 |
-| spec-decode fixes | 11 |
+| general fixes | 24 |
+| spec-decode fixes | 13 |
+| model bring-up (GLM5Next / Qwen4Exp / DSV41) | 6 |
 | sparse attention (TRITON_MLA_SPARSE) | 4 |
-| model bring-up (GLM5Next / Qwen4Exp / DSV41) | 4 |
-| KV-cache / offload fixes | 2 |
-| fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 1 |
+| KV-cache / offload fixes | 3 |
+| fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 2 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + KV-cache / offload fixes) | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + spec-decode fixes) | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + SM80 / pre-SM89 fp8 fallbacks + model bring-up (GLM5Next / Qwen4Exp / DSV41) + spec-decode fixes + KV-cache / offload fixes) | 1 |
 
 <details><summary>Full commit list</summary>
 
+- fix(v1) fork: restore the copy-event wait + the MAMBA env registrations on main (1519c55404)
+- fix(v1): keep spec-decode draft padding out of input_ids under async scheduling (c27c4f4b30)
+- feat: token-embedding UVA offload for Qwen4Exp (VLLM_EMBED_UVA=1) (4dc2d4dbd4)
+- fix: warm the compile cache before the pinned-path memory profile (5647cb9445)
+- feat: vision tower CPU offload via UVAOffloader bulk-copy (VLLM_VISION_CPU_OFFLOAD_GB) (eb067aa792)
+- worker: profile transient + cudagraph claims in the pinned-KV path (4de178aa35)
+- bench: memprofile via allocator history (torch.profiler inert under graph capture) (3933a8d246)
+- bench: memprofile filter on device_memory_usage + empty-table diagnostic (111f6fb1d3)
+- bench: env-gated per-op device-memory attribution for forward bench (VLLM_BENCH_MEMPROFILE) (2a6b776fd8)
+- bench: emit per-case peak-memory in forward bench output-json (local measurement tool) (9c185b8a81)
+- feat(sched): KV valve demand trigger — pool-size-insensitive arming (a61560efe6)
+- fix(sched): KV valve arms only when requests are waiting (d130dcef04)
+- fix(sched): key dynamic-SD tier on the running batch, not per-step scheduled count (9d8ce24a64)
 - correction: f3e27e6ef2 'whitespace only' claim false — remove resurrected dead single_group_spec (d2c1a7fde9)
 - fix: sparse-indexer SM80 fallback validation fixes (781 passed on SM80) (22714165ba)
+- [Feature][Hybrid] K0 spec-window slot release for hybrid mamba models (b51baae430)
 - fix: align MTP draft QSA geometry with the shared top-k buffer (ef7d022c42)
 - fix: drop upstream's duplicate process_weights_after_loading in qsa.py (d0a2f67817)
 - [Bugfix][Frontend] Thread excludes/max_whitespace_cnt into every or-branch leaf (9c2a2bd005)
