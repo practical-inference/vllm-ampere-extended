@@ -1593,6 +1593,20 @@ class SpeculativeConfig:
 
         self._validate_skip_draft_when_k0(warn_without_dynamic_schedule=True)
 
+        # Wire the rope propagation (1540d07a15 follow-up): the function shipped
+        # in this wheel but was never called — the drafter built a native-262144
+        # rotary cache while yarn 2x let the target run to 524288, and any
+        # request past 262144 device-asserted in the drafter's position-indexed
+        # cache lookup (vectorized_gather_kernel OOB, 2026-11-13 cold-load kill).
+        if (
+            self.draft_model_config is not None
+            and self.target_model_config is not None
+        ):
+            _propagate_rope_to_draft(
+                self.target_model_config.hf_config,
+                self.draft_model_config.hf_config,
+            )
+
         return self
 
     def _validate_dflash_dynamic_schedule(self) -> None:

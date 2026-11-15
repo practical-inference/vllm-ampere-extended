@@ -80,6 +80,7 @@ def _make_speculative_config(
     hf_kwargs: dict,
     architecture: str,
     target_model: str = "target",
+    target_hf_attrs: dict | None = None,
     **speculative_kwargs,
 ) -> SpeculativeConfig:
     hf_config = SpeculativeConfig.hf_config_override(_make_hf_config(**hf_kwargs))
@@ -98,6 +99,12 @@ def _make_speculative_config(
         model=target_model, max_model_len=128, quantization=None, hf_overrides={}
     )
     target.hf_config.model_type = hf_kwargs["model_type"]
+    if target_hf_attrs:
+        # A real config, not a mock: the rope propagation reads these attrs
+        # off the target, and a MagicMock would auto-attribute garbage.
+        target.hf_config = _make_hf_config(
+            model_type=hf_kwargs["model_type"], **target_hf_attrs
+        )
     target.using_transformers_backend.return_value = False
     speculative_kwargs.setdefault("model", "draft")
 
@@ -293,6 +300,29 @@ def test_top_level_rope_parameters_replace_on_draft():
     assert hf_config.architectures == ["DeepSeekMTPModel"]
     assert getattr(hf_config, "num_hidden_layers", None) != 1
     rope = getattr(hf_config, "rope_parameters", None)
+    assert rope is not None
+    assert rope["rope_type"] == "yarn"
+    assert rope["factor"] == 4.0
+
+
+@pytest.mark.cpu_test
+def test_target_rope_parameters_propagate_without_overrides():
+    """The drafter's rotary cos/sin cache is position-indexed: a draft config
+    built without the target's resolved rope fields OOBs once the target runs
+    past the draft's native max position (2026-11-13 cold-load kill). With no
+    user overrides in play, __post_init__ must copy the target's rope fields
+    onto the draft text config."""
+    config = _make_speculative_config(
+        dict(model_type="deepseek_v4", num_nextn_predict_layers=3),
+        "DeepSeekV4MTPModel",
+        target_hf_attrs={
+            "rope_parameters": _YARN_ROPE_PARAMETERS,
+            "max_position_embeddings": 262_144,
+        },
+        method="mtp",
+        num_speculative_tokens=3,
+    )
+    rope = getattr(config.draft_model_config.hf_config, "rope_parameters", None)
     assert rope is not None
     assert rope["rope_type"] == "yarn"
     assert rope["factor"] == 4.0
