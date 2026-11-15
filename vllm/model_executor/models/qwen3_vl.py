@@ -653,7 +653,7 @@ class Qwen3_VisionTransformer(nn.Module):
             prefix=f"{prefix}.merger",
         )
         if vision_offloader is not None:
-            vision_offloader.wrap_modules(iter([self.merger]))
+            vision_offloader.wrap_modules(merger for merger in [self.merger])
 
         self.deepstack_merger_list = nn.ModuleList(
             [

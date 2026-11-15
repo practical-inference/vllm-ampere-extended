@@ -88,7 +88,7 @@ def create_scheduler(
     use_ec_connector: bool = False,
     ec_role: str | None = None,
     kv_cache_layer_config: KVCacheLayerConfig | None = None,
-    kv_cache_groups: list[KVCacheGroupSpec] | None = None,
+    kv_cache_groups: list[KVCacheGroup] | None = None,
     runner: RunnerOption = "auto",
     per_request_spec_decode_metrics: str = "none",
     cache_aware_admission_window: int = 0,
@@ -241,13 +241,11 @@ def create_scheduler(
             )
         )
     if kv_cache_groups is None:
-        kv_cache_groups = [KVCacheGroupSpec(["layer"], kv_cache_spec)]
+        kv_cache_groups = [new_kv_cache_group(["layer"], kv_cache_layer_config)]
     kv_cache_config = KVCacheConfig(
         num_blocks=num_blocks,  # A large number of blocks to hold all requests
         kv_cache_tensors=[],
-        kv_cache_groups=kv_cache_groups
-        if kv_cache_groups is not None
-        else [new_kv_cache_group(["layer"], kv_cache_layer_config)],
+        kv_cache_groups=kv_cache_groups,
     )
     cache_config.num_gpu_blocks = num_blocks
     if scheduler_cls is None:

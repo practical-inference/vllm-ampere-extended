@@ -440,7 +440,7 @@ class Glm5NextVisionTransformer(nn.Module):
             prefix=f"{prefix}.merger",
         )
         if vision_offloader is not None:
-            vision_offloader.wrap_modules(iter([self.merger]))
+            vision_offloader.wrap_modules(merger for merger in [self.merger])
 
         self.downsample = Conv2dLayer(
             in_channels=vision_config.hidden_size,

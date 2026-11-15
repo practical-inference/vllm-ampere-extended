@@ -89,6 +89,7 @@ from .utils import (
     EOS_TOKEN_ID,
     create_requests,
     create_scheduler,
+    mamba_layer,
     mock_kv,
     new_kv_cache_group,
     new_sliding_window_layer,
@@ -9282,10 +9283,8 @@ def _mamba_priced_scheduler(
         block_size=16,
         num_speculative_tokens=2,
         num_speculative_tokens_per_batch_size=schedule_table,
-        kv_cache_spec=MambaSpec(
-            block_size=16,
-            shapes=((1, 1),),
-            dtypes=(torch.float32,),
+        kv_cache_layer_config=mamba_layer(
+            MambaSpec(block_size=16, shapes=((1, 1),), dtypes=(torch.float32,)),
             mamba_cache_mode="align",
             num_speculative_blocks=2,
         ),
@@ -9486,10 +9485,8 @@ def _mamba_slot_release_scheduler(
         block_size=16,
         num_speculative_tokens=2,
         num_speculative_tokens_per_batch_size=schedule_table,
-        kv_cache_spec=MambaSpec(
-            block_size=16,
-            shapes=((1, 1),),
-            dtypes=(torch.float32,),
+        kv_cache_layer_config=mamba_layer(
+            MambaSpec(block_size=16, shapes=((1, 1),), dtypes=(torch.float32,)),
             mamba_cache_mode="align",
             num_speculative_blocks=2,
         ),
@@ -9820,29 +9817,22 @@ def _hybrid_priced_scheduler(
         scheduler_reserve_full_isl=scheduler_reserve_full_isl,
         num_speculative_tokens=2,
         num_speculative_tokens_per_batch_size=schedule_table,
-        kv_cache_spec=MambaSpec(
-            block_size=16,
-            shapes=((1, 1),),
-            dtypes=(torch.float32,),
+        kv_cache_layer_config=mamba_layer(
+            MambaSpec(block_size=16, shapes=((1, 1),), dtypes=(torch.float32,)),
             mamba_cache_mode="align",
             num_speculative_blocks=2,
         ),
         kv_cache_groups=[
-            KVCacheGroupSpec(
+            new_kv_cache_group(
                 ["attn"],
-                FullAttentionSpec(
+                AttentionSpec(
                     block_size=16, num_kv_heads=1, head_size=1, dtype=torch.float32
                 ),
             ),
-            KVCacheGroupSpec(
+            new_kv_cache_group(
                 ["mamba"],
-                MambaSpec(
-                    block_size=16,
-                    shapes=((1, 1),),
-                    dtypes=(torch.float32,),
-                    mamba_cache_mode="align",
-                    num_speculative_blocks=2,
-                ),
+                MambaSpec(block_size=16, shapes=((1, 1),), dtypes=(torch.float32,)),
+                MambaManager.config(mamba_cache_mode="align", num_speculative_blocks=2),
             ),
         ],
     )
