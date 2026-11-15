@@ -738,8 +738,8 @@ class Worker(WorkerBase):
                 self.model_runner.profile_run(
                     randomize_inputs=self.randomize_dummy_inputs
                 )
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
+            torch.accelerator.synchronize()
+            torch.accelerator.empty_cache()
             with (
                 memory_profiling(
                     self.init_snapshot,
@@ -759,8 +759,8 @@ class Worker(WorkerBase):
             # and Triton autotune scratch). Release it so the pool does not
             # stack on stale cache (syv-ai pinned-kv-empty-cache, vllm
             # #59893).
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
+            torch.accelerator.synchronize()
+            torch.accelerator.empty_cache()
             may_capture_graphs = current_platform.is_cuda_alike()
             cudagraph_memory_estimate = 0
             if may_capture_graphs and envs.VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS:

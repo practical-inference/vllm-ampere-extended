@@ -205,7 +205,7 @@ def _offload_embedding_to_uva(embedding: nn.Module, tied: bool) -> None:
     weight.data = get_accelerator_view_from_cpu_tensor(cpu_weight)
     weight._vllm_is_uva_offloaded = True
 
-    torch.cuda.empty_cache()
+    torch.accelerator.empty_cache()
 
 
 class Qwen4ExpSparseMoeBlock(Qwen3NextSparseMoeBlock):
