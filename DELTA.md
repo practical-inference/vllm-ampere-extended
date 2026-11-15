@@ -1,18 +1,18 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 55 source commits (71 files changed, 5636 insertions(+), 418 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 57 source commits (71 files changed, 5636 insertions(+), 418 deletions(-)).
 
 Diff base: upstream commit `919d45fc3a` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 919d45fc3a..32b6d37607 -- vllm/ csrc/` and `git diff --stat 919d45fc3a..32b6d37607 -- vllm/ csrc/`.
+`git log --no-merges 919d45fc3a..785ec31b15 -- vllm/ csrc/` and `git diff --stat 919d45fc3a..785ec31b15 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
 | Area | Commits |
 |---|---|
-| general fixes | 24 |
+| general fixes | 25 |
 | spec-decode fixes | 13 |
-| model bring-up (GLM5Next / Qwen4Exp / DSV41) | 6 |
+| model bring-up (GLM5Next / Qwen4Exp / DSV41) | 7 |
 | sparse attention (TRITON_MLA_SPARSE) | 4 |
 | KV-cache / offload fixes | 3 |
 | fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 2 |
@@ -22,6 +22,8 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- fix: torch.accelerator APIs in fork-delta worker/model code (785ec31b15)
+- fix: port fork test/offloader call sites onto the upstream kv-cache interface rename (7894bf8633)
 - fix(v1) fork: restore the copy-event wait + the MAMBA env registrations on main (1519c55404)
 - fix(v1): keep spec-decode draft padding out of input_ids under async scheduling (c27c4f4b30)
 - feat: token-embedding UVA offload for Qwen4Exp (VLLM_EMBED_UVA=1) (4dc2d4dbd4)
