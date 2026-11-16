@@ -71,6 +71,15 @@ def _is_sm90() -> bool:
     return current_platform.get_device_capability() == (9, 0)
 
 
+@lru_cache(maxsize=1)
+def _needs_fp8_byte_arm() -> bool:
+    """True below sm_89: Triton has no fp8e4nv pointer type there, so fp8
+    caches ride as raw uint8 storage with in-kernel dequant (see
+    `_maybe_dequant`) and software e4m3 quant on the store side."""
+    cap = current_platform.get_device_capability()
+    return cap is not None and cap < (8, 9)
+
+
 @triton.jit(do_not_specialize=["num_rows", "num_requests"])
 def _qsa_sparse_paged_gqa_splitk_kernel(
     q_ptr,
@@ -1030,6 +1039,13 @@ def qsa_store_cache_rows(
         raise ValueError("QSA cache rows and slots have incompatible shapes")
     if not rows.shape[0]:
         return
+    if cache.dtype == torch.float8_e4m3fn and _needs_fp8_byte_arm():
+        # Below sm_89 Triton cannot name fp8e4nv pointers: quantize host-side
+        # (c10 RNE, identical codes to the sm_89 store cast for in-range
+        # values) and move raw bytes. Values are RMSNormed pre-quant, so the
+        # c10-overflow-to-NaN vs satfinite-clamp divergence is unreachable.
+        cache = cache.view(torch.uint8)
+        rows = rows.to(torch.float8_e4m3fn).view(torch.uint8)
     _store_qsa_rows_kernel[(rows.shape[0],)](
         cache,
         slot_mapping,

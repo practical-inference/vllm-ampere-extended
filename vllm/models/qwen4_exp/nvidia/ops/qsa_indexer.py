@@ -8,6 +8,10 @@ import vllm.envs as envs
 from vllm.model_executor.warmup.jit_warmup_triton_helper import (
     TritonWarmupTensor,
 )
+from vllm.models.qwen4_exp.nvidia.ops.qsa import (
+    _maybe_dequant,
+    _needs_fp8_byte_arm,
+)
 from vllm.platforms import current_platform
 from vllm.triton_utils import tl, triton
 from vllm.utils.math_utils import round_up
@@ -37,6 +41,7 @@ def _qsa_mqa_paged_uniform_kernel(
     BLOCK_N: tl.constexpr,
     TILES_PER_PROG: tl.constexpr,
     STAGES: tl.constexpr,
+    DEQUANT_K: tl.constexpr,
 ) -> None:
     NUM_COLUMNS: tl.constexpr = PAGE_TABLE_WIDTH * PAGE_SIZE
     DECODE_QUERY_LEN_PADDED: tl.constexpr = triton.next_power_of_2(DECODE_QUERY_LEN)
@@ -89,9 +94,11 @@ def _qsa_mqa_paged_uniform_kernel(
             + page_offset[:, None] * stride_cache_token
             + dims[None, :],
             mask=live[:, None] & (dims[None, :] < HEAD_DIM),
-            other=0.0,
+            other=0,
             eviction_policy="evict_first",
         )
+        if DEQUANT_K:
+            keys = _maybe_dequant(keys)
         scores = tl.dot(keys, query, out_dtype=tl.float32)
         scores = tl.where(valid_query[None, :], tl.maximum(scores, 0.0), 0.0)
         scores = tl.reshape(
@@ -132,6 +139,7 @@ def _qsa_mqa_paged_prefill_kernel(
     BLOCK_N: tl.constexpr,
     K_TILES: tl.constexpr,
     STAGES: tl.constexpr,
+    DEQUANT_K: tl.constexpr,
 ) -> None:
     num_columns = page_table_width * PAGE_SIZE
     NUM_HEADS_PADDED: tl.constexpr = triton.next_power_of_2(NUM_HEADS)
@@ -198,9 +206,11 @@ def _qsa_mqa_paged_prefill_kernel(
             + page_offset[:, None] * stride_cache_token
             + dims[None, :],
             mask=live[:, None] & (dims[None, :] < HEAD_DIM),
-            other=0.0,
+            other=0,
             eviction_policy="evict_first",
         )
+        if DEQUANT_K:
+            keys = _maybe_dequant(keys)
         # With an fp8 cache, SM90 lowers this dot to reduced-precision wgmma
         # accumulation; SM100 tcgen05 accumulates in fp32. The SM90 error
         # (~1e-4 relative) is far below the e4m3 quantization noise floor.
@@ -330,7 +340,11 @@ def warmup_qsa_mqa_paged_decode(
     if not profiles:
         return ()
 
-    k_cache_ptr = TritonWarmupTensor(k_cache.dtype, shape=tuple(k_cache.shape))
+    fp8_cache = k_cache.dtype == torch.float8_e4m3fn
+    dequant_k = fp8_cache and _needs_fp8_byte_arm()
+    k_ptr_dtype = torch.uint8 if dequant_k else k_cache.dtype
+    q_ptr_dtype = torch.float16 if dequant_k else k_cache.dtype
+    k_cache_ptr = TritonWarmupTensor(k_ptr_dtype, shape=tuple(k_cache.shape))
     page_table_ptr = TritonWarmupTensor(
         page_table.dtype,
         shape=(max_num_reqs, page_table_width),
@@ -340,7 +354,7 @@ def warmup_qsa_mqa_paged_decode(
     for decode_query_len, num_requests in profiles:
         num_rows = decode_query_len * num_requests
         q_ptr = TritonWarmupTensor(
-            k_cache.dtype,
+            q_ptr_dtype,
             shape=(num_rows, num_heads, head_dim),
         )
         logits_ptr = TritonWarmupTensor(
@@ -368,8 +382,9 @@ def warmup_qsa_mqa_paged_decode(
             BLOCK_N=_DECODE_BLOCK_N,
             TILES_PER_PROG=tiles_per_program,
             STAGES=2,
+            DEQUANT_K=dequant_k,
             # tuned on GB300
-            num_warps=1 if k_cache.dtype == torch.float8_e4m3fn else 2,
+            num_warps=1 if fp8_cache else 2,
             grid=(
                 num_requests,
                 triton.cdiv(columns, _DECODE_BLOCK_N * tiles_per_program),
@@ -403,7 +418,15 @@ def _prefill_logits(
     )
 
     # tuned on GB300
-    if k_cache.dtype == torch.float8_e4m3fn:
+    fp8_tuning = k_cache.dtype == torch.float8_e4m3fn
+    dequant_k = fp8_tuning and _needs_fp8_byte_arm()
+    if dequant_k:
+        # Below sm_89: raw uint8 storage + fp16 Q codes; the kernel dequants
+        # K tiles and dots in fp16 (exact products, fp32 accumulate). The
+        # byte decode yields x*2^-8 — fold 2^8 into Q (exact).
+        q = q.to(torch.float16) * 256.0
+        k_cache = k_cache.view(torch.uint8)
+    if fp8_tuning:
         TILE_R, STAGES, num_warps = 32, 2, 8
     else:
         TILE_R, STAGES, num_warps = 64, 2, 4
@@ -435,6 +458,7 @@ def _prefill_logits(
         BLOCK_N=BLOCK_N,
         K_TILES=K_TILES,
         STAGES=STAGES,
+        DEQUANT_K=dequant_k,
         num_warps=num_warps,
     )
     return logits
@@ -539,6 +563,17 @@ def qsa_select_paged_decode(
     assert page_table.shape[0] == num_requests
     assert visible_blocks.shape == (q.shape[0],)
 
+    dequant_k = k_cache.dtype == torch.float8_e4m3fn and _needs_fp8_byte_arm()
+    fp8_tuning = k_cache.dtype == torch.float8_e4m3fn
+    if dequant_k:
+        # Below sm_89: raw uint8 storage + fp16 Q codes (e4m3->fp16 exact);
+        # the kernel dequants K tiles and dots in fp16 — numerically identical
+        # to the native fp8 dot (exact products, fp32 accumulate). The byte
+        # decode yields x*2^-8, so fold 2^8 into Q (exact: power of two), the
+        # same trick as the sparse-attention reader's scale fold.
+        q = q.to(torch.float16) * 256.0
+        k_cache = k_cache.view(torch.uint8)
+
     columns = page_table.shape[1] * k_cache.shape[1]
     logits = torch.empty((q.shape[0], columns), dtype=torch.float32, device=q.device)
     tiles_per_program = _decode_tiles_per_program(num_requests, columns)
@@ -564,8 +599,9 @@ def qsa_select_paged_decode(
         BLOCK_N=_DECODE_BLOCK_N,
         TILES_PER_PROG=tiles_per_program,
         STAGES=2,
+        DEQUANT_K=dequant_k,
         # tuned on GB300
-        num_warps=1 if k_cache.dtype == torch.float8_e4m3fn else 2,
+        num_warps=1 if fp8_tuning else 2,
     )
     _topk(
         logits,
