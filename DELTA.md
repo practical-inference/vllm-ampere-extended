@@ -1,20 +1,20 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 58 source commits (71 files changed, 5636 insertions(+), 418 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 60 source commits (72 files changed, 5709 insertions(+), 425 deletions(-)).
 
-Diff base: upstream commit `919d45fc3a` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 919d45fc3a..af45b77066 -- vllm/ csrc/` and `git diff --stat 919d45fc3a..af45b77066 -- vllm/ csrc/`.
+Diff base: upstream commit `9986df4121` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges 9986df4121..f66ed79661 -- vllm/ csrc/` and `git diff --stat 9986df4121..f66ed79661 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
 | Area | Commits |
 |---|---|
 | general fixes | 25 |
-| spec-decode fixes | 13 |
+| spec-decode fixes | 14 |
 | model bring-up (GLM5Next / Qwen4Exp / DSV41) | 7 |
+| sparse attention (TRITON_MLA_SPARSE) | 5 |
 | KV-cache / offload fixes | 4 |
-| sparse attention (TRITON_MLA_SPARSE) | 4 |
 | fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 2 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + KV-cache / offload fixes) | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + spec-decode fixes) | 1 |
@@ -22,6 +22,8 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- [core] qsa: sm_80 fp8-indexer arm — uint8 storage + software e4m3 dequant (145978c011)
+- config: wire the draft rope propagation in SpeculativeConfig.__post_init__ (708c44bb71)
 - fix: demand recording must not sit under the K0 diagnostics guard (31bc038e67)
 - fix: torch.accelerator APIs in fork-delta worker/model code (785ec31b15)
 - fix: port fork test/offloader call sites onto the upstream kv-cache interface rename (7894bf8633)
