@@ -1,0 +1,5 @@
+WATCH_DONE health=200
+(EngineCore pid=712685) INFO 11-15 19:41:58 [gpu_worker.py:786] KV cache auto-pinned from boot accounting: safe maximum 16.21 GiB, margin 0.93 GiB, pinning 15.28 GiB for KV Cache.
+(EngineCore pid=712685) INFO 11-15 19:41:58 [kv_cache_utils.py:1134] GPU KV cache size: 1,097,383 tokens, Maximum concurrency for 524,288 tokens per request: 2.09x
+(EngineCore pid=712685) INFO 11-15 19:41:58 [kv_cache_utils.py:850] kv cache group sizes (1664, 1664, 1664, 1664, 8, 1664)
+final=200

@@ -1,0 +1,7 @@
+# FP8-ENGAGEMENT PROOF (post-arm boot 2026-11-15 20:46:27, APIServer pid=2130887 / EngineCore pid=2145186)
+# source: /data/models/leoncca_exp2.log non-default-args line (attention_config fields) + boot lines below
+ 'attention_config': AttentionConfig(backend=None
+ indexer_kv_dtype='fp8'
+(EngineCore pid=2145186) INFO 11-15 20:49:54 [gpu_worker.py:786] KV cache auto-pinned from boot accounting: safe maximum 16.21 GiB, margin 0.93 GiB, pinning 15.28 GiB for KV Cache.
+(EngineCore pid=2145186) INFO 11-15 20:49:54 [kv_cache_utils.py:1134] GPU KV cache size: 1,130,446 tokens, Maximum concurrency for 524,288 tokens per request: 2.16x
+(EngineCore pid=2145186) INFO 11-15 20:49:55 [qwen4_exp_qsa_warmup.py:60] Warmed up Qwen4Exp QSA decode kernels: ((1, 1), (1, 8), (1, 16), (2, 1), (2, 8), (2, 16), (3, 1), (3, 8), (3, 16)).

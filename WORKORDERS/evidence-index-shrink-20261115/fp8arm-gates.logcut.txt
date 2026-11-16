@@ -1,0 +1,1464 @@
+STAGE1 health=200
+=== leoncca benchmark: http://localhost:8017 model=qwen3.8-flash-next ===
+=== out=/data/models/leoncca_bench_20261115_205050.json ===
+name                   conc maxtok   wall_s   tok   tok_s
+------------------------------------------------------------
+hello_short               1     80    0.714    62    86.8
+code_few                  1    300    2.059   252   122.4
+agent_tool_schema         1    500    0.882    91   103.2
+long_context_pack         4    200    2.104   584   277.6
+long_context_pack        16    200    2.258  2231   988.0
+long_context_pack        32    200    3.617  4364  1206.5
+
+Wrote /data/models/leoncca_bench_20261115_205050.json
+done
+STAGE2 house wave done: /data/models/leoncca_bench_20261115_205050.json
+2026-11-15 20:51:06,594 INFO HTTP Request: GET http://localhost:8017/v1/models "HTTP/1.1 200 OK"
+2026-11-15 20:51:06,594 INFO model=qwen3.8-flash-next rounds=40 per_round=9000 cap=300000
+2026-11-15 20:51:06,606 INFO needle planted: Shipping label: 754-214-125
+2026-11-15 20:51:11,314 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:12,128 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:12,129 INFO round 1: {'round': 1, 'user_tokens': 9027, 'cum_prompt_tokens': 9615, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 512, 'round_secs': 5.52}
+2026-11-15 20:51:14,415 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:15,293 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:15,294 INFO round 2: {'round': 2, 'user_tokens': 9011, 'cum_prompt_tokens': 18698, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number that was mentioned earlier in the conversation. Let me look back through the conversation history.\n\nIn the first message, there was a line that said: "Shipping label: 754-214-125"\n\nThis was mentioned in the original block of text provided by the user. I already answered this question previously with "754-214-125" and the user is asking', 'reply_tokens': 141, 'round_secs': 3.16}
+2026-11-15 20:51:17,131 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:17,984 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:17,985 INFO round 3: {'round': 3, 'user_tokens': 9011, 'cum_prompt_tokens': 27866, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number that was mentioned earlier in the conversation. Let me look back through the conversation history.\n\nIn the first message, there was a line that said: "Shipping label: 754-214-125"\n\nThis was embedded in the large block of operational data. I\'ve already answered this question multiple times with "754-214-125". The user is asking again,', 'reply_tokens': 96, 'round_secs': 2.69}
+2026-11-15 20:51:20,036 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:20,872 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:20,873 INFO round 4: {'round': 4, 'user_tokens': 9013, 'cum_prompt_tokens': 37036, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 119, 'round_secs': 2.89}
+2026-11-15 20:51:22,693 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:23,559 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:23,560 INFO round 5: {'round': 5, 'user_tokens': 9011, 'cum_prompt_tokens': 46119, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 92, 'round_secs': 2.69}
+2026-11-15 20:51:25,579 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:26,451 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:26,452 INFO round 6: {'round': 6, 'user_tokens': 9004, 'cum_prompt_tokens': 55195, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 93, 'round_secs': 2.89}
+2026-11-15 20:51:32,440 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:32,674 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:38,378 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:38,378 INFO drift at 50000: {'boundary': 50000, 'cached_mean': -0.0343, 'cold_mean': -0.0125, 'drift': -0.0218, 'gen_match': True}
+2026-11-15 20:51:40,204 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:41,141 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:41,142 INFO round 7: {'round': 7, 'user_tokens': 9011, 'cum_prompt_tokens': 64278, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 81, 'round_secs': 2.76}
+2026-11-15 20:51:43,181 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:44,142 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:44,143 INFO round 8: {'round': 8, 'user_tokens': 9006, 'cum_prompt_tokens': 73356, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number that was mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 93, 'round_secs': 3.0}
+2026-11-15 20:51:46,030 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:46,958 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:46,959 INFO round 9: {'round': 9, 'user_tokens': 9006, 'cum_prompt_tokens': 82518, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 93, 'round_secs': 2.82}
+2026-11-15 20:51:49,051 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:49,960 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:49,961 INFO round 10: {'round': 10, 'user_tokens': 9011, 'cum_prompt_tokens': 91601, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 110, 'round_secs': 3.0}
+2026-11-15 20:51:51,912 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:52,885 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:52,886 INFO round 11: {'round': 11, 'user_tokens': 9010, 'cum_prompt_tokens': 100683, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 94, 'round_secs': 2.93}
+2026-11-15 20:51:57,825 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 20:51:58,136 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:08,427 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:08,427 INFO drift at 100000: {'boundary': 100000, 'cached_mean': -0.0009, 'cold_mean': -0.0017, 'drift': 0.0008, 'gen_match': True}
+2026-11-15 20:52:10,375 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:11,337 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:11,338 INFO round 12: {'round': 12, 'user_tokens': 9013, 'cum_prompt_tokens': 109852, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 94, 'round_secs': 2.91}
+2026-11-15 20:52:13,280 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:14,260 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:14,260 INFO round 13: {'round': 13, 'user_tokens': 9016, 'cum_prompt_tokens': 119024, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 94, 'round_secs': 2.92}
+2026-11-15 20:52:16,395 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:17,397 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:17,402 INFO round 14: {'round': 14, 'user_tokens': 9011, 'cum_prompt_tokens': 128191, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.14}
+2026-11-15 20:52:19,506 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:20,532 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:20,532 INFO round 15: {'round': 15, 'user_tokens': 9001, 'cum_prompt_tokens': 137348, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 110, 'round_secs': 3.13}
+2026-11-15 20:52:22,660 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:23,657 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:23,658 INFO round 16: {'round': 16, 'user_tokens': 9013, 'cum_prompt_tokens': 146433, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 110, 'round_secs': 3.13}
+2026-11-15 20:52:25,941 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:27,004 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:27,005 INFO round 17: {'round': 17, 'user_tokens': 9004, 'cum_prompt_tokens': 155509, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 110, 'round_secs': 3.35}
+2026-11-15 20:52:29,168 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:30,246 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:30,247 INFO round 18: {'round': 18, 'user_tokens': 9000, 'cum_prompt_tokens': 164581, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 110, 'round_secs': 3.24}
+2026-11-15 20:52:32,573 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:33,707 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:33,707 INFO round 19: {'round': 19, 'user_tokens': 9013, 'cum_prompt_tokens': 173666, 'needle_ok': False, 'probe_text': '\n\n', 'reply_tokens': 110, 'round_secs': 3.46}
+2026-11-15 20:52:35,906 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:37,036 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:37,036 INFO round 20: {'round': 20, 'user_tokens': 9000, 'cum_prompt_tokens': 182727, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.33}
+2026-11-15 20:52:39,388 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:40,470 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:40,471 INFO round 21: {'round': 21, 'user_tokens': 9006, 'cum_prompt_tokens': 191889, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.43}
+2026-11-15 20:52:42,712 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:43,882 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:43,883 INFO round 22: {'round': 22, 'user_tokens': 9005, 'cum_prompt_tokens': 201050, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.41}
+2026-11-15 20:52:54,848 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 20:52:55,335 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:16,183 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:16,183 INFO drift at 200000: {'boundary': 200000, 'cached_mean': -0.0133, 'cold_mean': -0.0041, 'drift': -0.0092, 'gen_match': True}
+2026-11-15 20:53:18,566 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:19,726 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:19,727 INFO round 23: {'round': 23, 'user_tokens': 9004, 'cum_prompt_tokens': 210210, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.54}
+2026-11-15 20:53:22,025 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:23,215 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:23,216 INFO round 24: {'round': 24, 'user_tokens': 9013, 'cum_prompt_tokens': 219379, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.49}
+2026-11-15 20:53:25,643 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:26,818 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:26,818 INFO round 25: {'round': 25, 'user_tokens': 9004, 'cum_prompt_tokens': 228539, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.6}
+2026-11-15 20:53:29,200 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:30,420 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:30,421 INFO round 26: {'round': 26, 'user_tokens': 9010, 'cum_prompt_tokens': 237705, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 112, 'round_secs': 3.6}
+2026-11-15 20:53:32,914 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:34,168 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:34,169 INFO round 27: {'round': 27, 'user_tokens': 9008, 'cum_prompt_tokens': 246869, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.75}
+2026-11-15 20:53:36,581 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:37,846 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:37,847 INFO round 28: {'round': 28, 'user_tokens': 9020, 'cum_prompt_tokens': 256045, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.68}
+2026-11-15 20:53:40,403 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:41,676 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:41,676 INFO round 29: {'round': 29, 'user_tokens': 9001, 'cum_prompt_tokens': 265202, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.83}
+2026-11-15 20:53:44,134 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:45,435 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:45,436 INFO round 30: {'round': 30, 'user_tokens': 9007, 'cum_prompt_tokens': 274365, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.76}
+2026-11-15 20:53:48,062 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:49,375 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:49,376 INFO round 31: {'round': 31, 'user_tokens': 9016, 'cum_prompt_tokens': 283537, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 110, 'round_secs': 3.94}
+2026-11-15 20:53:51,904 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:53,253 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:53,253 INFO round 32: {'round': 32, 'user_tokens': 9001, 'cum_prompt_tokens': 292694, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 114, 'round_secs': 3.88}
+2026-11-15 20:53:55,892 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:57,274 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 20:53:57,275 INFO round 33: {'round': 33, 'user_tokens': 9002, 'cum_prompt_tokens': 301852, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Looking back through the conversation history, in the very first message from the user, there was a line that read: "Shipping label: 754-214-125". This is the only shipping label number that was mentioned in the entire conversation. I have been consistently answering this question with "754-214-125" throughout the conversation.\n', 'reply_tokens': 96, 'round_secs': 4.02}
+2026-11-15 20:53:57,275 INFO total cap 300000 reached at round 33
+2026-11-15 20:53:57,275 INFO SUMMARY {"needle_ok_any": true, "final_needle_ok": true, "per_round_recall": [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true], "recall_curve": 19, "drifts": [{"boundary": 50000, "cached_mean": -0.0343, "cold_mean": -0.0125, "drift": -0.0218, "gen_match": true}, {"boundary": 100000, "cached_mean": -0.0009, "cold_mean": -0.0017, "drift": 0.0008, "gen_match": true}, {"boundary": 200000, "cached_mean": -0.0133, "cold_mean": -0.0041, "drift": -0.0092, "gen_match": true}], "model": "qwen3.8-flash-next", "seed": 42, "total_prompt_tokens": 301852}
+STAGE3 needle done
+Running GSM8K evaluation: 1319 questions, 5-shot
+Evaluating:   0%|          | 0/1319 [00:00<?, ?it/s]REQDONE t=1794801242.164 idx=89 tokens=61 err=False
+Evaluating:   0%|          | 1/1319 [00:02<54:54,  2.50s/it]REQDONE t=1794801242.753 idx=91 tokens=85 err=False
+Evaluating:   0%|          | 2/1319 [00:03<30:12,  1.38s/it]REQDONE t=1794801243.201 idx=1028 tokens=98 err=False
+Evaluating:   0%|          | 3/1319 [00:03<20:52,  1.05it/s]REQDONE t=1794801243.387 idx=1025 tokens=101 err=False
+Evaluating:   0%|          | 4/1319 [00:03<14:14,  1.54it/s]REQDONE t=1794801243.789 idx=92 tokens=107 err=False
+Evaluating:   0%|          | 5/1319 [00:04<12:16,  1.78it/s]REQDONE t=1794801243.933 idx=592 tokens=109 err=False
+Evaluating:   0%|          | 6/1319 [00:04<09:09,  2.39it/s]REQDONE t=1794801244.342 idx=593 tokens=119 err=False
+Evaluating:   1%|          | 7/1319 [00:04<09:05,  2.41it/s]REQDONE t=1794801244.342 idx=595 tokens=121 err=False
+REQDONE t=1794801244.343 idx=1027 tokens=117 err=False
+REQDONE t=1794801244.900 idx=88 tokens=136 err=False
+Evaluating:   1%|          | 10/1319 [00:05<06:08,  3.55it/s]REQDONE t=1794801245.088 idx=93 tokens=139 err=False
+Evaluating:   1%|          | 11/1319 [00:05<05:41,  3.83it/s]REQDONE t=1794801245.371 idx=1024 tokens=148 err=False
+Evaluating:   1%|          | 12/1319 [00:05<05:48,  3.76it/s]REQDONE t=1794801245.949 idx=1026 tokens=164 err=False
+Evaluating:   1%|          | 13/1319 [00:06<07:30,  2.90it/s]REQDONE t=1794801245.978 idx=90 tokens=164 err=False
+REQDONE t=1794801245.978 idx=594 tokens=158 err=False
+REQDONE t=1794801246.571 idx=96 tokens=49 err=False
+Evaluating:   1%|          | 16/1319 [00:06<05:56,  3.66it/s]REQDONE t=1794801246.764 idx=596 tokens=182 err=False
+Evaluating:   1%|▏         | 17/1319 [00:07<05:35,  3.88it/s]REQDONE t=1794801247.676 idx=1031 tokens=92 err=False
+Evaluating:   1%|▏         | 18/1319 [00:08<08:43,  2.49it/s]REQDONE t=1794801247.955 idx=600 tokens=81 err=False
+Evaluating:   1%|▏         | 19/1319 [00:08<08:04,  2.68it/s]REQDONE t=1794801248.393 idx=597 tokens=174 err=False
+Evaluating:   2%|▏         | 20/1319 [00:08<08:25,  2.57it/s]REQDONE t=1794801248.743 idx=94 tokens=140 err=False
+Evaluating:   2%|▏         | 21/1319 [00:09<08:11,  2.64it/s]REQDONE t=1794801248.748 idx=95 tokens=136 err=False
+REQDONE t=1794801249.151 idx=1032 tokens=110 err=False
+Evaluating:   2%|▏         | 23/1319 [00:09<06:32,  3.30it/s]REQDONE t=1794801249.156 idx=599 tokens=132 err=False
+REQDONE t=1794801249.584 idx=602 tokens=84 err=False
+Evaluating:   2%|▏         | 25/1319 [00:09<05:49,  3.70it/s]REQDONE t=1794801249.611 idx=1034 tokens=81 err=False
+REQDONE t=1794801249.990 idx=97 tokens=125 err=False
+Evaluating:   2%|▏         | 27/1319 [00:10<05:18,  4.06it/s]REQDONE t=1794801250.185 idx=98 tokens=109 err=False
+Evaluating:   2%|▏         | 28/1319 [00:10<05:04,  4.24it/s]REQDONE t=1794801250.713 idx=1033 tokens=132 err=False
+Evaluating:   2%|▏         | 29/1319 [00:11<06:28,  3.32it/s]REQDONE t=1794801251.207 idx=598 tokens=207 err=False
+REQDONE t=1794801251.208 idx=1036 tokens=59 err=False
+Evaluating:   2%|▏         | 30/1319 [00:11<07:28,  2.87it/s]REQDONE t=1794801251.880 idx=99 tokens=120 err=False
+Evaluating:   2%|▏         | 32/1319 [00:12<07:21,  2.91it/s]REQDONE t=1794801251.909 idx=1029 tokens=256 err=False
+REQDONE t=1794801252.620 idx=1030 tokens=256 err=False
+Evaluating:   3%|▎         | 34/1319 [00:12<07:33,  2.83it/s]REQDONE t=1794801252.846 idx=101 tokens=119 err=False
+Evaluating:   3%|▎         | 35/1319 [00:13<06:59,  3.06it/s]REQDONE t=1794801253.110 idx=604 tokens=133 err=False
+REQDONE t=1794801253.110 idx=1037 tokens=114 err=False
+Evaluating:   3%|▎         | 36/1319 [00:13<06:40,  3.20it/s]REQDONE t=1794801253.586 idx=1035 tokens=152 err=False
+Evaluating:   3%|▎         | 38/1319 [00:13<06:02,  3.53it/s]REQDONE t=1794801253.926 idx=603 tokens=171 err=False
+Evaluating:   3%|▎         | 39/1319 [00:14<06:18,  3.39it/s]REQDONE t=1794801254.298 idx=601 tokens=256 err=False
+Evaluating:   3%|▎         | 40/1319 [00:14<06:41,  3.19it/s]REQDONE t=1794801254.637 idx=103 tokens=100 err=False
+Evaluating:   3%|▎         | 41/1319 [00:14<06:49,  3.12it/s]REQDONE t=1794801254.830 idx=100 tokens=180 err=False
+Evaluating:   3%|▎         | 42/1319 [00:15<06:05,  3.49it/s]REQDONE t=1794801255.231 idx=105 tokens=52 err=False
+Evaluating:   3%|▎         | 43/1319 [00:15<06:45,  3.14it/s]REQDONE t=1794801255.456 idx=609 tokens=60 err=False
+Evaluating:   3%|▎         | 44/1319 [00:15<06:11,  3.43it/s]REQDONE t=1794801255.905 idx=1039 tokens=117 err=False
+Evaluating:   3%|▎         | 45/1319 [00:16<07:09,  2.97it/s]REQDONE t=1794801256.096 idx=605 tokens=202 err=False
+Evaluating:   3%|▎         | 46/1319 [00:16<06:14,  3.40it/s]REQDONE t=1794801256.384 idx=607 tokens=152 err=False
+Evaluating:   4%|▎         | 47/1319 [00:16<06:11,  3.42it/s]REQDONE t=1794801256.820 idx=102 tokens=196 err=False
+Evaluating:   4%|▎         | 48/1319 [00:17<07:05,  2.99it/s]REQDONE t=1794801257.154 idx=104 tokens=140 err=False
+Evaluating:   4%|▎         | 49/1319 [00:17<07:04,  2.99it/s]REQDONE t=1794801257.715 idx=1040 tokens=127 err=False
+Evaluating:   4%|▍         | 50/1319 [00:18<08:30,  2.49it/s]REQDONE t=1794801258.111 idx=608 tokens=141 err=False
+REQDONE t=1794801258.111 idx=1041 tokens=120 err=False
+Evaluating:   4%|▍         | 51/1319 [00:18<08:27,  2.50it/s]REQDONE t=1794801258.585 idx=606 tokens=245 err=False
+Evaluating:   4%|▍         | 53/1319 [00:18<06:51,  3.08it/s]REQDONE t=1794801258.778 idx=1038 tokens=237 err=False
+Evaluating:   4%|▍         | 54/1319 [00:19<06:09,  3.42it/s]REQDONE t=1794801259.064 idx=1043 tokens=89 err=False
+Evaluating:   4%|▍         | 55/1319 [00:19<06:07,  3.44it/s]REQDONE t=1794801259.578 idx=610 tokens=138 err=False
+Evaluating:   4%|▍         | 56/1319 [00:19<07:24,  2.84it/s]REQDONE t=1794801260.212 idx=109 tokens=102 err=False
+Evaluating:   4%|▍         | 57/1319 [00:20<09:03,  2.32it/s]REQDONE t=1794801260.610 idx=612 tokens=126 err=False
+Evaluating:   4%|▍         | 58/1319 [00:20<08:51,  2.37it/s]REQDONE t=1794801260.638 idx=613 tokens=109 err=False
+REQDONE t=1794801261.371 idx=1044 tokens=153 err=False
+Evaluating:   5%|▍         | 60/1319 [00:21<08:27,  2.48it/s]REQDONE t=1794801261.712 idx=110 tokens=110 err=False
+Evaluating:   5%|▍         | 61/1319 [00:22<08:07,  2.58it/s]REQDONE t=1794801261.739 idx=615 tokens=88 err=False
+REQDONE t=1794801262.193 idx=614 tokens=125 err=False
+Evaluating:   5%|▍         | 63/1319 [00:22<06:51,  3.05it/s]REQDONE t=1794801262.221 idx=108 tokens=181 err=False
+REQDONE t=1794801262.681 idx=107 tokens=222 err=False
+Evaluating:   5%|▍         | 65/1319 [00:23<06:12,  3.37it/s]REQDONE t=1794801262.687 idx=106 tokens=256 err=False
+REQDONE t=1794801262.688 idx=1046 tokens=122 err=False
+REQDONE t=1794801263.213 idx=112 tokens=80 err=False
+Evaluating:   5%|▌         | 68/1319 [00:23<05:05,  4.10it/s]REQDONE t=1794801263.611 idx=1042 tokens=256 err=False
+Evaluating:   5%|▌         | 69/1319 [00:23<05:38,  3.69it/s]REQDONE t=1794801263.953 idx=616 tokens=87 err=False
+Evaluating:   5%|▌         | 70/1319 [00:24<05:55,  3.51it/s]REQDONE t=1794801264.220 idx=611 tokens=256 err=False
+Evaluating:   5%|▌         | 71/1319 [00:24<05:50,  3.56it/s]REQDONE t=1794801264.649 idx=113 tokens=77 err=False
+Evaluating:   5%|▌         | 72/1319 [00:24<06:34,  3.16it/s]REQDONE t=1794801264.676 idx=617 tokens=73 err=False
+REQDONE t=1794801265.382 idx=1050 tokens=74 err=False
+Evaluating:   6%|▌         | 74/1319 [00:25<06:59,  2.97it/s]REQDONE t=1794801265.571 idx=1045 tokens=234 err=False
+Evaluating:   6%|▌         | 75/1319 [00:25<06:17,  3.30it/s]REQDONE t=1794801265.646 idx=111 tokens=204 err=False
+REQDONE t=1794801266.155 idx=114 tokens=111 err=False
+Evaluating:   6%|▌         | 77/1319 [00:26<06:11,  3.34it/s]REQDONE t=1794801266.182 idx=1051 tokens=90 err=False
+REQDONE t=1794801266.709 idx=619 tokens=112 err=False
+Evaluating:   6%|▌         | 79/1319 [00:27<06:01,  3.43it/s]REQDONE t=1794801266.738 idx=1049 tokens=140 err=False
+REQDONE t=1794801267.367 idx=117 tokens=81 err=False
+Evaluating:   6%|▌         | 81/1319 [00:27<06:16,  3.29it/s]REQDONE t=1794801267.764 idx=618 tokens=154 err=False
+Evaluating:   6%|▌         | 82/1319 [00:28<06:38,  3.11it/s]REQDONE t=1794801267.958 idx=1047 tokens=256 err=False
+Evaluating:   6%|▋         | 83/1319 [00:28<06:03,  3.40it/s]REQDONE t=1794801267.959 idx=620 tokens=120 err=False
+REQDONE t=1794801268.135 idx=116 tokens=125 err=False
+Evaluating:   6%|▋         | 85/1319 [00:28<04:25,  4.64it/s]REQDONE t=1794801268.581 idx=1048 tokens=224 err=False
+Evaluating:   7%|▋         | 86/1319 [00:28<05:26,  3.78it/s]REQDONE t=1794801268.974 idx=621 tokens=125 err=False
+REQDONE t=1794801268.995 idx=623 tokens=59 err=False
+Evaluating:   7%|▋         | 87/1319 [00:29<06:09,  3.33it/s]REQDONE t=1794801269.499 idx=1053 tokens=117 err=False
+Evaluating:   7%|▋         | 89/1319 [00:29<05:45,  3.56it/s]REQDONE t=1794801269.891 idx=118 tokens=127 err=False
+Evaluating:   7%|▋         | 90/1319 [00:30<06:15,  3.27it/s]REQDONE t=1794801270.084 idx=115 tokens=211 err=False
+Evaluating:   7%|▋         | 91/1319 [00:30<05:41,  3.59it/s]REQDONE t=1794801270.157 idx=120 tokens=74 err=False
+REQDONE t=1794801270.583 idx=1054 tokens=114 err=False
+Evaluating:   7%|▋         | 93/1319 [00:30<05:26,  3.75it/s]REQDONE t=1794801271.086 idx=624 tokens=89 err=False
+Evaluating:   7%|▋         | 94/1319 [00:31<06:31,  3.13it/s]REQDONE t=1794801271.115 idx=1052 tokens=208 err=False
+REQDONE t=1794801271.279 idx=625 tokens=85 err=False
+Evaluating:   7%|▋         | 96/1319 [00:31<04:44,  4.31it/s]REQDONE t=1794801271.559 idx=1057 tokens=75 err=False
+Evaluating:   7%|▋         | 97/1319 [00:31<04:56,  4.12it/s]REQDONE t=1794801272.091 idx=1055 tokens=143 err=False
+Evaluating:   7%|▋         | 98/1319 [00:32<06:20,  3.21it/s]REQDONE t=1794801272.463 idx=121 tokens=122 err=False
+Evaluating:   8%|▊         | 99/1319 [00:32<06:39,  3.06it/s]REQDONE t=1794801273.051 idx=622 tokens=212 err=False
+Evaluating:   8%|▊         | 100/1319 [00:33<08:03,  2.52it/s]REQDONE t=1794801273.561 idx=124 tokens=95 err=False
+Evaluating:   8%|▊         | 101/1319 [00:33<08:41,  2.34it/s]REQDONE t=1794801273.982 idx=1058 tokens=134 err=False
+Evaluating:   8%|▊         | 102/1319 [00:34<08:38,  2.35it/s]REQDONE t=1794801274.179 idx=122 tokens=149 err=False
+Evaluating:   8%|▊         | 103/1319 [00:34<07:17,  2.78it/s]REQDONE t=1794801274.399 idx=1056 tokens=185 err=False
+Evaluating:   8%|▊         | 104/1319 [00:34<06:27,  3.13it/s]REQDONE t=1794801274.399 idx=1059 tokens=123 err=False
+REQDONE t=1794801274.399 idx=126 tokens=60 err=False
+REQDONE t=1794801274.901 idx=626 tokens=164 err=False
+REQDONE t=1794801274.902 idx=123 tokens=137 err=False
+Evaluating:   8%|▊         | 107/1319 [00:35<04:44,  4.25it/s]REQDONE t=1794801275.312 idx=125 tokens=108 err=False
+Evaluating:   8%|▊         | 109/1319 [00:35<04:31,  4.45it/s]REQDONE t=1794801275.654 idx=628 tokens=116 err=False
+Evaluating:   8%|▊         | 110/1319 [00:35<04:59,  4.03it/s]REQDONE t=1794801275.680 idx=1060 tokens=122 err=False
+REQDONE t=1794801275.843 idx=119 tokens=256 err=False
+Evaluating:   8%|▊         | 112/1319 [00:36<03:52,  5.19it/s]REQDONE t=1794801276.542 idx=627 tokens=179 err=False
+Evaluating:   9%|▊         | 113/1319 [00:36<05:57,  3.37it/s]REQDONE t=1794801276.765 idx=127 tokens=62 err=False
+Evaluating:   9%|▊         | 114/1319 [00:37<05:37,  3.57it/s]REQDONE t=1794801277.248 idx=630 tokens=120 err=False
+REQDONE t=1794801277.249 idx=634 tokens=53 err=False
+Evaluating:   9%|▊         | 115/1319 [00:37<06:36,  3.03it/s]REQDONE t=1794801277.635 idx=632 tokens=88 err=False
+Evaluating:   9%|▉         | 117/1319 [00:37<05:28,  3.66it/s]REQDONE t=1794801277.640 idx=633 tokens=70 err=False
+REQDONE t=1794801278.039 idx=1063 tokens=95 err=False
+Evaluating:   9%|▉         | 119/1319 [00:38<04:56,  4.05it/s]REQDONE t=1794801278.067 idx=629 tokens=193 err=False
+REQDONE t=1794801278.718 idx=1064 tokens=109 err=False
+Evaluating:   9%|▉         | 121/1319 [00:39<05:34,  3.58it/s]REQDONE t=1794801278.944 idx=130 tokens=97 err=False
+Evaluating:   9%|▉         | 122/1319 [00:39<05:21,  3.72it/s]REQDONE t=1794801279.241 idx=631 tokens=141 err=False
+Evaluating:   9%|▉         | 123/1319 [00:39<05:28,  3.64it/s]REQDONE t=1794801279.433 idx=131 tokens=76 err=False
+Evaluating:   9%|▉         | 124/1319 [00:39<05:04,  3.92it/s]REQDONE t=1794801279.800 idx=1061 tokens=220 err=False
+Evaluating:   9%|▉         | 125/1319 [00:40<05:38,  3.53it/s]REQDONE t=1794801279.800 idx=1062 tokens=165 err=False
+REQDONE t=1794801280.281 idx=1065 tokens=133 err=False
+Evaluating:  10%|▉         | 127/1319 [00:40<05:16,  3.77it/s]REQDONE t=1794801280.866 idx=637 tokens=60 err=False
+Evaluating:  10%|▉         | 128/1319 [00:41<06:44,  2.95it/s]REQDONE t=1794801281.262 idx=133 tokens=87 err=False
+Evaluating:  10%|▉         | 129/1319 [00:41<07:00,  2.83it/s]REQDONE t=1794801281.676 idx=134 tokens=62 err=False
+Evaluating:  10%|▉         | 130/1319 [00:42<07:19,  2.71it/s]REQDONE t=1794801282.035 idx=135 tokens=59 err=False
+Evaluating:  10%|▉         | 131/1319 [00:42<07:15,  2.73it/s]REQDONE t=1794801282.436 idx=636 tokens=129 err=False
+Evaluating:  10%|█         | 132/1319 [00:42<07:26,  2.66it/s]REQDONE t=1794801282.462 idx=1068 tokens=120 err=False
+REQDONE t=1794801282.630 idx=1066 tokens=176 err=False
+Evaluating:  10%|█         | 134/1319 [00:42<04:58,  3.97it/s]REQDONE t=1794801283.081 idx=132 tokens=141 err=False
+Evaluating:  10%|█         | 135/1319 [00:43<05:55,  3.33it/s]REQDONE t=1794801283.082 idx=639 tokens=67 err=False
+REQDONE t=1794801283.572 idx=128 tokens=253 err=False
+Evaluating:  10%|█         | 137/1319 [00:43<05:28,  3.60it/s]REQDONE t=1794801284.019 idx=136 tokens=65 err=False
+Evaluating:  10%|█         | 138/1319 [00:44<06:13,  3.16it/s]REQDONE t=1794801284.205 idx=1069 tokens=135 err=False
+Evaluating:  11%|█         | 139/1319 [00:44<05:35,  3.52it/s]REQDONE t=1794801284.527 idx=129 tokens=256 err=False
+Evaluating:  11%|█         | 140/1319 [00:44<05:46,  3.40it/s]REQDONE t=1794801284.724 idx=1067 tokens=196 err=False
+Evaluating:  11%|█         | 141/1319 [00:45<05:15,  3.73it/s]REQDONE t=1794801285.468 idx=1070 tokens=149 err=False
+Evaluating:  11%|█         | 142/1319 [00:45<07:50,  2.50it/s]REQDONE t=1794801286.270 idx=139 tokens=78 err=False
+Evaluating:  11%|█         | 143/1319 [00:46<10:05,  1.94it/s]REQDONE t=1794801286.462 idx=1074 tokens=97 err=False
+Evaluating:  11%|█         | 144/1319 [00:46<08:15,  2.37it/s]REQDONE t=1794801286.463 idx=643 tokens=76 err=False
+REQDONE t=1794801286.603 idx=1072 tokens=137 err=False
+Evaluating:  11%|█         | 146/1319 [00:46<05:08,  3.81it/s]REQDONE t=1794801286.923 idx=140 tokens=70 err=False
+Evaluating:  11%|█         | 147/1319 [00:47<05:24,  3.61it/s]REQDONE t=1794801287.003 idx=635 tokens=256 err=False
+REQDONE t=1794801287.514 idx=638 tokens=229 err=False
+Evaluating:  11%|█▏        | 149/1319 [00:47<05:32,  3.51it/s]REQDONE t=1794801288.117 idx=1071 tokens=203 err=False
+Evaluating:  11%|█▏        | 150/1319 [00:48<06:56,  2.80it/s]REQDONE t=1794801288.146 idx=1073 tokens=162 err=False
+REQDONE t=1794801288.146 idx=644 tokens=84 err=False
+REQDONE t=1794801288.321 idx=138 tokens=159 err=False
+Evaluating:  12%|█▏        | 153/1319 [00:48<04:09,  4.67it/s]REQDONE t=1794801289.217 idx=645 tokens=81 err=False
+Evaluating:  12%|█▏        | 154/1319 [00:49<06:40,  2.91it/s]REQDONE t=1794801289.245 idx=641 tokens=208 err=False
+REQDONE t=1794801289.597 idx=142 tokens=79 err=False
+Evaluating:  12%|█▏        | 156/1319 [00:49<05:36,  3.45it/s]REQDONE t=1794801289.952 idx=646 tokens=91 err=False
+Evaluating:  12%|█▏        | 157/1319 [00:50<05:51,  3.30it/s]REQDONE t=1794801289.981 idx=1075 tokens=170 err=False
+REQDONE t=1794801290.293 idx=642 tokens=221 err=False
+Evaluating:  12%|█▏        | 159/1319 [00:50<04:55,  3.93it/s]REQDONE t=1794801290.793 idx=640 tokens=256 err=False
+Evaluating:  12%|█▏        | 160/1319 [00:51<05:53,  3.28it/s]REQDONE t=1794801290.820 idx=137 tokens=256 err=False
+REQDONE t=1794801291.158 idx=1078 tokens=111 err=False
+Evaluating:  12%|█▏        | 162/1319 [00:51<05:00,  3.85it/s]REQDONE t=1794801292.049 idx=1076 tokens=180 err=False
+Evaluating:  12%|█▏        | 163/1319 [00:52<07:33,  2.55it/s]REQDONE t=1794801292.399 idx=647 tokens=140 err=False
+Evaluating:  12%|█▏        | 164/1319 [00:52<07:21,  2.62it/s]REQDONE t=1794801292.733 idx=1081 tokens=86 err=False
+Evaluating:  13%|█▎        | 165/1319 [00:53<07:07,  2.70it/s]REQDONE t=1794801293.103 idx=145 tokens=115 err=False
+Evaluating:  13%|█▎        | 166/1319 [00:53<07:06,  2.70it/s]REQDONE t=1794801293.371 idx=648 tokens=124 err=False
+Evaluating:  13%|█▎        | 167/1319 [00:53<06:34,  2.92it/s]REQDONE t=1794801293.703 idx=1079 tokens=177 err=False
+Evaluating:  13%|█▎        | 168/1319 [00:54<06:30,  2.95it/s]REQDONE t=1794801293.928 idx=649 tokens=129 err=False
+Evaluating:  13%|█▎        | 169/1319 [00:54<05:52,  3.26it/s]REQDONE t=1794801294.326 idx=144 tokens=193 err=False
+Evaluating:  13%|█▎        | 170/1319 [00:54<06:22,  3.00it/s]REQDONE t=1794801294.744 idx=1077 tokens=256 err=False
+Evaluating:  13%|█▎        | 171/1319 [00:55<06:50,  2.79it/s]REQDONE t=1794801294.930 idx=141 tokens=256 err=False
+Evaluating:  13%|█▎        | 172/1319 [00:55<05:52,  3.26it/s]REQDONE t=1794801295.214 idx=143 tokens=217 err=False
+Evaluating:  13%|█▎        | 173/1319 [00:55<05:44,  3.33it/s]REQDONE t=1794801295.215 idx=1080 tokens=178 err=False
+REQDONE t=1794801295.215 idx=148 tokens=67 err=False
+REQDONE t=1794801295.486 idx=146 tokens=163 err=False
+Evaluating:  13%|█▎        | 176/1319 [00:55<03:29,  5.46it/s]REQDONE t=1794801296.165 idx=1082 tokens=151 err=False
+Evaluating:  13%|█▎        | 177/1319 [00:56<05:28,  3.48it/s]REQDONE t=1794801296.558 idx=149 tokens=76 err=False
+Evaluating:  13%|█▎        | 178/1319 [00:56<05:55,  3.21it/s]REQDONE t=1794801296.928 idx=1085 tokens=68 err=False
+Evaluating:  14%|█▎        | 179/1319 [00:57<06:11,  3.07it/s]REQDONE t=1794801297.446 idx=653 tokens=99 err=False
+REQDONE t=1794801297.446 idx=655 tokens=61 err=False
+Evaluating:  14%|█▎        | 180/1319 [00:57<07:08,  2.66it/s]REQDONE t=1794801297.868 idx=147 tokens=210 err=False
+Evaluating:  14%|█▍        | 182/1319 [00:58<05:47,  3.27it/s]REQDONE t=1794801297.898 idx=1083 tokens=160 err=False
+REQDONE t=1794801298.551 idx=1087 tokens=96 err=False
+Evaluating:  14%|█▍        | 184/1319 [00:58<06:02,  3.13it/s]REQDONE t=1794801298.774 idx=152 tokens=80 err=False
+Evaluating:  14%|█▍        | 185/1319 [00:59<05:38,  3.35it/s]REQDONE t=1794801298.781 idx=651 tokens=199 err=False
+REQDONE t=1794801298.974 idx=652 tokens=167 err=False
+Evaluating:  14%|█▍        | 187/1319 [00:59<04:12,  4.48it/s]REQDONE t=1794801299.247 idx=650 tokens=254 err=False
+Evaluating:  14%|█▍        | 188/1319 [00:59<04:24,  4.27it/s]REQDONE t=1794801299.683 idx=654 tokens=122 err=False
+Evaluating:  14%|█▍        | 189/1319 [01:00<05:17,  3.56it/s]REQDONE t=1794801300.099 idx=1084 tokens=186 err=False
+Evaluating:  14%|█▍        | 190/1319 [01:00<05:55,  3.18it/s]REQDONE t=1794801300.444 idx=656 tokens=101 err=False
+Evaluating:  14%|█▍        | 191/1319 [01:00<06:04,  3.10it/s]REQDONE t=1794801301.422 idx=1091 tokens=79 err=False
+Evaluating:  15%|█▍        | 192/1319 [01:01<09:25,  1.99it/s]REQDONE t=1794801301.852 idx=1089 tokens=130 err=False
+Evaluating:  15%|█▍        | 193/1319 [01:02<09:02,  2.08it/s]REQDONE t=1794801302.277 idx=1090 tokens=115 err=False
+Evaluating:  15%|█▍        | 194/1319 [01:02<08:43,  2.15it/s]REQDONE t=1794801302.278 idx=156 tokens=96 err=False
+REQDONE t=1794801302.747 idx=658 tokens=133 err=False
+Evaluating:  15%|█▍        | 196/1319 [01:03<06:46,  2.76it/s]REQDONE t=1794801302.938 idx=150 tokens=256 err=False
+Evaluating:  15%|█▍        | 197/1319 [01:03<05:59,  3.12it/s]REQDONE t=1794801303.314 idx=1086 tokens=256 err=False
+Evaluating:  15%|█▌        | 198/1319 [01:03<06:15,  2.99it/s]REQDONE t=1794801303.343 idx=151 tokens=255 err=False
+REQDONE t=1794801303.849 idx=657 tokens=199 err=False
+Evaluating:  15%|█▌        | 200/1319 [01:04<05:42,  3.27it/s]REQDONE t=1794801304.387 idx=1092 tokens=131 err=False
+Evaluating:  15%|█▌        | 201/1319 [01:04<06:42,  2.78it/s]REQDONE t=1794801304.722 idx=154 tokens=217 err=False
+Evaluating:  15%|█▌        | 202/1319 [01:05<06:35,  2.83it/s]REQDONE t=1794801305.115 idx=1088 tokens=256 err=False
+Evaluating:  15%|█▌        | 203/1319 [01:05<06:46,  2.75it/s]REQDONE t=1794801305.303 idx=158 tokens=82 err=False
+Evaluating:  15%|█▌        | 204/1319 [01:05<05:52,  3.16it/s]REQDONE t=1794801305.944 idx=153 tokens=256 err=False
+Evaluating:  16%|█▌        | 205/1319 [01:06<07:33,  2.46it/s]REQDONE t=1794801305.972 idx=659 tokens=223 err=False
+REQDONE t=1794801306.278 idx=663 tokens=77 err=False
+Evaluating:  16%|█▌        | 207/1319 [01:06<05:34,  3.33it/s]REQDONE t=1794801306.598 idx=661 tokens=126 err=False
+Evaluating:  16%|█▌        | 208/1319 [01:06<05:38,  3.28it/s]REQDONE t=1794801306.930 idx=662 tokens=104 err=False
+Evaluating:  16%|█▌        | 209/1319 [01:07<05:46,  3.21it/s]REQDONE t=1794801307.265 idx=159 tokens=99 err=False
+Evaluating:  16%|█▌        | 210/1319 [01:07<05:52,  3.14it/s]REQDONE t=1794801307.296 idx=160 tokens=69 err=False
+REQDONE t=1794801307.460 idx=155 tokens=256 err=False
+Evaluating:  16%|█▌        | 212/1319 [01:07<04:06,  4.50it/s]REQDONE t=1794801308.279 idx=660 tokens=253 err=False
+Evaluating:  16%|█▌        | 213/1319 [01:08<06:42,  2.75it/s]REQDONE t=1794801308.472 idx=1095 tokens=130 err=False
+Evaluating:  16%|█▌        | 214/1319 [01:08<05:54,  3.12it/s]REQDONE t=1794801308.765 idx=1093 tokens=180 err=False
+Evaluating:  16%|█▋        | 215/1319 [01:09<05:45,  3.19it/s]REQDONE t=1794801309.109 idx=664 tokens=118 err=False
+Evaluating:  16%|█▋        | 216/1319 [01:09<05:54,  3.11it/s]REQDONE t=1794801309.475 idx=665 tokens=109 err=False
+Evaluating:  16%|█▋        | 217/1319 [01:09<06:08,  2.99it/s]REQDONE t=1794801309.905 idx=667 tokens=92 err=False
+Evaluating:  17%|█▋        | 218/1319 [01:10<06:38,  2.77it/s]REQDONE t=1794801310.246 idx=668 tokens=80 err=False
+Evaluating:  17%|█▋        | 219/1319 [01:10<06:31,  2.81it/s]REQDONE t=1794801310.638 idx=157 tokens=256 err=False
+Evaluating:  17%|█▋        | 220/1319 [01:10<06:42,  2.73it/s]REQDONE t=1794801310.664 idx=669 tokens=94 err=False
+REQDONE t=1794801311.114 idx=165 tokens=100 err=False
+Evaluating:  17%|█▋        | 222/1319 [01:11<05:37,  3.25it/s]REQDONE t=1794801311.115 idx=166 tokens=65 err=False
+REQDONE t=1794801311.309 idx=1094 tokens=224 err=False
+Evaluating:  17%|█▋        | 224/1319 [01:11<04:06,  4.45it/s]REQDONE t=1794801311.310 idx=164 tokens=113 err=False
+REQDONE t=1794801311.901 idx=666 tokens=148 err=False
+Evaluating:  17%|█▋        | 226/1319 [01:12<04:33,  3.99it/s]REQDONE t=1794801311.928 idx=670 tokens=75 err=False
+REQDONE t=1794801312.374 idx=162 tokens=154 err=False
+Evaluating:  17%|█▋        | 228/1319 [01:12<04:28,  4.07it/s]REQDONE t=1794801312.566 idx=168 tokens=62 err=False
+Evaluating:  17%|█▋        | 229/1319 [01:12<04:16,  4.25it/s]REQDONE t=1794801312.929 idx=163 tokens=163 err=False
+Evaluating:  17%|█▋        | 230/1319 [01:13<04:46,  3.80it/s]REQDONE t=1794801313.195 idx=161 tokens=200 err=False
+Evaluating:  18%|█▊        | 231/1319 [01:13<04:46,  3.79it/s]REQDONE t=1794801313.841 idx=671 tokens=126 err=False
+Evaluating:  18%|█▊        | 232/1319 [01:14<06:31,  2.77it/s]REQDONE t=1794801314.350 idx=170 tokens=102 err=False
+Evaluating:  18%|█▊        | 233/1319 [01:14<07:14,  2.50it/s]REQDONE t=1794801314.719 idx=677 tokens=79 err=False
+Evaluating:  18%|█▊        | 234/1319 [01:15<07:04,  2.55it/s]REQDONE t=1794801314.915 idx=672 tokens=131 err=False
+Evaluating:  18%|█▊        | 235/1319 [01:15<06:04,  2.97it/s]REQDONE t=1794801314.915 idx=169 tokens=127 err=False
+REQDONE t=1794801315.391 idx=673 tokens=125 err=False
+Evaluating:  18%|█▊        | 237/1319 [01:15<05:16,  3.42it/s]REQDONE t=1794801315.584 idx=678 tokens=84 err=False
+Evaluating:  18%|█▊        | 238/1319 [01:15<04:50,  3.73it/s]REQDONE t=1794801315.796 idx=167 tokens=186 err=False
+Evaluating:  18%|█▊        | 239/1319 [01:16<04:34,  3.94it/s]REQDONE t=1794801316.225 idx=172 tokens=141 err=False
+Evaluating:  18%|█▊        | 240/1319 [01:16<05:24,  3.32it/s]REQDONE t=1794801316.487 idx=674 tokens=148 err=False
+Evaluating:  18%|█▊        | 241/1319 [01:16<05:12,  3.45it/s]REQDONE t=1794801316.938 idx=174 tokens=145 err=False
+Evaluating:  18%|█▊        | 242/1319 [01:17<06:01,  2.98it/s]REQDONE t=1794801316.966 idx=171 tokens=180 err=False
+REQDONE t=1794801317.420 idx=176 tokens=82 err=False
+Evaluating:  18%|█▊        | 244/1319 [01:17<05:15,  3.41it/s]REQDONE t=1794801317.451 idx=676 tokens=172 err=False
+REQDONE t=1794801317.451 idx=679 tokens=103 err=False
+REQDONE t=1794801317.943 idx=173 tokens=172 err=False
+Evaluating:  19%|█▊        | 247/1319 [01:18<04:12,  4.25it/s]REQDONE t=1794801318.280 idx=680 tokens=90 err=False
+Evaluating:  19%|█▉        | 248/1319 [01:18<04:32,  3.93it/s]REQDONE t=1794801318.476 idx=179 tokens=73 err=False
+Evaluating:  19%|█▉        | 249/1319 [01:18<04:18,  4.13it/s]REQDONE t=1794801318.773 idx=178 tokens=96 err=False
+Evaluating:  19%|█▉        | 250/1319 [01:19<04:32,  3.92it/s]REQDONE t=1794801318.971 idx=675 tokens=209 err=False
+Evaluating:  19%|█▉        | 251/1319 [01:19<04:16,  4.16it/s]REQDONE t=1794801319.592 idx=684 tokens=64 err=False
+Evaluating:  19%|█▉        | 252/1319 [01:19<06:03,  2.93it/s]REQDONE t=1794801320.126 idx=180 tokens=107 err=False
+Evaluating:  19%|█▉        | 253/1319 [01:20<06:59,  2.54it/s]REQDONE t=1794801320.492 idx=681 tokens=169 err=False
+Evaluating:  19%|█▉        | 254/1319 [01:20<06:50,  2.59it/s]REQDONE t=1794801320.823 idx=686 tokens=93 err=False
+Evaluating:  19%|█▉        | 255/1319 [01:21<06:33,  2.70it/s]REQDONE t=1794801320.824 idx=185 tokens=56 err=False
+REQDONE t=1794801320.855 idx=175 tokens=246 err=False
+REQDONE t=1794801321.206 idx=683 tokens=138 err=False
+REQDONE t=1794801321.207 idx=685 tokens=101 err=False
+Evaluating:  20%|█▉        | 258/1319 [01:21<04:11,  4.23it/s]REQDONE t=1794801321.902 idx=682 tokens=187 err=False
+Evaluating:  20%|█▉        | 260/1319 [01:22<04:51,  3.64it/s]REQDONE t=1794801322.576 idx=181 tokens=159 err=False
+Evaluating:  20%|█▉        | 261/1319 [01:22<06:14,  2.83it/s]REQDONE t=1794801322.604 idx=182 tokens=159 err=False
+REQDONE t=1794801323.053 idx=688 tokens=128 err=False
+Evaluating:  20%|█▉        | 263/1319 [01:23<05:29,  3.20it/s]REQDONE t=1794801323.392 idx=177 tokens=256 err=False
+Evaluating:  20%|██        | 264/1319 [01:23<05:35,  3.15it/s]REQDONE t=1794801323.925 idx=187 tokens=97 err=False
+Evaluating:  20%|██        | 265/1319 [01:24<06:26,  2.73it/s]REQDONE t=1794801324.544 idx=183 tokens=213 err=False
+Evaluating:  20%|██        | 266/1319 [01:24<07:30,  2.34it/s]REQDONE t=1794801324.944 idx=184 tokens=218 err=False
+Evaluating:  20%|██        | 267/1319 [01:25<07:22,  2.38it/s]REQDONE t=1794801324.945 idx=690 tokens=144 err=False
+REQDONE t=1794801325.135 idx=188 tokens=132 err=False
+Evaluating:  20%|██        | 269/1319 [01:25<04:56,  3.54it/s]REQDONE t=1794801325.335 idx=190 tokens=78 err=False
+Evaluating:  20%|██        | 270/1319 [01:25<04:36,  3.80it/s]REQDONE t=1794801325.655 idx=191 tokens=74 err=False
+Evaluating:  21%|██        | 271/1319 [01:25<04:50,  3.60it/s]REQDONE t=1794801326.022 idx=695 tokens=78 err=False
+Evaluating:  21%|██        | 272/1319 [01:26<05:15,  3.32it/s]REQDONE t=1794801326.209 idx=189 tokens=154 err=False
+Evaluating:  21%|██        | 273/1319 [01:26<04:42,  3.70it/s]REQDONE t=1794801326.451 idx=687 tokens=256 err=False
+Evaluating:  21%|██        | 274/1319 [01:26<04:33,  3.82it/s]REQDONE t=1794801326.478 idx=692 tokens=168 err=False
+REQDONE t=1794801326.921 idx=691 tokens=169 err=False
+Evaluating:  21%|██        | 276/1319 [01:27<04:20,  4.00it/s]REQDONE t=1794801327.590 idx=194 tokens=72 err=False
+Evaluating:  21%|██        | 277/1319 [01:27<06:05,  2.85it/s]REQDONE t=1794801327.618 idx=689 tokens=256 err=False
+REQDONE t=1794801327.780 idx=697 tokens=81 err=False
+Evaluating:  21%|██        | 279/1319 [01:28<04:16,  4.06it/s]REQDONE t=1794801328.062 idx=195 tokens=72 err=False
+Evaluating:  21%|██        | 280/1319 [01:28<04:24,  3.93it/s]REQDONE t=1794801328.356 idx=694 tokens=160 err=False
+Evaluating:  21%|██▏       | 281/1319 [01:28<04:34,  3.79it/s]REQDONE t=1794801328.357 idx=699 tokens=65 err=False
+REQDONE t=1794801328.694 idx=196 tokens=68 err=False
+Evaluating:  21%|██▏       | 283/1319 [01:29<03:53,  4.44it/s]REQDONE t=1794801329.144 idx=186 tokens=256 err=False
+Evaluating:  22%|██▏       | 284/1319 [01:29<04:45,  3.62it/s]REQDONE t=1794801329.172 idx=693 tokens=226 err=False
+REQDONE t=1794801329.815 idx=192 tokens=174 err=False
+Evaluating:  22%|██▏       | 286/1319 [01:30<05:09,  3.34it/s]REQDONE t=1794801330.219 idx=696 tokens=169 err=False
+Evaluating:  22%|██▏       | 287/1319 [01:30<05:32,  3.10it/s]REQDONE t=1794801330.557 idx=200 tokens=69 err=False
+Evaluating:  22%|██▏       | 288/1319 [01:30<05:36,  3.07it/s]REQDONE t=1794801330.750 idx=698 tokens=163 err=False
+Evaluating:  22%|██▏       | 289/1319 [01:31<05:01,  3.42it/s]REQDONE t=1794801331.192 idx=700 tokens=139 err=False
+Evaluating:  22%|██▏       | 290/1319 [01:31<05:41,  3.01it/s]REQDONE t=1794801331.534 idx=705 tokens=65 err=False
+Evaluating:  22%|██▏       | 291/1319 [01:31<05:44,  2.99it/s]REQDONE t=1794801331.877 idx=193 tokens=188 err=False
+Evaluating:  22%|██▏       | 292/1319 [01:32<05:46,  2.97it/s]REQDONE t=1794801332.068 idx=202 tokens=73 err=False
+Evaluating:  22%|██▏       | 293/1319 [01:32<05:02,  3.39it/s]REQDONE t=1794801332.215 idx=704 tokens=98 err=False
+Evaluating:  22%|██▏       | 294/1319 [01:32<04:18,  3.97it/s]REQDONE t=1794801332.709 idx=197 tokens=167 err=False
+Evaluating:  22%|██▏       | 295/1319 [01:33<05:30,  3.10it/s]REQDONE t=1794801333.165 idx=702 tokens=135 err=False
+Evaluating:  22%|██▏       | 296/1319 [01:33<06:10,  2.76it/s]REQDONE t=1794801333.386 idx=706 tokens=79 err=False
+Evaluating:  23%|██▎       | 297/1319 [01:33<05:27,  3.12it/s]REQDONE t=1794801333.418 idx=703 tokens=142 err=False
+REQDONE t=1794801333.989 idx=708 tokens=70 err=False
+Evaluating:  23%|██▎       | 299/1319 [01:34<05:18,  3.21it/s]REQDONE t=1794801334.539 idx=198 tokens=196 err=False
+Evaluating:  23%|██▎       | 300/1319 [01:34<06:17,  2.70it/s]REQDONE t=1794801334.567 idx=707 tokens=108 err=False
+REQDONE t=1794801334.729 idx=701 tokens=233 err=False
+Evaluating:  23%|██▎       | 302/1319 [01:35<04:20,  3.90it/s]REQDONE t=1794801335.283 idx=199 tokens=213 err=False
+Evaluating:  23%|██▎       | 303/1319 [01:35<05:29,  3.08it/s]REQDONE t=1794801335.614 idx=204 tokens=135 err=False
+Evaluating:  23%|██▎       | 304/1319 [01:35<05:30,  3.07it/s]REQDONE t=1794801335.946 idx=201 tokens=212 err=False
+Evaluating:  23%|██▎       | 305/1319 [01:36<05:32,  3.05it/s]REQDONE t=1794801336.424 idx=203 tokens=171 err=False
+Evaluating:  23%|██▎       | 306/1319 [01:36<06:13,  2.71it/s]REQDONE t=1794801336.902 idx=711 tokens=118 err=False
+Evaluating:  23%|██▎       | 307/1319 [01:37<06:43,  2.51it/s]REQDONE t=1794801337.237 idx=207 tokens=146 err=False
+Evaluating:  23%|██▎       | 308/1319 [01:37<06:24,  2.63it/s]REQDONE t=1794801337.811 idx=208 tokens=141 err=False
+Evaluating:  23%|██▎       | 309/1319 [01:38<07:20,  2.29it/s]REQDONE t=1794801338.154 idx=712 tokens=154 err=False
+Evaluating:  24%|██▎       | 310/1319 [01:38<06:53,  2.44it/s]REQDONE t=1794801338.378 idx=714 tokens=106 err=False
+Evaluating:  24%|██▎       | 311/1319 [01:38<05:57,  2.82it/s]REQDONE t=1794801338.714 idx=206 tokens=207 err=False
+Evaluating:  24%|██▎       | 312/1319 [01:39<05:51,  2.86it/s]REQDONE t=1794801338.936 idx=212 tokens=86 err=False
+Evaluating:  24%|██▎       | 313/1319 [01:39<05:13,  3.21it/s]REQDONE t=1794801339.274 idx=709 tokens=226 err=False
+Evaluating:  24%|██▍       | 314/1319 [01:39<05:20,  3.13it/s]REQDONE t=1794801339.278 idx=209 tokens=166 err=False
+REQDONE t=1794801339.469 idx=713 tokens=138 err=False
+Evaluating:  24%|██▍       | 316/1319 [01:39<03:37,  4.60it/s]REQDONE t=1794801340.102 idx=205 tokens=256 err=False
+Evaluating:  24%|██▍       | 317/1319 [01:40<05:20,  3.12it/s]REQDONE t=1794801340.295 idx=710 tokens=253 err=False
+Evaluating:  24%|██▍       | 318/1319 [01:40<04:47,  3.49it/s]REQDONE t=1794801340.576 idx=210 tokens=171 err=False
+REQDONE t=1794801340.576 idx=715 tokens=147 err=False
+Evaluating:  24%|██▍       | 319/1319 [01:40<04:45,  3.50it/s]REQDONE t=1794801341.015 idx=717 tokens=109 err=False
+Evaluating:  24%|██▍       | 321/1319 [01:41<04:16,  3.90it/s]REQDONE t=1794801341.239 idx=720 tokens=54 err=False
+Evaluating:  24%|██▍       | 322/1319 [01:41<04:08,  4.02it/s]REQDONE t=1794801341.267 idx=217 tokens=56 err=False
+REQDONE t=1794801341.429 idx=719 tokens=71 err=False
+Evaluating:  25%|██▍       | 324/1319 [01:41<03:05,  5.36it/s]REQDONE t=1794801342.024 idx=213 tokens=148 err=False
+Evaluating:  25%|██▍       | 325/1319 [01:42<04:36,  3.59it/s]REQDONE t=1794801342.218 idx=716 tokens=168 err=False
+Evaluating:  25%|██▍       | 326/1319 [01:42<04:15,  3.88it/s]REQDONE t=1794801342.361 idx=718 tokens=116 err=False
+Evaluating:  25%|██▍       | 327/1319 [01:42<03:46,  4.38it/s]REQDONE t=1794801342.897 idx=211 tokens=216 err=False
+Evaluating:  25%|██▍       | 328/1319 [01:43<05:08,  3.22it/s]REQDONE t=1794801342.925 idx=215 tokens=118 err=False
+REQDONE t=1794801343.703 idx=723 tokens=101 err=False
+REQDONE t=1794801343.704 idx=220 tokens=88 err=False
+Evaluating:  25%|██▌       | 330/1319 [01:44<05:47,  2.85it/s]REQDONE t=1794801344.119 idx=222 tokens=65 err=False
+Evaluating:  25%|██▌       | 332/1319 [01:44<04:52,  3.38it/s]REQDONE t=1794801344.769 idx=219 tokens=138 err=False
+Evaluating:  25%|██▌       | 333/1319 [01:45<06:06,  2.69it/s]REQDONE t=1794801344.796 idx=725 tokens=111 err=False
+REQDONE t=1794801345.246 idx=221 tokens=125 err=False
+Evaluating:  25%|██▌       | 335/1319 [01:45<05:16,  3.11it/s]REQDONE t=1794801345.509 idx=214 tokens=232 err=False
+REQDONE t=1794801345.510 idx=216 tokens=197 err=False
+Evaluating:  25%|██▌       | 336/1319 [01:45<05:03,  3.24it/s]REQDONE t=1794801345.514 idx=225 tokens=49 err=False
+REQDONE t=1794801345.753 idx=224 tokens=92 err=False
+Evaluating:  26%|██▌       | 339/1319 [01:46<03:16,  5.00it/s]REQDONE t=1794801346.292 idx=722 tokens=179 err=False
+Evaluating:  26%|██▌       | 340/1319 [01:46<04:17,  3.80it/s]REQDONE t=1794801346.552 idx=223 tokens=124 err=False
+Evaluating:  26%|██▌       | 341/1319 [01:46<04:16,  3.81it/s]REQDONE t=1794801346.977 idx=724 tokens=167 err=False
+Evaluating:  26%|██▌       | 342/1319 [01:47<04:52,  3.34it/s]REQDONE t=1794801347.297 idx=218 tokens=219 err=False
+Evaluating:  26%|██▌       | 343/1319 [01:47<04:57,  3.28it/s]REQDONE t=1794801347.629 idx=721 tokens=248 err=False
+Evaluating:  26%|██▌       | 344/1319 [01:47<05:04,  3.21it/s]REQDONE t=1794801347.657 idx=730 tokens=65 err=False
+REQDONE t=1794801348.548 idx=733 tokens=71 err=False
+Evaluating:  26%|██▌       | 346/1319 [01:48<06:04,  2.67it/s]REQDONE t=1794801348.576 idx=727 tokens=187 err=False
+REQDONE t=1794801349.029 idx=732 tokens=98 err=False
+Evaluating:  26%|██▋       | 348/1319 [01:49<05:14,  3.09it/s]REQDONE t=1794801349.364 idx=231 tokens=57 err=False
+Evaluating:  26%|██▋       | 349/1319 [01:49<05:16,  3.06it/s]REQDONE t=1794801349.368 idx=726 tokens=223 err=False
+REQDONE t=1794801349.783 idx=232 tokens=59 err=False
+Evaluating:  27%|██▋       | 351/1319 [01:50<04:33,  3.54it/s]REQDONE t=1794801349.972 idx=228 tokens=121 err=False
+Evaluating:  27%|██▋       | 352/1319 [01:50<04:13,  3.81it/s]REQDONE t=1794801350.046 idx=728 tokens=177 err=False
+REQDONE t=1794801351.030 idx=227 tokens=175 err=False
+Evaluating:  27%|██▋       | 354/1319 [01:51<05:50,  2.75it/s]REQDONE t=1794801351.220 idx=734 tokens=135 err=False
+Evaluating:  27%|██▋       | 355/1319 [01:51<05:14,  3.06it/s]REQDONE t=1794801351.592 idx=1098 tokens=56 err=False
+Evaluating:  27%|██▋       | 356/1319 [01:51<05:24,  2.97it/s]REQDONE t=1794801351.620 idx=226 tokens=204 err=False
+REQDONE t=1794801351.925 idx=229 tokens=183 err=False
+Evaluating:  27%|██▋       | 358/1319 [01:52<04:18,  3.72it/s]REQDONE t=1794801352.367 idx=729 tokens=248 err=False
+Evaluating:  27%|██▋       | 359/1319 [01:52<04:55,  3.25it/s]REQDONE t=1794801352.368 idx=738 tokens=77 err=False
+REQDONE t=1794801352.745 idx=731 tokens=211 err=False
+Evaluating:  27%|██▋       | 361/1319 [01:53<04:10,  3.83it/s]REQDONE t=1794801352.777 idx=234 tokens=87 err=False
+REQDONE t=1794801352.936 idx=736 tokens=119 err=False
+Evaluating:  28%|██▊       | 363/1319 [01:53<03:13,  4.95it/s]REQDONE t=1794801353.444 idx=230 tokens=212 err=False
+Evaluating:  28%|██▊       | 364/1319 [01:53<04:12,  3.78it/s]REQDONE t=1794801353.808 idx=735 tokens=177 err=False
+Evaluating:  28%|██▊       | 365/1319 [01:54<04:33,  3.49it/s]REQDONE t=1794801353.808 idx=1097 tokens=124 err=False
+REQDONE t=1794801353.835 idx=235 tokens=62 err=False
+REQDONE t=1794801354.001 idx=233 tokens=135 err=False
+Evaluating:  28%|██▊       | 368/1319 [01:54<02:48,  5.63it/s]REQDONE t=1794801354.764 idx=737 tokens=155 err=False
+Evaluating:  28%|██▊       | 369/1319 [01:55<04:34,  3.47it/s]REQDONE t=1794801355.328 idx=237 tokens=80 err=False
+Evaluating:  28%|██▊       | 370/1319 [01:55<05:29,  2.88it/s]REQDONE t=1794801355.666 idx=739 tokens=118 err=False
+Evaluating:  28%|██▊       | 371/1319 [01:56<05:27,  2.90it/s]REQDONE t=1794801356.005 idx=1101 tokens=87 err=False
+Evaluating:  28%|██▊       | 372/1319 [01:56<05:25,  2.91it/s]REQDONE t=1794801356.037 idx=1096 tokens=212 err=False
+REQDONE t=1794801356.482 idx=741 tokens=94 err=False
+Evaluating:  28%|██▊       | 374/1319 [01:56<04:43,  3.34it/s]REQDONE t=1794801356.488 idx=740 tokens=122 err=False
+REQDONE t=1794801356.984 idx=742 tokens=98 err=False
+Evaluating:  29%|██▊       | 376/1319 [01:57<04:25,  3.55it/s]REQDONE t=1794801357.315 idx=238 tokens=118 err=False
+Evaluating:  29%|██▊       | 377/1319 [01:57<04:35,  3.43it/s]REQDONE t=1794801357.511 idx=1100 tokens=133 err=False
+Evaluating:  29%|██▊       | 378/1319 [01:57<04:13,  3.71it/s]REQDONE t=1794801357.902 idx=1104 tokens=48 err=False
+Evaluating:  29%|██▊       | 379/1319 [01:58<04:41,  3.34it/s]REQDONE t=1794801358.252 idx=743 tokens=121 err=False
+Evaluating:  29%|██▉       | 380/1319 [01:58<04:53,  3.19it/s]REQDONE t=1794801358.522 idx=236 tokens=168 err=False
+Evaluating:  29%|██▉       | 381/1319 [01:58<04:42,  3.32it/s]REQDONE t=1794801358.852 idx=744 tokens=83 err=False
+Evaluating:  29%|██▉       | 382/1319 [01:59<04:49,  3.23it/s]REQDONE t=1794801359.139 idx=1099 tokens=205 err=False
+Evaluating:  29%|██▉       | 383/1319 [01:59<04:43,  3.30it/s]REQDONE t=1794801359.330 idx=240 tokens=120 err=False
+Evaluating:  29%|██▉       | 384/1319 [01:59<04:12,  3.70it/s]REQDONE t=1794801359.477 idx=1103 tokens=152 err=False
+Evaluating:  29%|██▉       | 385/1319 [01:59<03:38,  4.27it/s]REQDONE t=1794801359.994 idx=241 tokens=94 err=False
+Evaluating:  29%|██▉       | 386/1319 [02:00<04:56,  3.15it/s]REQDONE t=1794801360.372 idx=239 tokens=187 err=False
+Evaluating:  29%|██▉       | 387/1319 [02:00<05:12,  2.98it/s]REQDONE t=1794801360.771 idx=1106 tokens=94 err=False
+Evaluating:  29%|██▉       | 388/1319 [02:01<05:29,  2.82it/s]REQDONE t=1794801361.081 idx=746 tokens=113 err=False
+Evaluating:  29%|██▉       | 389/1319 [02:01<05:17,  2.93it/s]REQDONE t=1794801361.420 idx=243 tokens=108 err=False
+Evaluating:  30%|██▉       | 390/1319 [02:01<05:16,  2.94it/s]REQDONE t=1794801361.686 idx=747 tokens=110 err=False
+Evaluating:  30%|██▉       | 391/1319 [02:02<04:55,  3.14it/s]REQDONE t=1794801361.691 idx=1108 tokens=67 err=False
+REQDONE t=1794801362.481 idx=1102 tokens=256 err=False
+Evaluating:  30%|██▉       | 393/1319 [02:02<05:28,  2.82it/s]REQDONE t=1794801362.671 idx=745 tokens=191 err=False
+Evaluating:  30%|██▉       | 394/1319 [02:03<04:50,  3.19it/s]REQDONE t=1794801362.746 idx=242 tokens=189 err=False
+REQDONE t=1794801363.173 idx=748 tokens=129 err=False
+Evaluating:  30%|███       | 396/1319 [02:03<04:25,  3.47it/s]REQDONE t=1794801363.368 idx=245 tokens=116 err=False
+Evaluating:  30%|███       | 397/1319 [02:03<04:05,  3.75it/s]REQDONE t=1794801364.258 idx=1109 tokens=154 err=False
+Evaluating:  30%|███       | 398/1319 [02:04<06:26,  2.38it/s]REQDONE t=1794801364.453 idx=1105 tokens=256 err=False
+REQDONE t=1794801364.454 idx=247 tokens=107 err=False
+Evaluating:  30%|███       | 399/1319 [02:04<05:32,  2.77it/s]REQDONE t=1794801364.454 idx=248 tokens=68 err=False
+REQDONE t=1794801365.090 idx=1107 tokens=220 err=False
+Evaluating:  30%|███       | 402/1319 [02:05<04:19,  3.54it/s]REQDONE t=1794801365.491 idx=1110 tokens=143 err=False
+REQDONE t=1794801365.491 idx=1111 tokens=133 err=False
+Evaluating:  31%|███       | 403/1319 [02:05<04:40,  3.26it/s]REQDONE t=1794801365.491 idx=752 tokens=89 err=False
+REQDONE t=1794801366.013 idx=1112 tokens=99 err=False
+Evaluating:  31%|███       | 406/1319 [02:06<03:43,  4.08it/s]REQDONE t=1794801366.352 idx=750 tokens=179 err=False
+Evaluating:  31%|███       | 407/1319 [02:06<03:59,  3.82it/s]REQDONE t=1794801366.656 idx=751 tokens=158 err=False
+Evaluating:  31%|███       | 408/1319 [02:06<04:06,  3.69it/s]REQDONE t=1794801367.001 idx=244 tokens=252 err=False
+Evaluating:  31%|███       | 409/1319 [02:07<04:21,  3.48it/s]REQDONE t=1794801367.259 idx=1113 tokens=65 err=False
+Evaluating:  31%|███       | 410/1319 [02:07<04:14,  3.57it/s]REQDONE t=1794801367.630 idx=755 tokens=56 err=False
+Evaluating:  31%|███       | 411/1319 [02:07<04:35,  3.29it/s]REQDONE t=1794801367.854 idx=251 tokens=72 err=False
+Evaluating:  31%|███       | 412/1319 [02:08<04:16,  3.54it/s]REQDONE t=1794801368.048 idx=749 tokens=256 err=False
+Evaluating:  31%|███▏      | 413/1319 [02:08<03:53,  3.88it/s]REQDONE t=1794801368.465 idx=246 tokens=254 err=False
+Evaluating:  31%|███▏      | 414/1319 [02:08<04:34,  3.30it/s]REQDONE t=1794801368.492 idx=1114 tokens=112 err=False
+REQDONE t=1794801368.792 idx=249 tokens=177 err=False
+Evaluating:  32%|███▏      | 416/1319 [02:09<03:37,  4.16it/s]REQDONE t=1794801368.933 idx=753 tokens=170 err=False
+Evaluating:  32%|███▏      | 417/1319 [02:09<03:15,  4.62it/s]REQDONE t=1794801369.417 idx=252 tokens=96 err=False
+Evaluating:  32%|███▏      | 418/1319 [02:09<04:16,  3.51it/s]REQDONE t=1794801369.445 idx=1116 tokens=80 err=False
+REQDONE t=1794801369.947 idx=1117 tokens=67 err=False
+Evaluating:  32%|███▏      | 420/1319 [02:10<04:08,  3.62it/s]REQDONE t=1794801370.311 idx=1115 tokens=115 err=False
+Evaluating:  32%|███▏      | 421/1319 [02:10<04:26,  3.37it/s]REQDONE t=1794801370.645 idx=253 tokens=97 err=False
+Evaluating:  32%|███▏      | 422/1319 [02:10<04:34,  3.27it/s]REQDONE t=1794801371.019 idx=758 tokens=68 err=False
+Evaluating:  32%|███▏      | 423/1319 [02:11<04:50,  3.09it/s]REQDONE t=1794801371.473 idx=254 tokens=93 err=False
+Evaluating:  32%|███▏      | 424/1319 [02:11<05:21,  2.78it/s]REQDONE t=1794801371.806 idx=756 tokens=142 err=False
+Evaluating:  32%|███▏      | 425/1319 [02:12<05:14,  2.84it/s]REQDONE t=1794801372.206 idx=250 tokens=210 err=False
+Evaluating:  32%|███▏      | 426/1319 [02:12<05:26,  2.74it/s]REQDONE t=1794801372.714 idx=759 tokens=112 err=False
+Evaluating:  32%|███▏      | 427/1319 [02:13<06:03,  2.46it/s]REQDONE t=1794801373.112 idx=1119 tokens=118 err=False
+REQDONE t=1794801373.112 idx=1120 tokens=101 err=False
+Evaluating:  32%|███▏      | 428/1319 [02:13<06:00,  2.47it/s]REQDONE t=1794801373.303 idx=258 tokens=73 err=False
+Evaluating:  33%|███▎      | 430/1319 [02:13<03:54,  3.79it/s]REQDONE t=1794801373.968 idx=754 tokens=256 err=False
+REQDONE t=1794801373.969 idx=1121 tokens=92 err=False
+Evaluating:  33%|███▎      | 431/1319 [02:14<05:21,  2.76it/s]REQDONE t=1794801374.490 idx=757 tokens=219 err=False
+Evaluating:  33%|███▎      | 433/1319 [02:14<04:43,  3.12it/s]REQDONE t=1794801374.678 idx=762 tokens=95 err=False
+Evaluating:  33%|███▎      | 434/1319 [02:15<04:16,  3.44it/s]REQDONE t=1794801374.751 idx=760 tokens=157 err=False
+REQDONE t=1794801375.289 idx=255 tokens=186 err=False
+Evaluating:  33%|███▎      | 436/1319 [02:15<04:21,  3.37it/s]REQDONE t=1794801375.477 idx=257 tokens=160 err=False
+Evaluating:  33%|███▎      | 437/1319 [02:15<04:00,  3.67it/s]REQDONE t=1794801375.623 idx=1118 tokens=206 err=False
+Evaluating:  33%|███▎      | 438/1319 [02:15<03:33,  4.13it/s]REQDONE t=1794801375.905 idx=256 tokens=190 err=False
+Evaluating:  33%|███▎      | 439/1319 [02:16<03:42,  3.96it/s]REQDONE t=1794801376.397 idx=761 tokens=166 err=False
+Evaluating:  33%|███▎      | 440/1319 [02:16<04:38,  3.16it/s]REQDONE t=1794801376.986 idx=764 tokens=100 err=False
+Evaluating:  33%|███▎      | 441/1319 [02:17<05:43,  2.55it/s]REQDONE t=1794801377.325 idx=260 tokens=109 err=False
+Evaluating:  34%|███▎      | 442/1319 [02:17<05:30,  2.66it/s]REQDONE t=1794801377.605 idx=1124 tokens=97 err=False
+Evaluating:  34%|███▎      | 443/1319 [02:17<05:05,  2.87it/s]REQDONE t=1794801377.606 idx=262 tokens=76 err=False
+REQDONE t=1794801377.990 idx=1123 tokens=127 err=False
+Evaluating:  34%|███▎      | 445/1319 [02:18<04:03,  3.59it/s]REQDONE t=1794801378.186 idx=261 tokens=108 err=False
+Evaluating:  34%|███▍      | 446/1319 [02:18<03:45,  3.87it/s]REQDONE t=1794801378.550 idx=763 tokens=148 err=False
+Evaluating:  34%|███▍      | 447/1319 [02:18<04:08,  3.50it/s]REQDONE t=1794801378.860 idx=766 tokens=88 err=False
+REQDONE t=1794801378.860 idx=263 tokens=82 err=False
+Evaluating:  34%|███▍      | 448/1319 [02:19<04:14,  3.42it/s]REQDONE t=1794801378.886 idx=765 tokens=114 err=False
+REQDONE t=1794801379.256 idx=767 tokens=84 err=False
+Evaluating:  34%|███▍      | 451/1319 [02:19<02:59,  4.85it/s]REQDONE t=1794801379.626 idx=1127 tokens=77 err=False
+Evaluating:  34%|███▍      | 452/1319 [02:19<03:27,  4.17it/s]REQDONE t=1794801379.631 idx=1126 tokens=96 err=False
+REQDONE t=1794801380.168 idx=1125 tokens=140 err=False
+Evaluating:  34%|███▍      | 454/1319 [02:20<03:37,  3.98it/s]REQDONE t=1794801380.196 idx=259 tokens=222 err=False
+REQDONE t=1794801380.540 idx=1122 tokens=245 err=False
+Evaluating:  35%|███▍      | 456/1319 [02:20<03:17,  4.37it/s]REQDONE t=1794801381.137 idx=1128 tokens=96 err=False
+Evaluating:  35%|███▍      | 457/1319 [02:21<04:19,  3.32it/s]REQDONE t=1794801381.480 idx=264 tokens=123 err=False
+Evaluating:  35%|███▍      | 458/1319 [02:21<04:27,  3.22it/s]REQDONE t=1794801382.045 idx=768 tokens=137 err=False
+Evaluating:  35%|███▍      | 459/1319 [02:22<05:19,  2.69it/s]REQDONE t=1794801382.469 idx=771 tokens=102 err=False
+Evaluating:  35%|███▍      | 460/1319 [02:22<05:30,  2.60it/s]REQDONE t=1794801382.496 idx=269 tokens=65 err=False
+REQDONE t=1794801383.001 idx=268 tokens=109 err=False
+Evaluating:  35%|███▌      | 462/1319 [02:23<04:46,  2.99it/s]REQDONE t=1794801383.424 idx=769 tokens=152 err=False
+Evaluating:  35%|███▌      | 463/1319 [02:23<05:04,  2.81it/s]REQDONE t=1794801383.425 idx=1131 tokens=123 err=False
+REQDONE t=1794801383.809 idx=770 tokens=136 err=False
+Evaluating:  35%|███▌      | 465/1319 [02:24<04:08,  3.44it/s]REQDONE t=1794801384.283 idx=267 tokens=170 err=False
+Evaluating:  35%|███▌      | 466/1319 [02:24<04:42,  3.02it/s]REQDONE t=1794801384.732 idx=773 tokens=114 err=False
+Evaluating:  35%|███▌      | 467/1319 [02:25<05:06,  2.78it/s]REQDONE t=1794801384.759 idx=1130 tokens=186 err=False
+REQDONE t=1794801385.240 idx=265 tokens=230 err=False
+Evaluating:  36%|███▌      | 469/1319 [02:25<04:29,  3.16it/s]REQDONE t=1794801385.632 idx=1134 tokens=88 err=False
+Evaluating:  36%|███▌      | 470/1319 [02:25<04:43,  3.00it/s]REQDONE t=1794801385.826 idx=1129 tokens=227 err=False
+Evaluating:  36%|███▌      | 471/1319 [02:26<04:13,  3.34it/s]REQDONE t=1794801385.827 idx=1132 tokens=178 err=False
+REQDONE t=1794801386.300 idx=266 tokens=236 err=False
+Evaluating:  36%|███▌      | 473/1319 [02:26<03:51,  3.65it/s]REQDONE t=1794801386.632 idx=270 tokens=128 err=False
+Evaluating:  36%|███▌      | 474/1319 [02:26<04:02,  3.48it/s]REQDONE t=1794801386.637 idx=1133 tokens=153 err=False
+REQDONE t=1794801386.637 idx=272 tokens=79 err=False
+REQDONE t=1794801386.663 idx=772 tokens=192 err=False
+REQDONE t=1794801387.389 idx=774 tokens=134 err=False
+Evaluating:  36%|███▌      | 478/1319 [02:27<03:15,  4.31it/s]REQDONE t=1794801387.722 idx=776 tokens=80 err=False
+Evaluating:  36%|███▋      | 479/1319 [02:28<03:28,  4.02it/s]REQDONE t=1794801387.958 idx=1135 tokens=125 err=False
+Evaluating:  36%|███▋      | 480/1319 [02:28<03:26,  4.06it/s]REQDONE t=1794801388.298 idx=775 tokens=139 err=False
+Evaluating:  36%|███▋      | 481/1319 [02:28<03:43,  3.75it/s]REQDONE t=1794801388.490 idx=271 tokens=158 err=False
+Evaluating:  37%|███▋      | 482/1319 [02:28<03:28,  4.01it/s]REQDONE t=1794801389.018 idx=1136 tokens=115 err=False
+Evaluating:  37%|███▋      | 483/1319 [02:29<04:27,  3.13it/s]REQDONE t=1794801389.580 idx=778 tokens=112 err=False
+Evaluating:  37%|███▋      | 484/1319 [02:29<05:20,  2.61it/s]REQDONE t=1794801389.608 idx=274 tokens=113 err=False
+REQDONE t=1794801390.232 idx=1140 tokens=86 err=False
+Evaluating:  37%|███▋      | 486/1319 [02:30<04:58,  2.79it/s]REQDONE t=1794801390.876 idx=273 tokens=191 err=False
+Evaluating:  37%|███▋      | 487/1319 [02:31<05:54,  2.35it/s]REQDONE t=1794801391.129 idx=781 tokens=98 err=False
+Evaluating:  37%|███▋      | 488/1319 [02:31<05:17,  2.62it/s]REQDONE t=1794801391.318 idx=1139 tokens=157 err=False
+Evaluating:  37%|███▋      | 489/1319 [02:31<04:34,  3.02it/s]REQDONE t=1794801391.638 idx=275 tokens=164 err=False
+Evaluating:  37%|███▋      | 490/1319 [02:31<04:32,  3.05it/s]REQDONE t=1794801392.003 idx=278 tokens=98 err=False
+Evaluating:  37%|███▋      | 491/1319 [02:32<04:40,  2.95it/s]REQDONE t=1794801392.195 idx=277 tokens=139 err=False
+Evaluating:  37%|███▋      | 492/1319 [02:32<04:05,  3.37it/s]REQDONE t=1794801392.659 idx=1142 tokens=88 err=False
+Evaluating:  37%|███▋      | 493/1319 [02:32<04:45,  2.90it/s]REQDONE t=1794801393.219 idx=276 tokens=204 err=False
+REQDONE t=1794801393.220 idx=780 tokens=190 err=False
+Evaluating:  37%|███▋      | 494/1319 [02:33<05:36,  2.45it/s]REQDONE t=1794801393.598 idx=1141 tokens=159 err=False
+Evaluating:  38%|███▊      | 496/1319 [02:33<04:13,  3.24it/s]REQDONE t=1794801393.794 idx=777 tokens=256 err=False
+Evaluating:  38%|███▊      | 497/1319 [02:34<03:50,  3.56it/s]REQDONE t=1794801394.230 idx=1143 tokens=70 err=False
+Evaluating:  38%|███▊      | 498/1319 [02:34<04:23,  3.11it/s]REQDONE t=1794801394.596 idx=1137 tokens=256 err=False
+Evaluating:  38%|███▊      | 499/1319 [02:34<04:33,  3.00it/s]REQDONE t=1794801394.931 idx=779 tokens=240 err=False
+REQDONE t=1794801394.931 idx=782 tokens=144 err=False
+Evaluating:  38%|███▊      | 500/1319 [02:35<04:33,  3.00it/s]REQDONE t=1794801394.960 idx=280 tokens=87 err=False
+REQDONE t=1794801395.128 idx=1138 tokens=256 err=False
+Evaluating:  38%|███▊      | 503/1319 [02:35<02:33,  5.33it/s]REQDONE t=1794801396.252 idx=1144 tokens=120 err=False
+Evaluating:  38%|███▊      | 504/1319 [02:36<05:10,  2.63it/s]REQDONE t=1794801396.443 idx=1148 tokens=50 err=False
+Evaluating:  38%|███▊      | 505/1319 [02:36<04:34,  2.96it/s]REQDONE t=1794801396.716 idx=786 tokens=95 err=False
+Evaluating:  38%|███▊      | 506/1319 [02:37<04:21,  3.11it/s]REQDONE t=1794801396.905 idx=784 tokens=151 err=False
+Evaluating:  38%|███▊      | 507/1319 [02:37<03:53,  3.48it/s]REQDONE t=1794801397.582 idx=279 tokens=227 err=False
+Evaluating:  39%|███▊      | 508/1319 [02:37<05:18,  2.55it/s]REQDONE t=1794801397.976 idx=787 tokens=113 err=False
+Evaluating:  39%|███▊      | 509/1319 [02:38<05:18,  2.54it/s]REQDONE t=1794801398.169 idx=788 tokens=102 err=False
+Evaluating:  39%|███▊      | 510/1319 [02:38<04:31,  2.97it/s]REQDONE t=1794801398.384 idx=282 tokens=149 err=False
+Evaluating:  39%|███▊      | 511/1319 [02:38<04:03,  3.32it/s]REQDONE t=1794801398.457 idx=281 tokens=185 err=False
+REQDONE t=1794801398.880 idx=285 tokens=61 err=False
+Evaluating:  39%|███▉      | 513/1319 [02:39<03:43,  3.61it/s]REQDONE t=1794801398.911 idx=1146 tokens=146 err=False
+REQDONE t=1794801399.071 idx=1147 tokens=125 err=False
+Evaluating:  39%|███▉      | 515/1319 [02:39<02:45,  4.86it/s]REQDONE t=1794801399.741 idx=783 tokens=248 err=False
+Evaluating:  39%|███▉      | 516/1319 [02:40<04:06,  3.25it/s]REQDONE t=1794801399.769 idx=283 tokens=167 err=False
+REQDONE t=1794801400.215 idx=785 tokens=208 err=False
+Evaluating:  39%|███▉      | 518/1319 [02:40<03:44,  3.57it/s]REQDONE t=1794801400.561 idx=1149 tokens=93 err=False
+Evaluating:  39%|███▉      | 519/1319 [02:40<03:55,  3.40it/s]REQDONE t=1794801401.039 idx=789 tokens=125 err=False
+Evaluating:  39%|███▉      | 520/1319 [02:41<04:29,  2.96it/s]REQDONE t=1794801401.232 idx=1145 tokens=225 err=False
+Evaluating:  39%|███▉      | 521/1319 [02:41<04:00,  3.32it/s]REQDONE t=1794801401.232 idx=1150 tokens=79 err=False
+REQDONE t=1794801401.833 idx=286 tokens=139 err=False
+Evaluating:  40%|███▉      | 523/1319 [02:42<03:59,  3.32it/s]REQDONE t=1794801402.176 idx=288 tokens=87 err=False
+Evaluating:  40%|███▉      | 524/1319 [02:42<04:06,  3.22it/s]REQDONE t=1794801402.524 idx=792 tokens=96 err=False
+Evaluating:  40%|███▉      | 525/1319 [02:42<04:14,  3.12it/s]REQDONE t=1794801402.973 idx=289 tokens=82 err=False
+Evaluating:  40%|███▉      | 526/1319 [02:43<04:40,  2.83it/s]REQDONE t=1794801403.165 idx=790 tokens=144 err=False
+Evaluating:  40%|███▉      | 527/1319 [02:43<04:05,  3.23it/s]REQDONE t=1794801403.165 idx=1151 tokens=124 err=False
+REQDONE t=1794801403.541 idx=1152 tokens=121 err=False
+Evaluating:  40%|████      | 529/1319 [02:43<03:22,  3.90it/s]REQDONE t=1794801403.571 idx=791 tokens=136 err=False
+REQDONE t=1794801403.572 idx=794 tokens=62 err=False
+REQDONE t=1794801403.734 idx=284 tokens=256 err=False
+Evaluating:  40%|████      | 532/1319 [02:44<02:08,  6.11it/s]REQDONE t=1794801403.735 idx=287 tokens=143 err=False
+REQDONE t=1794801404.600 idx=290 tokens=116 err=False
+Evaluating:  40%|████      | 534/1319 [02:44<03:15,  4.02it/s]REQDONE t=1794801405.193 idx=1154 tokens=116 err=False
+Evaluating:  41%|████      | 535/1319 [02:45<04:04,  3.21it/s]REQDONE t=1794801405.527 idx=1155 tokens=95 err=False
+Evaluating:  41%|████      | 536/1319 [02:45<04:07,  3.16it/s]REQDONE t=1794801405.873 idx=1153 tokens=162 err=False
+Evaluating:  41%|████      | 537/1319 [02:46<04:12,  3.09it/s]REQDONE t=1794801406.212 idx=795 tokens=119 err=False
+Evaluating:  41%|████      | 538/1319 [02:46<04:15,  3.06it/s]REQDONE t=1794801406.213 idx=294 tokens=77 err=False
+REQDONE t=1794801406.762 idx=291 tokens=155 err=False
+Evaluating:  41%|████      | 540/1319 [02:47<03:58,  3.27it/s]REQDONE t=1794801406.763 idx=797 tokens=96 err=False
+REQDONE t=1794801406.952 idx=793 tokens=195 err=False
+Evaluating:  41%|████      | 542/1319 [02:47<02:56,  4.40it/s]REQDONE t=1794801407.439 idx=1157 tokens=106 err=False
+Evaluating:  41%|████      | 543/1319 [02:47<03:38,  3.55it/s]REQDONE t=1794801407.954 idx=799 tokens=68 err=False
+Evaluating:  41%|████      | 544/1319 [02:48<04:20,  2.98it/s]REQDONE t=1794801408.637 idx=796 tokens=172 err=False
+Evaluating:  41%|████▏     | 545/1319 [02:48<05:26,  2.37it/s]REQDONE t=1794801408.975 idx=292 tokens=192 err=False
+Evaluating:  41%|████▏     | 546/1319 [02:49<05:09,  2.50it/s]REQDONE t=1794801408.979 idx=1156 tokens=167 err=False
+REQDONE t=1794801409.007 idx=1158 tokens=161 err=False
+REQDONE t=1794801409.741 idx=800 tokens=108 err=False
+Evaluating:  42%|████▏     | 549/1319 [02:50<04:09,  3.09it/s]REQDONE t=1794801410.526 idx=1162 tokens=64 err=False
+Evaluating:  42%|████▏     | 550/1319 [02:50<05:20,  2.40it/s]REQDONE t=1794801410.556 idx=296 tokens=150 err=False
+REQDONE t=1794801410.557 idx=1163 tokens=56 err=False
+REQDONE t=1794801410.871 idx=297 tokens=129 err=False
+Evaluating:  42%|████▏     | 553/1319 [02:51<03:31,  3.61it/s]REQDONE t=1794801411.225 idx=293 tokens=247 err=False
+Evaluating:  42%|████▏     | 554/1319 [02:51<03:42,  3.44it/s]REQDONE t=1794801411.462 idx=798 tokens=245 err=False
+Evaluating:  42%|████▏     | 555/1319 [02:51<03:33,  3.58it/s]REQDONE t=1794801411.653 idx=1160 tokens=169 err=False
+Evaluating:  42%|████▏     | 556/1319 [02:51<03:18,  3.85it/s]REQDONE t=1794801412.147 idx=801 tokens=165 err=False
+Evaluating:  42%|████▏     | 557/1319 [02:52<04:01,  3.16it/s]REQDONE t=1794801412.496 idx=295 tokens=239 err=False
+Evaluating:  42%|████▏     | 558/1319 [02:52<04:07,  3.07it/s]REQDONE t=1794801412.496 idx=300 tokens=69 err=False
+REQDONE t=1794801412.691 idx=1159 tokens=205 err=False
+Evaluating:  42%|████▏     | 560/1319 [02:53<02:53,  4.38it/s]REQDONE t=1794801413.674 idx=298 tokens=198 err=False
+Evaluating:  43%|████▎     | 561/1319 [02:54<05:06,  2.47it/s]REQDONE t=1794801413.863 idx=301 tokens=83 err=False
+Evaluating:  43%|████▎     | 562/1319 [02:54<04:25,  2.85it/s]REQDONE t=1794801413.896 idx=1161 tokens=212 err=False
+REQDONE t=1794801414.175 idx=803 tokens=154 err=False
+Evaluating:  43%|████▎     | 564/1319 [02:54<03:23,  3.71it/s]REQDONE t=1794801414.461 idx=802 tokens=197 err=False
+Evaluating:  43%|████▎     | 565/1319 [02:54<03:26,  3.66it/s]REQDONE t=1794801414.607 idx=804 tokens=99 err=False
+Evaluating:  43%|████▎     | 566/1319 [02:54<03:02,  4.14it/s]REQDONE t=1794801415.039 idx=1167 tokens=67 err=False
+Evaluating:  43%|████▎     | 567/1319 [02:55<03:39,  3.43it/s]REQDONE t=1794801415.375 idx=302 tokens=98 err=False
+Evaluating:  43%|████▎     | 568/1319 [02:55<03:48,  3.29it/s]REQDONE t=1794801415.407 idx=805 tokens=117 err=False
+REQDONE t=1794801416.279 idx=807 tokens=117 err=False
+Evaluating:  43%|████▎     | 570/1319 [02:56<04:35,  2.71it/s]REQDONE t=1794801416.755 idx=305 tokens=72 err=False
+Evaluating:  43%|████▎     | 571/1319 [02:57<04:54,  2.54it/s]REQDONE t=1794801417.292 idx=299 tokens=256 err=False
+REQDONE t=1794801417.293 idx=1164 tokens=198 err=False
+Evaluating:  43%|████▎     | 572/1319 [02:57<05:21,  2.32it/s]REQDONE t=1794801418.103 idx=17 tokens=146 err=False
+Evaluating:  44%|████▎     | 574/1319 [02:58<05:12,  2.38it/s]REQDONE t=1794801418.293 idx=1165 tokens=227 err=False
+Evaluating:  44%|████▎     | 575/1319 [02:58<04:32,  2.73it/s]REQDONE t=1794801418.499 idx=303 tokens=203 err=False
+Evaluating:  44%|████▎     | 576/1319 [02:58<04:02,  3.06it/s]REQDONE t=1794801418.500 idx=809 tokens=115 err=False
+REQDONE t=1794801418.890 idx=808 tokens=163 err=False
+Evaluating:  44%|████▍     | 578/1319 [02:59<03:21,  3.67it/s]REQDONE t=1794801419.343 idx=1169 tokens=140 err=False
+Evaluating:  44%|████▍     | 579/1319 [02:59<03:52,  3.19it/s]REQDONE t=1794801419.533 idx=304 tokens=181 err=False
+Evaluating:  44%|████▍     | 580/1319 [02:59<03:29,  3.53it/s]REQDONE t=1794801419.564 idx=806 tokens=256 err=False
+REQDONE t=1794801419.706 idx=20 tokens=172 err=False
+Evaluating:  44%|████▍     | 582/1319 [03:00<02:28,  4.95it/s]REQDONE t=1794801420.200 idx=1166 tokens=256 err=False
+Evaluating:  44%|████▍     | 583/1319 [03:00<03:17,  3.72it/s]REQDONE t=1794801420.201 idx=1170 tokens=101 err=False
+REQDONE t=1794801420.584 idx=306 tokens=166 err=False
+Evaluating:  44%|████▍     | 585/1319 [03:00<02:54,  4.20it/s]REQDONE t=1794801421.129 idx=811 tokens=81 err=False
+Evaluating:  44%|████▍     | 586/1319 [03:01<03:44,  3.27it/s]REQDONE t=1794801421.577 idx=307 tokens=131 err=False
+Evaluating:  45%|████▍     | 587/1319 [03:01<04:08,  2.94it/s]REQDONE t=1794801422.061 idx=810 tokens=195 err=False
+Evaluating:  45%|████▍     | 588/1319 [03:02<04:35,  2.66it/s]REQDONE t=1794801422.090 idx=1168 tokens=256 err=False
+REQDONE t=1794801422.090 idx=18 tokens=103 err=False
+REQDONE t=1794801422.760 idx=21 tokens=95 err=False
+Evaluating:  45%|████▍     | 591/1319 [03:03<03:39,  3.32it/s]REQDONE t=1794801422.954 idx=308 tokens=132 err=False
+Evaluating:  45%|████▍     | 592/1319 [03:03<03:23,  3.57it/s]REQDONE t=1794801423.387 idx=22 tokens=92 err=False
+Evaluating:  45%|████▍     | 593/1319 [03:03<03:48,  3.18it/s]REQDONE t=1794801423.927 idx=309 tokens=128 err=False
+Evaluating:  45%|████▌     | 594/1319 [03:04<04:26,  2.72it/s]REQDONE t=1794801424.547 idx=1173 tokens=138 err=False
+Evaluating:  45%|████▌     | 595/1319 [03:04<05:13,  2.31it/s]REQDONE t=1794801424.575 idx=813 tokens=157 err=False
+REQDONE t=1794801424.740 idx=23 tokens=79 err=False
+Evaluating:  45%|████▌     | 597/1319 [03:05<03:29,  3.44it/s]REQDONE t=1794801425.178 idx=312 tokens=54 err=False
+Evaluating:  45%|████▌     | 598/1319 [03:05<03:54,  3.08it/s]REQDONE t=1794801425.207 idx=1171 tokens=209 err=False
+REQDONE t=1794801425.720 idx=19 tokens=256 err=False
+Evaluating:  45%|████▌     | 600/1319 [03:06<03:38,  3.29it/s]REQDONE t=1794801426.061 idx=1172 tokens=196 err=False
+Evaluating:  46%|████▌     | 601/1319 [03:06<03:43,  3.21it/s]REQDONE t=1794801426.606 idx=24 tokens=104 err=False
+Evaluating:  46%|████▌     | 602/1319 [03:06<04:23,  2.72it/s]REQDONE t=1794801427.004 idx=817 tokens=55 err=False
+Evaluating:  46%|████▌     | 603/1319 [03:07<04:28,  2.66it/s]REQDONE t=1794801427.032 idx=311 tokens=150 err=False
+REQDONE t=1794801427.488 idx=812 tokens=256 err=False
+Evaluating:  46%|████▌     | 605/1319 [03:07<03:47,  3.13it/s]REQDONE t=1794801427.824 idx=816 tokens=111 err=False
+Evaluating:  46%|████▌     | 606/1319 [03:08<03:50,  3.09it/s]REQDONE t=1794801428.197 idx=310 tokens=238 err=False
+Evaluating:  46%|████▌     | 607/1319 [03:08<03:58,  2.98it/s]REQDONE t=1794801429.016 idx=814 tokens=256 err=False
+Evaluating:  46%|████▌     | 608/1319 [03:09<05:28,  2.16it/s]REQDONE t=1794801429.042 idx=1178 tokens=71 err=False
+REQDONE t=1794801429.352 idx=1174 tokens=244 err=False
+Evaluating:  46%|████▌     | 610/1319 [03:09<03:58,  2.97it/s]REQDONE t=1794801429.916 idx=25 tokens=163 err=False
+Evaluating:  46%|████▋     | 611/1319 [03:10<04:35,  2.57it/s]REQDONE t=1794801430.316 idx=815 tokens=256 err=False
+REQDONE t=1794801430.317 idx=313 tokens=180 err=False
+Evaluating:  46%|████▋     | 612/1319 [03:10<04:37,  2.55it/s]REQDONE t=1794801430.343 idx=1177 tokens=166 err=False
+REQDONE t=1794801430.695 idx=27 tokens=108 err=False
+Evaluating:  47%|████▋     | 615/1319 [03:11<02:59,  3.93it/s]REQDONE t=1794801431.132 idx=1175 tokens=256 err=False
+Evaluating:  47%|████▋     | 616/1319 [03:11<03:24,  3.44it/s]REQDONE t=1794801431.528 idx=819 tokens=115 err=False
+Evaluating:  47%|████▋     | 617/1319 [03:11<03:40,  3.19it/s]REQDONE t=1794801431.872 idx=26 tokens=194 err=False
+Evaluating:  47%|████▋     | 618/1319 [03:12<03:44,  3.12it/s]REQDONE t=1794801431.872 idx=314 tokens=177 err=False
+REQDONE t=1794801432.344 idx=818 tokens=176 err=False
+REQDONE t=1794801432.345 idx=28 tokens=77 err=False
+Evaluating:  47%|████▋     | 620/1319 [03:12<03:20,  3.49it/s]REQDONE t=1794801432.838 idx=1179 tokens=132 err=False
+Evaluating:  47%|████▋     | 622/1319 [03:13<03:09,  3.68it/s]REQDONE t=1794801433.107 idx=820 tokens=95 err=False
+Evaluating:  47%|████▋     | 623/1319 [03:13<03:08,  3.69it/s]REQDONE t=1794801433.447 idx=317 tokens=72 err=False
+Evaluating:  47%|████▋     | 624/1319 [03:13<03:19,  3.49it/s]REQDONE t=1794801433.475 idx=821 tokens=71 err=False
+REQDONE t=1794801433.914 idx=1176 tokens=256 err=False
+REQDONE t=1794801433.915 idx=315 tokens=192 err=False
+Evaluating:  47%|████▋     | 626/1319 [03:14<03:04,  3.76it/s]REQDONE t=1794801434.686 idx=29 tokens=119 err=False
+Evaluating:  48%|████▊     | 628/1319 [03:15<03:33,  3.23it/s]REQDONE t=1794801434.714 idx=1180 tokens=132 err=False
+REQDONE t=1794801435.014 idx=316 tokens=162 err=False
+Evaluating:  48%|████▊     | 630/1319 [03:15<02:59,  3.85it/s]REQDONE t=1794801435.331 idx=319 tokens=86 err=False
+Evaluating:  48%|████▊     | 631/1319 [03:15<03:06,  3.69it/s]REQDONE t=1794801435.725 idx=30 tokens=129 err=False
+Evaluating:  48%|████▊     | 632/1319 [03:16<03:24,  3.36it/s]REQDONE t=1794801435.726 idx=822 tokens=112 err=False
+REQDONE t=1794801436.135 idx=1182 tokens=123 err=False
+Evaluating:  48%|████▊     | 634/1319 [03:16<02:59,  3.81it/s]REQDONE t=1794801436.616 idx=32 tokens=94 err=False
+Evaluating:  48%|████▊     | 635/1319 [03:16<03:31,  3.23it/s]REQDONE t=1794801436.617 idx=321 tokens=44 err=False
+REQDONE t=1794801436.808 idx=824 tokens=86 err=False
+Evaluating:  48%|████▊     | 637/1319 [03:17<02:35,  4.39it/s]REQDONE t=1794801436.925 idx=31 tokens=130 err=False
+Evaluating:  48%|████▊     | 638/1319 [03:17<02:19,  4.90it/s]REQDONE t=1794801437.071 idx=318 tokens=155 err=False
+Evaluating:  48%|████▊     | 639/1319 [03:17<02:09,  5.25it/s]REQDONE t=1794801437.533 idx=1184 tokens=97 err=False
+Evaluating:  49%|████▊     | 640/1319 [03:17<02:55,  3.87it/s]REQDONE t=1794801438.042 idx=823 tokens=156 err=False
+Evaluating:  49%|████▊     | 641/1319 [03:18<03:40,  3.08it/s]REQDONE t=1794801438.469 idx=34 tokens=79 err=False
+Evaluating:  49%|████▊     | 642/1319 [03:18<03:58,  2.84it/s]REQDONE t=1794801438.820 idx=1183 tokens=157 err=False
+Evaluating:  49%|████▊     | 643/1319 [03:19<03:58,  2.84it/s]REQDONE t=1794801439.305 idx=320 tokens=174 err=False
+Evaluating:  49%|████▉     | 644/1319 [03:19<04:23,  2.56it/s]REQDONE t=1794801439.670 idx=1181 tokens=256 err=False
+Evaluating:  49%|████▉     | 645/1319 [03:20<04:18,  2.61it/s]REQDONE t=1794801439.700 idx=322 tokens=116 err=False
+REQDONE t=1794801439.701 idx=826 tokens=107 err=False
+REQDONE t=1794801440.259 idx=35 tokens=97 err=False
+Evaluating:  49%|████▉     | 648/1319 [03:20<03:07,  3.58it/s]REQDONE t=1794801440.679 idx=1186 tokens=112 err=False
+Evaluating:  49%|████▉     | 649/1319 [03:21<03:26,  3.24it/s]REQDONE t=1794801440.871 idx=324 tokens=69 err=False
+Evaluating:  49%|████▉     | 650/1319 [03:21<03:08,  3.55it/s]REQDONE t=1794801441.019 idx=1185 tokens=158 err=False
+Evaluating:  49%|████▉     | 651/1319 [03:21<02:46,  4.02it/s]REQDONE t=1794801441.306 idx=36 tokens=103 err=False
+Evaluating:  49%|████▉     | 652/1319 [03:21<02:52,  3.87it/s]REQDONE t=1794801442.170 idx=1188 tokens=100 err=False
+Evaluating:  50%|████▉     | 653/1319 [03:22<04:41,  2.36it/s]REQDONE t=1794801442.570 idx=1187 tokens=168 err=False
+REQDONE t=1794801442.571 idx=1189 tokens=81 err=False
+Evaluating:  50%|████▉     | 654/1319 [03:22<04:37,  2.40it/s]REQDONE t=1794801443.160 idx=33 tokens=253 err=False
+Evaluating:  50%|████▉     | 656/1319 [03:23<04:00,  2.76it/s]REQDONE t=1794801443.558 idx=825 tokens=256 err=False
+Evaluating:  50%|████▉     | 657/1319 [03:23<04:05,  2.69it/s]REQDONE t=1794801443.584 idx=828 tokens=154 err=False
+REQDONE t=1794801444.137 idx=38 tokens=117 err=False
+Evaluating:  50%|████▉     | 659/1319 [03:24<03:43,  2.96it/s]REQDONE t=1794801444.333 idx=37 tokens=139 err=False
+Evaluating:  50%|█████     | 660/1319 [03:24<03:21,  3.27it/s]REQDONE t=1794801444.839 idx=323 tokens=240 err=False
+Evaluating:  50%|█████     | 661/1319 [03:25<03:53,  2.82it/s]REQDONE t=1794801445.262 idx=827 tokens=249 err=False
+Evaluating:  50%|█████     | 662/1319 [03:25<04:04,  2.69it/s]REQDONE t=1794801445.601 idx=326 tokens=154 err=False
+Evaluating:  50%|█████     | 663/1319 [03:25<03:58,  2.75it/s]REQDONE t=1794801445.998 idx=40 tokens=85 err=False
+Evaluating:  50%|█████     | 664/1319 [03:26<04:04,  2.68it/s]REQDONE t=1794801446.026 idx=1191 tokens=107 err=False
+REQDONE t=1794801446.512 idx=829 tokens=209 err=False
+Evaluating:  50%|█████     | 666/1319 [03:26<03:29,  3.11it/s]REQDONE t=1794801447.274 idx=325 tokens=248 err=False
+REQDONE t=1794801447.274 idx=41 tokens=100 err=False
+Evaluating:  51%|█████     | 667/1319 [03:27<04:38,  2.34it/s]REQDONE t=1794801447.461 idx=329 tokens=88 err=False
+Evaluating:  51%|█████     | 669/1319 [03:27<03:09,  3.43it/s]REQDONE t=1794801447.872 idx=328 tokens=128 err=False
+Evaluating:  51%|█████     | 670/1319 [03:28<03:26,  3.14it/s]REQDONE t=1794801448.194 idx=830 tokens=235 err=False
+Evaluating:  51%|█████     | 671/1319 [03:28<03:26,  3.13it/s]REQDONE t=1794801448.223 idx=832 tokens=144 err=False
+REQDONE t=1794801448.762 idx=39 tokens=245 err=False
+Evaluating:  51%|█████     | 673/1319 [03:29<03:16,  3.28it/s]REQDONE t=1794801448.790 idx=833 tokens=110 err=False
+REQDONE t=1794801449.246 idx=1190 tokens=256 err=False
+Evaluating:  51%|█████     | 675/1319 [03:29<03:01,  3.55it/s]REQDONE t=1794801449.615 idx=42 tokens=101 err=False
+Evaluating:  51%|█████▏    | 676/1319 [03:29<03:12,  3.33it/s]REQDONE t=1794801449.807 idx=834 tokens=91 err=False
+Evaluating:  51%|█████▏    | 677/1319 [03:30<02:56,  3.64it/s]REQDONE t=1794801450.089 idx=327 tokens=238 err=False
+Evaluating:  51%|█████▏    | 678/1319 [03:30<02:57,  3.61it/s]REQDONE t=1794801450.116 idx=1194 tokens=69 err=False
+REQDONE t=1794801450.487 idx=330 tokens=115 err=False
+Evaluating:  52%|█████▏    | 680/1319 [03:30<02:36,  4.09it/s]REQDONE t=1794801450.681 idx=1192 tokens=187 err=False
+Evaluating:  52%|█████▏    | 681/1319 [03:31<02:28,  4.29it/s]REQDONE t=1794801451.313 idx=831 tokens=256 err=False
+Evaluating:  52%|█████▏    | 682/1319 [03:31<03:31,  3.02it/s]REQDONE t=1794801451.602 idx=1193 tokens=170 err=False
+Evaluating:  52%|█████▏    | 683/1319 [03:31<03:23,  3.12it/s]REQDONE t=1794801452.217 idx=1196 tokens=90 err=False
+Evaluating:  52%|█████▏    | 684/1319 [03:32<04:14,  2.50it/s]REQDONE t=1794801452.245 idx=332 tokens=101 err=False
+REQDONE t=1794801452.891 idx=43 tokens=159 err=False
+REQDONE t=1794801452.891 idx=836 tokens=122 err=False
+Evaluating:  52%|█████▏    | 686/1319 [03:33<03:55,  2.68it/s]REQDONE t=1794801453.432 idx=44 tokens=151 err=False
+Evaluating:  52%|█████▏    | 688/1319 [03:33<03:30,  3.00it/s]REQDONE t=1794801453.912 idx=334 tokens=105 err=False
+Evaluating:  52%|█████▏    | 689/1319 [03:34<03:49,  2.74it/s]REQDONE t=1794801454.178 idx=1195 tokens=179 err=False
+Evaluating:  52%|█████▏    | 690/1319 [03:34<03:34,  2.93it/s]REQDONE t=1794801454.601 idx=46 tokens=130 err=False
+Evaluating:  52%|█████▏    | 691/1319 [03:34<03:47,  2.76it/s]REQDONE t=1794801454.856 idx=333 tokens=170 err=False
+Evaluating:  52%|█████▏    | 692/1319 [03:35<03:29,  2.99it/s]REQDONE t=1794801455.042 idx=838 tokens=126 err=False
+Evaluating:  53%|█████▎    | 693/1319 [03:35<03:03,  3.41it/s]REQDONE t=1794801455.514 idx=335 tokens=101 err=False
+Evaluating:  53%|█████▎    | 694/1319 [03:35<03:34,  2.91it/s]REQDONE t=1794801455.543 idx=45 tokens=190 err=False
+REQDONE t=1794801456.059 idx=331 tokens=256 err=False
+Evaluating:  53%|█████▎    | 696/1319 [03:36<03:14,  3.21it/s]REQDONE t=1794801456.399 idx=837 tokens=193 err=False
+Evaluating:  53%|█████▎    | 697/1319 [03:36<03:18,  3.14it/s]REQDONE t=1794801456.399 idx=839 tokens=98 err=False
+REQDONE t=1794801456.809 idx=835 tokens=256 err=False
+Evaluating:  53%|█████▎    | 699/1319 [03:37<02:48,  3.67it/s]REQDONE t=1794801456.998 idx=48 tokens=95 err=False
+Evaluating:  53%|█████▎    | 700/1319 [03:37<02:36,  3.95it/s]REQDONE t=1794801457.412 idx=1197 tokens=223 err=False
+Evaluating:  53%|█████▎    | 701/1319 [03:37<03:00,  3.42it/s]REQDONE t=1794801457.603 idx=337 tokens=67 err=False
+Evaluating:  53%|█████▎    | 702/1319 [03:37<02:44,  3.75it/s]REQDONE t=1794801458.106 idx=47 tokens=176 err=False
+Evaluating:  53%|█████▎    | 703/1319 [03:38<03:23,  3.03it/s]REQDONE t=1794801458.533 idx=49 tokens=102 err=False
+Evaluating:  53%|█████▎    | 704/1319 [03:38<03:39,  2.80it/s]REQDONE t=1794801458.533 idx=842 tokens=60 err=False
+REQDONE t=1794801458.929 idx=1200 tokens=116 err=False
+Evaluating:  54%|█████▎    | 706/1319 [03:39<02:55,  3.49it/s]REQDONE t=1794801459.125 idx=336 tokens=143 err=False
+Evaluating:  54%|█████▎    | 707/1319 [03:39<02:42,  3.78it/s]REQDONE t=1794801459.447 idx=1199 tokens=186 err=False
+Evaluating:  54%|█████▎    | 708/1319 [03:39<02:50,  3.58it/s]REQDONE t=1794801459.793 idx=50 tokens=92 err=False
+Evaluating:  54%|█████▍    | 709/1319 [03:40<03:01,  3.36it/s]REQDONE t=1794801460.219 idx=1198 tokens=256 err=False
+Evaluating:  54%|█████▍    | 710/1319 [03:40<03:22,  3.00it/s]REQDONE t=1794801460.220 idx=840 tokens=165 err=False
+REQDONE t=1794801460.527 idx=841 tokens=128 err=False
+Evaluating:  54%|█████▍    | 712/1319 [03:40<02:34,  3.94it/s]REQDONE t=1794801460.759 idx=51 tokens=104 err=False
+Evaluating:  54%|█████▍    | 713/1319 [03:41<02:30,  4.02it/s]REQDONE t=1794801461.180 idx=1201 tokens=152 err=False
+Evaluating:  54%|█████▍    | 714/1319 [03:41<02:57,  3.42it/s]REQDONE t=1794801461.523 idx=338 tokens=140 err=False
+Evaluating:  54%|█████▍    | 715/1319 [03:41<03:04,  3.27it/s]REQDONE t=1794801462.055 idx=843 tokens=124 err=False
+Evaluating:  54%|█████▍    | 716/1319 [03:42<03:42,  2.71it/s]REQDONE t=1794801462.246 idx=1203 tokens=111 err=False
+Evaluating:  54%|█████▍    | 717/1319 [03:42<03:11,  3.14it/s]REQDONE t=1794801462.944 idx=342 tokens=72 err=False
+Evaluating:  54%|█████▍    | 718/1319 [03:43<04:16,  2.34it/s]REQDONE t=1794801462.973 idx=52 tokens=130 err=False
+REQDONE t=1794801463.281 idx=1202 tokens=185 err=False
+Evaluating:  55%|█████▍    | 720/1319 [03:43<03:06,  3.22it/s]REQDONE t=1794801463.282 idx=1205 tokens=93 err=False
+REQDONE t=1794801463.983 idx=55 tokens=56 err=False
+Evaluating:  55%|█████▍    | 722/1319 [03:44<03:14,  3.06it/s]REQDONE t=1794801464.320 idx=54 tokens=110 err=False
+Evaluating:  55%|█████▍    | 723/1319 [03:44<03:15,  3.04it/s]REQDONE t=1794801464.516 idx=845 tokens=126 err=False
+Evaluating:  55%|█████▍    | 724/1319 [03:44<02:56,  3.36it/s]REQDONE t=1794801465.150 idx=1204 tokens=179 err=False
+Evaluating:  55%|█████▍    | 725/1319 [03:45<03:47,  2.61it/s]REQDONE t=1794801465.403 idx=340 tokens=183 err=False
+Evaluating:  55%|█████▌    | 726/1319 [03:45<03:26,  2.87it/s]REQDONE t=1794801465.664 idx=56 tokens=63 err=False
+Evaluating:  55%|█████▌    | 727/1319 [03:45<03:11,  3.09it/s]REQDONE t=1794801465.992 idx=844 tokens=213 err=False
+Evaluating:  55%|█████▌    | 728/1319 [03:46<03:12,  3.07it/s]REQDONE t=1794801465.992 idx=344 tokens=80 err=False
+REQDONE t=1794801466.182 idx=53 tokens=208 err=False
+Evaluating:  55%|█████▌    | 730/1319 [03:46<02:11,  4.49it/s]REQDONE t=1794801466.384 idx=1207 tokens=86 err=False
+Evaluating:  55%|█████▌    | 731/1319 [03:46<02:07,  4.60it/s]REQDONE t=1794801466.526 idx=339 tokens=256 err=False
+Evaluating:  55%|█████▌    | 732/1319 [03:46<01:56,  5.05it/s]REQDONE t=1794801467.094 idx=1206 tokens=168 err=False
+Evaluating:  56%|█████▌    | 733/1319 [03:47<02:54,  3.36it/s]REQDONE t=1794801467.094 idx=1208 tokens=72 err=False
+REQDONE t=1794801467.561 idx=846 tokens=184 err=False
+Evaluating:  56%|█████▌    | 735/1319 [03:47<02:37,  3.71it/s]REQDONE t=1794801467.780 idx=847 tokens=128 err=False
+Evaluating:  56%|█████▌    | 736/1319 [03:48<02:30,  3.88it/s]REQDONE t=1794801467.812 idx=343 tokens=164 err=False
+REQDONE t=1794801468.321 idx=848 tokens=118 err=False
+Evaluating:  56%|█████▌    | 738/1319 [03:48<02:32,  3.80it/s]REQDONE t=1794801468.350 idx=341 tokens=256 err=False
+REQDONE t=1794801468.717 idx=57 tokens=109 err=False
+Evaluating:  56%|█████▌    | 740/1319 [03:49<02:18,  4.18it/s]REQDONE t=1794801469.074 idx=849 tokens=90 err=False
+Evaluating:  56%|█████▌    | 741/1319 [03:49<02:32,  3.79it/s]REQDONE t=1794801469.102 idx=1210 tokens=71 err=False
+REQDONE t=1794801469.435 idx=345 tokens=112 err=False
+Evaluating:  56%|█████▋    | 743/1319 [03:49<02:14,  4.30it/s]REQDONE t=1794801469.940 idx=59 tokens=96 err=False
+Evaluating:  56%|█████▋    | 744/1319 [03:50<02:46,  3.45it/s]REQDONE t=1794801470.271 idx=58 tokens=109 err=False
+Evaluating:  56%|█████▋    | 745/1319 [03:50<02:51,  3.34it/s]REQDONE t=1794801470.303 idx=346 tokens=115 err=False
+REQDONE t=1794801470.751 idx=851 tokens=93 err=False
+Evaluating:  57%|█████▋    | 747/1319 [03:51<02:37,  3.63it/s]REQDONE t=1794801470.939 idx=347 tokens=98 err=False
+Evaluating:  57%|█████▋    | 748/1319 [03:51<02:26,  3.90it/s]REQDONE t=1794801471.083 idx=850 tokens=126 err=False
+Evaluating:  57%|█████▋    | 749/1319 [03:51<02:10,  4.36it/s]REQDONE t=1794801471.570 idx=60 tokens=94 err=False
+Evaluating:  57%|█████▋    | 750/1319 [03:51<02:47,  3.39it/s]REQDONE t=1794801471.943 idx=1211 tokens=110 err=False
+Evaluating:  57%|█████▋    | 751/1319 [03:52<02:59,  3.16it/s]REQDONE t=1794801472.308 idx=1209 tokens=168 err=False
+Evaluating:  57%|█████▋    | 752/1319 [03:52<03:06,  3.04it/s]REQDONE t=1794801472.870 idx=853 tokens=99 err=False
+Evaluating:  57%|█████▋    | 753/1319 [03:53<03:43,  2.53it/s]REQDONE t=1794801473.432 idx=1214 tokens=74 err=False
+Evaluating:  57%|█████▋    | 754/1319 [03:53<04:10,  2.26it/s]REQDONE t=1794801473.459 idx=61 tokens=135 err=False
+REQDONE t=1794801473.968 idx=1212 tokens=156 err=False
+Evaluating:  57%|█████▋    | 756/1319 [03:54<03:24,  2.75it/s]REQDONE t=1794801473.994 idx=852 tokens=160 err=False
+REQDONE t=1794801474.156 idx=349 tokens=142 err=False
+Evaluating:  57%|█████▋    | 758/1319 [03:54<02:24,  3.87it/s]REQDONE t=1794801474.472 idx=348 tokens=180 err=False
+Evaluating:  58%|█████▊    | 759/1319 [03:54<02:31,  3.69it/s]REQDONE t=1794801475.094 idx=350 tokens=137 err=False
+Evaluating:  58%|█████▊    | 760/1319 [03:55<03:18,  2.82it/s]REQDONE t=1794801475.285 idx=1213 tokens=168 err=False
+Evaluating:  58%|█████▊    | 761/1319 [03:55<02:54,  3.20it/s]REQDONE t=1794801475.285 idx=62 tokens=147 err=False
+REQDONE t=1794801475.285 idx=64 tokens=96 err=False
+REQDONE t=1794801475.774 idx=351 tokens=133 err=False
+Evaluating:  58%|█████▊    | 764/1319 [03:56<02:10,  4.26it/s]REQDONE t=1794801475.966 idx=854 tokens=154 err=False
+Evaluating:  58%|█████▊    | 765/1319 [03:56<02:05,  4.42it/s]REQDONE t=1794801476.250 idx=352 tokens=84 err=False
+Evaluating:  58%|█████▊    | 766/1319 [03:56<02:12,  4.18it/s]REQDONE t=1794801477.176 idx=856 tokens=105 err=False
+Evaluating:  58%|█████▊    | 767/1319 [03:57<03:43,  2.47it/s]REQDONE t=1794801477.555 idx=65 tokens=108 err=False
+Evaluating:  58%|█████▊    | 768/1319 [03:57<03:39,  2.51it/s]REQDONE t=1794801478.011 idx=1215 tokens=191 err=False
+Evaluating:  58%|█████▊    | 769/1319 [03:58<03:47,  2.42it/s]REQDONE t=1794801478.038 idx=63 tokens=216 err=False
+REQDONE t=1794801478.480 idx=857 tokens=129 err=False
+Evaluating:  58%|█████▊    | 771/1319 [03:58<03:04,  2.98it/s]REQDONE t=1794801478.933 idx=355 tokens=93 err=False
+Evaluating:  59%|█████▊    | 772/1319 [03:59<03:18,  2.75it/s]REQDONE t=1794801479.267 idx=67 tokens=108 err=False
+Evaluating:  59%|█████▊    | 773/1319 [03:59<03:14,  2.81it/s]REQDONE t=1794801479.649 idx=353 tokens=172 err=False
+Evaluating:  59%|█████▊    | 774/1319 [03:59<03:17,  2.76it/s]REQDONE t=1794801479.849 idx=855 tokens=256 err=False
+Evaluating:  59%|█████▉    | 775/1319 [04:00<02:53,  3.14it/s]REQDONE t=1794801479.849 idx=354 tokens=134 err=False
+REQDONE t=1794801479.925 idx=66 tokens=142 err=False
+REQDONE t=1794801480.060 idx=1218 tokens=138 err=False
+Evaluating:  59%|█████▉    | 778/1319 [04:00<01:39,  5.43it/s]REQDONE t=1794801480.723 idx=859 tokens=155 err=False
+Evaluating:  59%|█████▉    | 779/1319 [04:01<02:32,  3.54it/s]REQDONE t=1794801481.060 idx=860 tokens=82 err=False
+Evaluating:  59%|█████▉    | 780/1319 [04:01<02:38,  3.39it/s]REQDONE t=1794801481.088 idx=1219 tokens=120 err=False
+REQDONE t=1794801481.088 idx=68 tokens=103 err=False
+REQDONE t=1794801481.387 idx=1216 tokens=233 err=False
+Evaluating:  59%|█████▉    | 783/1319 [04:01<01:48,  4.92it/s]REQDONE t=1794801481.877 idx=1217 tokens=216 err=False
+REQDONE t=1794801481.878 idx=69 tokens=73 err=False
+Evaluating:  59%|█████▉    | 784/1319 [04:02<02:17,  3.88it/s]REQDONE t=1794801482.245 idx=858 tokens=203 err=False
+Evaluating:  60%|█████▉    | 786/1319 [04:02<02:03,  4.32it/s]REQDONE t=1794801482.722 idx=1221 tokens=74 err=False
+Evaluating:  60%|█████▉    | 787/1319 [04:03<02:29,  3.56it/s]REQDONE t=1794801482.911 idx=1220 tokens=119 err=False
+Evaluating:  60%|█████▉    | 788/1319 [04:03<02:18,  3.84it/s]REQDONE t=1794801483.438 idx=356 tokens=142 err=False
+Evaluating:  60%|█████▉    | 789/1319 [04:03<02:52,  3.08it/s]REQDONE t=1794801483.811 idx=71 tokens=63 err=False
+Evaluating:  60%|█████▉    | 790/1319 [04:04<02:58,  2.97it/s]REQDONE t=1794801484.004 idx=863 tokens=65 err=False
+Evaluating:  60%|█████▉    | 791/1319 [04:04<02:37,  3.35it/s]REQDONE t=1794801484.224 idx=358 tokens=105 err=False
+Evaluating:  60%|██████    | 792/1319 [04:04<02:25,  3.61it/s]REQDONE t=1794801484.370 idx=862 tokens=107 err=False
+Evaluating:  60%|██████    | 793/1319 [04:04<02:06,  4.17it/s]REQDONE t=1794801484.515 idx=1222 tokens=81 err=False
+Evaluating:  60%|██████    | 794/1319 [04:04<01:51,  4.71it/s]REQDONE t=1794801485.306 idx=1224 tokens=69 err=False
+Evaluating:  60%|██████    | 795/1319 [04:05<03:19,  2.62it/s]REQDONE t=1794801485.677 idx=1223 tokens=122 err=False
+Evaluating:  60%|██████    | 796/1319 [04:06<03:17,  2.64it/s]REQDONE t=1794801485.872 idx=70 tokens=163 err=False
+Evaluating:  60%|██████    | 797/1319 [04:06<02:49,  3.09it/s]REQDONE t=1794801485.873 idx=359 tokens=121 err=False
+REQDONE t=1794801486.084 idx=864 tokens=106 err=False
+Evaluating:  61%|██████    | 799/1319 [04:06<01:56,  4.46it/s]REQDONE t=1794801486.425 idx=72 tokens=124 err=False
+Evaluating:  61%|██████    | 800/1319 [04:06<02:11,  3.95it/s]REQDONE t=1794801486.573 idx=861 tokens=182 err=False
+Evaluating:  61%|██████    | 801/1319 [04:06<01:56,  4.43it/s]REQDONE t=1794801487.287 idx=360 tokens=147 err=False
+Evaluating:  61%|██████    | 802/1319 [04:07<03:05,  2.79it/s]REQDONE t=1794801487.714 idx=357 tokens=235 err=False
+Evaluating:  61%|██████    | 803/1319 [04:08<03:14,  2.65it/s]REQDONE t=1794801488.086 idx=867 tokens=53 err=False
+Evaluating:  61%|██████    | 804/1319 [04:08<03:13,  2.66it/s]REQDONE t=1794801488.424 idx=865 tokens=126 err=False
+Evaluating:  61%|██████    | 805/1319 [04:08<03:07,  2.74it/s]REQDONE t=1794801488.766 idx=362 tokens=123 err=False
+Evaluating:  61%|██████    | 806/1319 [04:09<03:03,  2.79it/s]REQDONE t=1794801489.146 idx=364 tokens=69 err=False
+Evaluating:  61%|██████    | 807/1319 [04:09<03:06,  2.74it/s]REQDONE t=1794801489.368 idx=73 tokens=170 err=False
+Evaluating:  61%|██████▏   | 808/1319 [04:09<02:44,  3.10it/s]REQDONE t=1794801489.922 idx=1227 tokens=93 err=False
+Evaluating:  61%|██████▏   | 809/1319 [04:10<03:19,  2.56it/s]REQDONE t=1794801490.176 idx=1228 tokens=55 err=False
+Evaluating:  61%|██████▏   | 810/1319 [04:10<02:58,  2.85it/s]REQDONE t=1794801490.399 idx=1225 tokens=173 err=False
+Evaluating:  61%|██████▏   | 811/1319 [04:10<02:38,  3.20it/s]REQDONE t=1794801490.840 idx=365 tokens=55 err=False
+Evaluating:  62%|██████▏   | 812/1319 [04:11<02:57,  2.85it/s]REQDONE t=1794801491.443 idx=363 tokens=143 err=False
+Evaluating:  62%|██████▏   | 813/1319 [04:11<03:35,  2.35it/s]REQDONE t=1794801491.471 idx=868 tokens=109 err=False
+REQDONE t=1794801491.939 idx=869 tokens=78 err=False
+Evaluating:  62%|██████▏   | 815/1319 [04:12<02:53,  2.91it/s]REQDONE t=1794801492.452 idx=74 tokens=232 err=False
+Evaluating:  62%|██████▏   | 816/1319 [04:12<03:14,  2.59it/s]REQDONE t=1794801492.650 idx=361 tokens=256 err=False
+Evaluating:  62%|██████▏   | 817/1319 [04:12<02:49,  2.97it/s]REQDONE t=1794801492.728 idx=75 tokens=186 err=False
+REQDONE t=1794801492.728 idx=366 tokens=74 err=False
+REQDONE t=1794801493.278 idx=1226 tokens=201 err=False
+Evaluating:  62%|██████▏   | 820/1319 [04:13<02:14,  3.71it/s]REQDONE t=1794801493.306 idx=79 tokens=67 err=False
+REQDONE t=1794801493.773 idx=77 tokens=139 err=False
+Evaluating:  62%|██████▏   | 822/1319 [04:14<02:10,  3.82it/s]REQDONE t=1794801493.778 idx=1229 tokens=114 err=False
+REQDONE t=1794801494.222 idx=866 tokens=256 err=False
+Evaluating:  62%|██████▏   | 824/1319 [04:14<02:03,  4.00it/s]REQDONE t=1794801494.622 idx=870 tokens=115 err=False
+Evaluating:  63%|██████▎   | 825/1319 [04:14<02:17,  3.60it/s]REQDONE t=1794801495.003 idx=76 tokens=227 err=False
+Evaluating:  63%|██████▎   | 826/1319 [04:15<02:27,  3.34it/s]REQDONE t=1794801495.439 idx=1232 tokens=61 err=False
+Evaluating:  63%|██████▎   | 827/1319 [04:15<02:43,  3.02it/s]REQDONE t=1794801495.989 idx=368 tokens=88 err=False
+Evaluating:  63%|██████▎   | 828/1319 [04:16<03:09,  2.59it/s]REQDONE t=1794801496.454 idx=82 tokens=71 err=False
+Evaluating:  63%|██████▎   | 829/1319 [04:16<03:19,  2.46it/s]REQDONE t=1794801496.482 idx=873 tokens=82 err=False
+REQDONE t=1794801496.804 idx=80 tokens=114 err=False
+Evaluating:  63%|██████▎   | 831/1319 [04:17<02:30,  3.25it/s]REQDONE t=1794801497.295 idx=874 tokens=70 err=False
+Evaluating:  63%|██████▎   | 832/1319 [04:17<02:50,  2.85it/s]REQDONE t=1794801497.648 idx=1230 tokens=206 err=False
+Evaluating:  63%|██████▎   | 833/1319 [04:17<02:50,  2.85it/s]REQDONE t=1794801498.028 idx=370 tokens=93 err=False
+Evaluating:  63%|██████▎   | 834/1319 [04:18<02:53,  2.79it/s]REQDONE t=1794801498.058 idx=871 tokens=179 err=False
+REQDONE t=1794801498.374 idx=1231 tokens=172 err=False
+Evaluating:  63%|██████▎   | 836/1319 [04:18<02:14,  3.59it/s]REQDONE t=1794801498.449 idx=1234 tokens=80 err=False
+REQDONE t=1794801498.892 idx=872 tokens=150 err=False
+Evaluating:  64%|██████▎   | 838/1319 [04:19<02:10,  3.69it/s]REQDONE t=1794801498.896 idx=78 tokens=256 err=False
+REQDONE t=1794801499.093 idx=81 tokens=151 err=False
+REQDONE t=1794801499.094 idx=83 tokens=67 err=False
+Evaluating:  64%|██████▎   | 840/1319 [04:19<01:41,  4.73it/s]REQDONE t=1794801499.668 idx=367 tokens=204 err=False
+Evaluating:  64%|██████▍   | 842/1319 [04:20<01:52,  4.23it/s]REQDONE t=1794801500.158 idx=1233 tokens=175 err=False
+Evaluating:  64%|██████▍   | 843/1319 [04:20<02:15,  3.50it/s]REQDONE t=1794801500.558 idx=875 tokens=101 err=False
+Evaluating:  64%|██████▍   | 844/1319 [04:20<02:27,  3.22it/s]REQDONE t=1794801501.017 idx=1237 tokens=65 err=False
+Evaluating:  64%|██████▍   | 845/1319 [04:21<02:43,  2.90it/s]REQDONE t=1794801501.398 idx=1236 tokens=89 err=False
+Evaluating:  64%|██████▍   | 846/1319 [04:21<02:47,  2.82it/s]REQDONE t=1794801501.425 idx=372 tokens=100 err=False
+REQDONE t=1794801501.737 idx=85 tokens=86 err=False
+Evaluating:  64%|██████▍   | 848/1319 [04:22<02:10,  3.61it/s]REQDONE t=1794801501.770 idx=371 tokens=136 err=False
+REQDONE t=1794801502.265 idx=1235 tokens=142 err=False
+Evaluating:  64%|██████▍   | 850/1319 [04:22<02:07,  3.68it/s]REQDONE t=1794801502.697 idx=369 tokens=256 err=False
+Evaluating:  65%|██████▍   | 851/1319 [04:23<02:23,  3.27it/s]REQDONE t=1794801503.034 idx=878 tokens=92 err=False
+Evaluating:  65%|██████▍   | 852/1319 [04:23<02:26,  3.20it/s]REQDONE t=1794801503.542 idx=84 tokens=167 err=False
+Evaluating:  65%|██████▍   | 853/1319 [04:23<02:48,  2.77it/s]REQDONE t=1794801503.570 idx=373 tokens=145 err=False
+REQDONE t=1794801503.571 idx=877 tokens=131 err=False
+REQDONE t=1794801503.877 idx=1238 tokens=101 err=False
+Evaluating:  65%|██████▍   | 856/1319 [04:24<01:47,  4.30it/s]REQDONE t=1794801504.076 idx=86 tokens=140 err=False
+Evaluating:  65%|██████▍   | 857/1319 [04:24<01:44,  4.42it/s]REQDONE t=1794801504.513 idx=374 tokens=145 err=False
+Evaluating:  65%|██████▌   | 858/1319 [04:24<02:05,  3.67it/s]REQDONE t=1794801505.250 idx=375 tokens=107 err=False
+Evaluating:  65%|██████▌   | 859/1319 [04:25<02:56,  2.61it/s]REQDONE t=1794801505.482 idx=879 tokens=113 err=False
+Evaluating:  65%|██████▌   | 860/1319 [04:25<02:38,  2.90it/s]REQDONE t=1794801506.170 idx=1250 tokens=69 err=False
+Evaluating:  65%|██████▌   | 861/1319 [04:26<03:19,  2.29it/s]REQDONE t=1794801506.440 idx=87 tokens=170 err=False
+Evaluating:  65%|██████▌   | 862/1319 [04:26<02:58,  2.56it/s]REQDONE t=1794801506.449 idx=876 tokens=249 err=False
+REQDONE t=1794801506.450 idx=1248 tokens=84 err=False
+REQDONE t=1794801506.472 idx=1241 tokens=141 err=False
+REQDONE t=1794801506.924 idx=1243 tokens=125 err=False
+Evaluating:  66%|██████▌   | 866/1319 [04:27<01:42,  4.43it/s]REQDONE t=1794801507.080 idx=1246 tokens=95 err=False
+Evaluating:  66%|██████▌   | 867/1319 [04:27<01:36,  4.69it/s]REQDONE t=1794801507.228 idx=1242 tokens=141 err=False
+Evaluating:  66%|██████▌   | 868/1319 [04:27<01:30,  5.00it/s]REQDONE t=1794801507.379 idx=1239 tokens=154 err=False
+Evaluating:  66%|██████▌   | 869/1319 [04:27<01:24,  5.30it/s]REQDONE t=1794801508.404 idx=1244 tokens=172 err=False
+Evaluating:  66%|██████▌   | 870/1319 [04:28<02:56,  2.55it/s]REQDONE t=1794801508.432 idx=1247 tokens=146 err=False
+REQDONE t=1794801508.751 idx=1240 tokens=213 err=False
+Evaluating:  66%|██████▌   | 872/1319 [04:29<02:15,  3.31it/s]REQDONE t=1794801509.291 idx=1251 tokens=118 err=False
+Evaluating:  66%|██████▌   | 873/1319 [04:29<02:39,  2.80it/s]REQDONE t=1794801509.292 idx=1260 tokens=63 err=False
+REQDONE t=1794801509.723 idx=1257 tokens=78 err=False
+Evaluating:  66%|██████▋   | 875/1319 [04:30<02:13,  3.32it/s]REQDONE t=1794801509.751 idx=1252 tokens=123 err=False
+REQDONE t=1794801510.333 idx=1253 tokens=105 err=False
+Evaluating:  66%|██████▋   | 877/1319 [04:30<02:13,  3.30it/s]REQDONE t=1794801510.828 idx=1259 tokens=110 err=False
+Evaluating:  67%|██████▋   | 878/1319 [04:31<02:30,  2.92it/s]REQDONE t=1794801511.030 idx=1254 tokens=120 err=False
+Evaluating:  67%|██████▋   | 879/1319 [04:31<02:16,  3.22it/s]REQDONE t=1794801511.508 idx=1258 tokens=135 err=False
+Evaluating:  67%|██████▋   | 880/1319 [04:31<02:34,  2.85it/s]REQDONE t=1794801511.917 idx=1249 tokens=248 err=False
+Evaluating:  67%|██████▋   | 881/1319 [04:32<02:40,  2.73it/s]REQDONE t=1794801511.945 idx=1261 tokens=145 err=False
+REQDONE t=1794801512.254 idx=1245 tokens=256 err=False
+Evaluating:  67%|██████▋   | 883/1319 [04:32<02:03,  3.54it/s]REQDONE t=1794801512.539 idx=1268 tokens=80 err=False
+Evaluating:  67%|██████▋   | 884/1319 [04:32<02:02,  3.54it/s]REQDONE t=1794801512.801 idx=1262 tokens=120 err=False
+Evaluating:  67%|██████▋   | 885/1319 [04:33<02:00,  3.60it/s]REQDONE t=1794801513.148 idx=1256 tokens=183 err=False
+Evaluating:  67%|██████▋   | 886/1319 [04:33<02:08,  3.38it/s]REQDONE t=1794801513.720 idx=1267 tokens=124 err=False
+Evaluating:  67%|██████▋   | 887/1319 [04:34<02:40,  2.69it/s]REQDONE t=1794801514.076 idx=1273 tokens=60 err=False
+Evaluating:  67%|██████▋   | 888/1319 [04:34<02:38,  2.72it/s]REQDONE t=1794801514.104 idx=1266 tokens=145 err=False
+REQDONE t=1794801514.561 idx=1255 tokens=228 err=False
+Evaluating:  67%|██████▋   | 890/1319 [04:34<02:13,  3.21it/s]REQDONE t=1794801515.002 idx=1269 tokens=136 err=False
+Evaluating:  68%|██████▊   | 891/1319 [04:35<02:26,  2.92it/s]REQDONE t=1794801515.339 idx=1265 tokens=168 err=False
+Evaluating:  68%|██████▊   | 892/1319 [04:35<02:25,  2.93it/s]REQDONE t=1794801515.688 idx=1271 tokens=132 err=False
+Evaluating:  68%|██████▊   | 893/1319 [04:36<02:26,  2.91it/s]REQDONE t=1794801516.070 idx=1275 tokens=111 err=False
+Evaluating:  68%|██████▊   | 894/1319 [04:36<02:30,  2.82it/s]REQDONE t=1794801516.421 idx=1274 tokens=126 err=False
+Evaluating:  68%|██████▊   | 895/1319 [04:36<02:29,  2.83it/s]REQDONE t=1794801516.448 idx=1280 tokens=58 err=False
+REQDONE t=1794801516.916 idx=1277 tokens=109 err=False
+Evaluating:  68%|██████▊   | 897/1319 [04:37<02:09,  3.27it/s]REQDONE t=1794801517.187 idx=1263 tokens=234 err=False
+Evaluating:  68%|██████▊   | 898/1319 [04:37<02:05,  3.36it/s]REQDONE t=1794801517.392 idx=1270 tokens=187 err=False
+Evaluating:  68%|██████▊   | 899/1319 [04:37<01:54,  3.65it/s]REQDONE t=1794801517.692 idx=1278 tokens=117 err=False
+Evaluating:  68%|██████▊   | 900/1319 [04:38<01:57,  3.56it/s]REQDONE t=1794801517.772 idx=1276 tokens=138 err=False
+REQDONE t=1794801517.929 idx=1272 tokens=172 err=False
+Evaluating:  68%|██████▊   | 902/1319 [04:38<01:27,  4.76it/s]REQDONE t=1794801518.391 idx=1264 tokens=256 err=False
+Evaluating:  68%|██████▊   | 903/1319 [04:38<01:52,  3.70it/s]REQDONE t=1794801519.222 idx=1285 tokens=97 err=False
+REQDONE t=1794801519.222 idx=1291 tokens=52 err=False
+Evaluating:  69%|██████▊   | 904/1319 [04:39<02:50,  2.43it/s]REQDONE t=1794801519.421 idx=1282 tokens=130 err=False
+Evaluating:  69%|██████▊   | 906/1319 [04:39<01:55,  3.56it/s]REQDONE t=1794801519.832 idx=1279 tokens=158 err=False
+Evaluating:  69%|██████▉   | 907/1319 [04:40<02:08,  3.22it/s]REQDONE t=1794801520.181 idx=1283 tokens=136 err=False
+Evaluating:  69%|██████▉   | 908/1319 [04:40<02:11,  3.12it/s]REQDONE t=1794801520.376 idx=1286 tokens=106 err=False
+Evaluating:  69%|██████▉   | 909/1319 [04:40<01:57,  3.48it/s]REQDONE t=1794801520.529 idx=1284 tokens=131 err=False
+Evaluating:  69%|██████▉   | 910/1319 [04:40<01:42,  3.98it/s]REQDONE t=1794801520.678 idx=1281 tokens=162 err=False
+Evaluating:  69%|██████▉   | 911/1319 [04:41<01:30,  4.50it/s]REQDONE t=1794801521.262 idx=1287 tokens=119 err=False
+Evaluating:  69%|██████▉   | 912/1319 [04:41<02:12,  3.07it/s]REQDONE t=1794801521.630 idx=1289 tokens=120 err=False
+Evaluating:  69%|██████▉   | 913/1319 [04:41<02:17,  2.96it/s]REQDONE t=1794801522.081 idx=1290 tokens=128 err=False
+Evaluating:  69%|██████▉   | 914/1319 [04:42<02:30,  2.70it/s]REQDONE t=1794801522.280 idx=1292 tokens=120 err=False
+Evaluating:  69%|██████▉   | 915/1319 [04:42<02:09,  3.12it/s]REQDONE t=1794801522.529 idx=1295 tokens=117 err=False
+Evaluating:  69%|██████▉   | 916/1319 [04:42<02:00,  3.34it/s]REQDONE t=1794801522.562 idx=1293 tokens=131 err=False
+REQDONE t=1794801523.212 idx=1296 tokens=102 err=False
+Evaluating:  70%|██████▉   | 918/1319 [04:43<02:07,  3.14it/s]REQDONE t=1794801523.554 idx=1294 tokens=158 err=False
+Evaluating:  70%|██████▉   | 919/1319 [04:43<02:09,  3.08it/s]REQDONE t=1794801523.917 idx=1299 tokens=104 err=False
+Evaluating:  70%|██████▉   | 920/1319 [04:44<02:13,  2.99it/s]REQDONE t=1794801524.336 idx=1304 tokens=86 err=False
+Evaluating:  70%|██████▉   | 921/1319 [04:44<02:22,  2.80it/s]REQDONE t=1794801524.791 idx=1300 tokens=119 err=False
+REQDONE t=1794801524.791 idx=1308 tokens=64 err=False
+Evaluating:  70%|██████▉   | 922/1319 [04:45<02:32,  2.60it/s]REQDONE t=1794801525.271 idx=1302 tokens=129 err=False
+Evaluating:  70%|███████   | 924/1319 [04:45<02:06,  3.12it/s]REQDONE t=1794801525.619 idx=1305 tokens=110 err=False
+Evaluating:  70%|███████   | 925/1319 [04:45<02:08,  3.06it/s]REQDONE t=1794801525.646 idx=1307 tokens=93 err=False
+REQDONE t=1794801526.174 idx=1288 tokens=252 err=False
+Evaluating:  70%|███████   | 927/1319 [04:46<02:00,  3.26it/s]REQDONE t=1794801526.618 idx=1303 tokens=168 err=False
+Evaluating:  70%|███████   | 928/1319 [04:46<02:12,  2.96it/s]REQDONE t=1794801526.646 idx=1298 tokens=203 err=False
+REQDONE t=1794801527.220 idx=1311 tokens=101 err=False
+Evaluating:  71%|███████   | 930/1319 [04:47<02:05,  3.09it/s]REQDONE t=1794801527.573 idx=1301 tokens=194 err=False
+Evaluating:  71%|███████   | 931/1319 [04:47<02:07,  3.03it/s]REQDONE t=1794801527.577 idx=1297 tokens=222 err=False
+REQDONE t=1794801528.118 idx=1309 tokens=164 err=False
+Evaluating:  71%|███████   | 933/1319 [04:48<01:58,  3.25it/s]REQDONE t=1794801528.319 idx=376 tokens=125 err=False
+Evaluating:  71%|███████   | 934/1319 [04:48<01:49,  3.51it/s]REQDONE t=1794801528.689 idx=881 tokens=91 err=False
+Evaluating:  71%|███████   | 935/1319 [04:49<01:57,  3.28it/s]REQDONE t=1794801528.889 idx=1306 tokens=189 err=False
+Evaluating:  71%|███████   | 936/1319 [04:49<01:46,  3.59it/s]REQDONE t=1794801529.347 idx=378 tokens=95 err=False
+Evaluating:  71%|███████   | 937/1319 [04:49<02:04,  3.07it/s]REQDONE t=1794801529.351 idx=1310 tokens=159 err=False
+REQDONE t=1794801529.743 idx=1313 tokens=100 err=False
+Evaluating:  71%|███████   | 939/1319 [04:50<01:42,  3.69it/s]REQDONE t=1794801530.002 idx=377 tokens=135 err=False
+Evaluating:  71%|███████▏  | 940/1319 [04:50<01:41,  3.73it/s]REQDONE t=1794801530.198 idx=379 tokens=83 err=False
+Evaluating:  71%|███████▏  | 941/1319 [04:50<01:34,  4.00it/s]REQDONE t=1794801530.572 idx=1312 tokens=144 err=False
+Evaluating:  71%|███████▏  | 942/1319 [04:50<01:46,  3.54it/s]REQDONE t=1794801531.115 idx=884 tokens=74 err=False
+Evaluating:  71%|███████▏  | 943/1319 [04:51<02:13,  2.83it/s]REQDONE t=1794801531.547 idx=1315 tokens=109 err=False
+Evaluating:  72%|███████▏  | 944/1319 [04:51<02:20,  2.66it/s]REQDONE t=1794801531.896 idx=381 tokens=85 err=False
+Evaluating:  72%|███████▏  | 945/1319 [04:52<02:17,  2.72it/s]REQDONE t=1794801532.248 idx=885 tokens=89 err=False
+Evaluating:  72%|███████▏  | 946/1319 [04:52<02:15,  2.75it/s]REQDONE t=1794801532.913 idx=883 tokens=160 err=False
+Evaluating:  72%|███████▏  | 947/1319 [04:53<02:48,  2.21it/s]REQDONE t=1794801532.941 idx=1314 tokens=179 err=False
+REQDONE t=1794801533.440 idx=1316 tokens=139 err=False
+REQDONE t=1794801533.440 idx=1318 tokens=99 err=False
+Evaluating:  72%|███████▏  | 949/1319 [04:53<02:15,  2.73it/s]REQDONE t=1794801533.632 idx=886 tokens=113 err=False
+Evaluating:  72%|███████▏  | 951/1319 [04:53<01:35,  3.85it/s]REQDONE t=1794801533.755 idx=880 tokens=256 err=False
+Evaluating:  72%|███████▏  | 952/1319 [04:54<01:24,  4.36it/s]REQDONE t=1794801534.316 idx=887 tokens=117 err=False
+REQDONE t=1794801534.316 idx=888 tokens=77 err=False
+Evaluating:  72%|███████▏  | 953/1319 [04:54<01:53,  3.24it/s]REQDONE t=1794801534.932 idx=882 tokens=256 err=False
+Evaluating:  72%|███████▏  | 955/1319 [04:55<01:52,  3.24it/s]REQDONE t=1794801535.281 idx=384 tokens=117 err=False
+Evaluating:  72%|███████▏  | 956/1319 [04:55<01:55,  3.15it/s]REQDONE t=1794801535.288 idx=385 tokens=102 err=False
+REQDONE t=1794801535.713 idx=388 tokens=58 err=False
+Evaluating:  73%|███████▎  | 958/1319 [04:56<01:40,  3.60it/s]REQDONE t=1794801536.010 idx=382 tokens=208 err=False
+Evaluating:  73%|███████▎  | 959/1319 [04:56<01:41,  3.55it/s]REQDONE t=1794801536.211 idx=386 tokens=92 err=False
+Evaluating:  73%|███████▎  | 960/1319 [04:56<01:34,  3.81it/s]REQDONE t=1794801536.504 idx=387 tokens=85 err=False
+Evaluating:  73%|███████▎  | 961/1319 [04:56<01:36,  3.70it/s]REQDONE t=1794801536.978 idx=380 tokens=256 err=False
+Evaluating:  73%|███████▎  | 962/1319 [04:57<01:55,  3.08it/s]REQDONE t=1794801537.214 idx=892 tokens=101 err=False
+Evaluating:  73%|███████▎  | 963/1319 [04:57<01:46,  3.33it/s]REQDONE t=1794801537.243 idx=889 tokens=152 err=False
+REQDONE t=1794801537.789 idx=1317 tokens=256 err=False
+Evaluating:  73%|███████▎  | 965/1319 [04:58<01:44,  3.39it/s]REQDONE t=1794801538.164 idx=893 tokens=102 err=False
+Evaluating:  73%|███████▎  | 966/1319 [04:58<01:50,  3.19it/s]REQDONE t=1794801538.364 idx=389 tokens=107 err=False
+Evaluating:  73%|███████▎  | 967/1319 [04:58<01:40,  3.51it/s]REQDONE t=1794801538.707 idx=895 tokens=82 err=False
+Evaluating:  73%|███████▎  | 968/1319 [04:59<01:45,  3.33it/s]REQDONE t=1794801538.736 idx=383 tokens=254 err=False
+REQDONE t=1794801539.216 idx=390 tokens=102 err=False
+Evaluating:  74%|███████▎  | 970/1319 [04:59<01:37,  3.56it/s]REQDONE t=1794801539.222 idx=891 tokens=157 err=False
+REQDONE t=1794801539.722 idx=890 tokens=187 err=False
+Evaluating:  74%|███████▎  | 972/1319 [05:00<01:33,  3.70it/s]REQDONE t=1794801539.995 idx=896 tokens=95 err=False
+Evaluating:  74%|███████▍  | 973/1319 [05:00<01:33,  3.70it/s]REQDONE t=1794801540.461 idx=391 tokens=139 err=False
+Evaluating:  74%|███████▍  | 974/1319 [05:00<01:49,  3.16it/s]REQDONE t=1794801540.970 idx=897 tokens=107 err=False
+REQDONE t=1794801540.970 idx=899 tokens=76 err=False
+Evaluating:  74%|███████▍  | 975/1319 [05:01<02:05,  2.74it/s]REQDONE t=1794801541.001 idx=898 tokens=102 err=False
+REQDONE t=1794801541.348 idx=393 tokens=134 err=False
+Evaluating:  74%|███████▍  | 978/1319 [05:01<01:22,  4.15it/s]REQDONE t=1794801541.646 idx=394 tokens=112 err=False
+Evaluating:  74%|███████▍  | 979/1319 [05:01<01:25,  3.96it/s]REQDONE t=1794801542.042 idx=397 tokens=75 err=False
+Evaluating:  74%|███████▍  | 980/1319 [05:02<01:36,  3.52it/s]REQDONE t=1794801542.233 idx=894 tokens=178 err=False
+Evaluating:  74%|███████▍  | 981/1319 [05:02<01:28,  3.82it/s]REQDONE t=1794801542.832 idx=396 tokens=117 err=False
+Evaluating:  74%|███████▍  | 982/1319 [05:03<01:57,  2.88it/s]REQDONE t=1794801543.176 idx=398 tokens=103 err=False
+Evaluating:  75%|███████▍  | 983/1319 [05:03<01:56,  2.88it/s]REQDONE t=1794801543.205 idx=900 tokens=114 err=False
+REQDONE t=1794801543.748 idx=904 tokens=58 err=False
+Evaluating:  75%|███████▍  | 985/1319 [05:04<01:47,  3.12it/s]REQDONE t=1794801543.775 idx=392 tokens=193 err=False
+REQDONE t=1794801544.277 idx=399 tokens=106 err=False
+Evaluating:  75%|███████▍  | 987/1319 [05:04<01:39,  3.34it/s]REQDONE t=1794801544.503 idx=400 tokens=77 err=False
+Evaluating:  75%|███████▍  | 988/1319 [05:04<01:33,  3.53it/s]REQDONE t=1794801544.509 idx=902 tokens=118 err=False
+REQDONE t=1794801545.096 idx=907 tokens=56 err=False
+Evaluating:  75%|███████▌  | 990/1319 [05:05<01:34,  3.47it/s]REQDONE t=1794801545.438 idx=901 tokens=157 err=False
+Evaluating:  75%|███████▌  | 991/1319 [05:05<01:38,  3.33it/s]REQDONE t=1794801545.444 idx=395 tokens=203 err=False
+REQDONE t=1794801545.444 idx=401 tokens=103 err=False
+REQDONE t=1794801545.684 idx=905 tokens=103 err=False
+Evaluating:  75%|███████▌  | 994/1319 [05:06<01:03,  5.11it/s]REQDONE t=1794801546.702 idx=402 tokens=144 err=False
+Evaluating:  75%|███████▌  | 995/1319 [05:07<01:52,  2.87it/s]REQDONE t=1794801546.728 idx=908 tokens=104 err=False
+REQDONE t=1794801547.039 idx=906 tokens=139 err=False
+Evaluating:  76%|███████▌  | 997/1319 [05:07<01:32,  3.50it/s]REQDONE t=1794801547.334 idx=910 tokens=81 err=False
+Evaluating:  76%|███████▌  | 998/1319 [05:07<01:32,  3.47it/s]REQDONE t=1794801547.660 idx=403 tokens=147 err=False
+Evaluating:  76%|███████▌  | 999/1319 [05:07<01:34,  3.38it/s]REQDONE t=1794801548.123 idx=912 tokens=71 err=False
+Evaluating:  76%|███████▌  | 1000/1319 [05:08<01:47,  2.97it/s]REQDONE t=1794801548.549 idx=909 tokens=132 err=False
+Evaluating:  76%|███████▌  | 1001/1319 [05:08<01:54,  2.79it/s]REQDONE t=1794801548.576 idx=911 tokens=96 err=False
+REQDONE t=1794801549.110 idx=903 tokens=234 err=False
+Evaluating:  76%|███████▌  | 1003/1319 [05:09<01:42,  3.07it/s]REQDONE t=1794801549.317 idx=404 tokens=163 err=False
+Evaluating:  76%|███████▌  | 1004/1319 [05:09<01:34,  3.35it/s]REQDONE t=1794801549.742 idx=405 tokens=163 err=False
+Evaluating:  76%|███████▌  | 1005/1319 [05:10<01:43,  3.03it/s]REQDONE t=1794801550.186 idx=914 tokens=84 err=False
+Evaluating:  76%|███████▋  | 1006/1319 [05:10<01:52,  2.78it/s]REQDONE t=1794801550.538 idx=913 tokens=139 err=False
+Evaluating:  76%|███████▋  | 1007/1319 [05:10<01:51,  2.80it/s]REQDONE t=1794801550.566 idx=1 tokens=53 err=False
+REQDONE t=1794801550.739 idx=412 tokens=77 err=False
+Evaluating:  76%|███████▋  | 1009/1319 [05:11<01:15,  4.08it/s]REQDONE t=1794801551.488 idx=917 tokens=69 err=False
+Evaluating:  77%|███████▋  | 1010/1319 [05:11<01:52,  2.74it/s]REQDONE t=1794801551.518 idx=408 tokens=175 err=False
+REQDONE t=1794801551.518 idx=915 tokens=122 err=False
+REQDONE t=1794801551.694 idx=406 tokens=212 err=False
+Evaluating:  77%|███████▋  | 1013/1319 [05:12<01:05,  4.64it/s]REQDONE t=1794801552.718 idx=414 tokens=111 err=False
+Evaluating:  77%|███████▋  | 1014/1319 [05:13<01:53,  2.69it/s]REQDONE t=1794801552.747 idx=407 tokens=250 err=False
+REQDONE t=1794801553.390 idx=409 tokens=238 err=False
+Evaluating:  77%|███████▋  | 1016/1319 [05:13<01:48,  2.78it/s]REQDONE t=1794801553.390 idx=918 tokens=118 err=False
+REQDONE t=1794801553.757 idx=411 tokens=202 err=False
+Evaluating:  77%|███████▋  | 1018/1319 [05:14<01:30,  3.33it/s]REQDONE t=1794801553.757 idx=921 tokens=71 err=False
+REQDONE t=1794801553.971 idx=0 tokens=76 err=False
+Evaluating:  77%|███████▋  | 1020/1319 [05:14<01:10,  4.21it/s]REQDONE t=1794801554.390 idx=919 tokens=113 err=False
+Evaluating:  77%|███████▋  | 1021/1319 [05:14<01:20,  3.68it/s]REQDONE t=1794801554.589 idx=413 tokens=165 err=False
+REQDONE t=1794801554.590 idx=418 tokens=85 err=False
+Evaluating:  77%|███████▋  | 1022/1319 [05:14<01:16,  3.90it/s]REQDONE t=1794801555.106 idx=410 tokens=235 err=False
+Evaluating:  78%|███████▊  | 1024/1319 [05:15<01:15,  3.89it/s]REQDONE t=1794801555.460 idx=916 tokens=206 err=False
+Evaluating:  78%|███████▊  | 1025/1319 [05:15<01:21,  3.60it/s]REQDONE t=1794801556.288 idx=415 tokens=202 err=False
+Evaluating:  78%|███████▊  | 1026/1319 [05:16<01:58,  2.46it/s]REQDONE t=1794801556.679 idx=920 tokens=197 err=False
+Evaluating:  78%|███████▊  | 1027/1319 [05:17<01:57,  2.49it/s]REQDONE t=1794801556.880 idx=924 tokens=87 err=False
+Evaluating:  78%|███████▊  | 1028/1319 [05:17<01:41,  2.86it/s]REQDONE t=1794801557.186 idx=922 tokens=126 err=False
+Evaluating:  78%|███████▊  | 1029/1319 [05:17<01:37,  2.96it/s]REQDONE t=1794801557.627 idx=419 tokens=144 err=False
+Evaluating:  78%|███████▊  | 1030/1319 [05:17<01:45,  2.73it/s]REQDONE t=1794801557.981 idx=420 tokens=135 err=False
+Evaluating:  78%|███████▊  | 1031/1319 [05:18<01:44,  2.75it/s]REQDONE t=1794801558.010 idx=416 tokens=227 err=False
+REQDONE t=1794801558.427 idx=421 tokens=132 err=False
+Evaluating:  78%|███████▊  | 1033/1319 [05:18<01:25,  3.33it/s]REQDONE t=1794801558.455 idx=925 tokens=123 err=False
+REQDONE t=1794801559.415 idx=923 tokens=178 err=False
+Evaluating:  78%|███████▊  | 1035/1319 [05:19<01:46,  2.66it/s]REQDONE t=1794801559.614 idx=417 tokens=252 err=False
+Evaluating:  79%|███████▊  | 1036/1319 [05:19<01:35,  2.96it/s]REQDONE t=1794801560.076 idx=424 tokens=139 err=False
+Evaluating:  79%|███████▊  | 1037/1319 [05:20<01:43,  2.73it/s]REQDONE t=1794801560.345 idx=929 tokens=91 err=False
+Evaluating:  79%|███████▊  | 1038/1319 [05:20<01:36,  2.92it/s]REQDONE t=1794801561.002 idx=928 tokens=130 err=False
+Evaluating:  79%|███████▉  | 1039/1319 [05:21<01:59,  2.35it/s]REQDONE t=1794801561.197 idx=930 tokens=101 err=False
+Evaluating:  79%|███████▉  | 1040/1319 [05:21<01:41,  2.76it/s]REQDONE t=1794801561.419 idx=422 tokens=215 err=False
+Evaluating:  79%|███████▉  | 1041/1319 [05:21<01:29,  3.10it/s]REQDONE t=1794801562.001 idx=426 tokens=136 err=False
+Evaluating:  79%|███████▉  | 1042/1319 [05:22<01:50,  2.52it/s]REQDONE t=1794801562.467 idx=16 tokens=82 err=False
+Evaluating:  79%|███████▉  | 1043/1319 [05:22<01:55,  2.40it/s]REQDONE t=1794801562.814 idx=932 tokens=124 err=False
+Evaluating:  79%|███████▉  | 1044/1319 [05:23<01:49,  2.52it/s]REQDONE t=1794801562.849 idx=927 tokens=238 err=False
+REQDONE t=1794801563.180 idx=423 tokens=254 err=False
+Evaluating:  79%|███████▉  | 1046/1319 [05:23<01:21,  3.34it/s]REQDONE t=1794801563.214 idx=425 tokens=179 err=False
+REQDONE t=1794801563.510 idx=926 tokens=256 err=False
+Evaluating:  79%|███████▉  | 1048/1319 [05:23<01:06,  4.06it/s]REQDONE t=1794801563.735 idx=429 tokens=103 err=False
+Evaluating:  80%|███████▉  | 1049/1319 [05:24<01:05,  4.14it/s]REQDONE t=1794801564.508 idx=431 tokens=85 err=False
+Evaluating:  80%|███████▉  | 1050/1319 [05:24<01:39,  2.71it/s]REQDONE t=1794801564.846 idx=430 tokens=122 err=False
+Evaluating:  80%|███████▉  | 1051/1319 [05:25<01:36,  2.77it/s]REQDONE t=1794801565.069 idx=427 tokens=199 err=False
+Evaluating:  80%|███████▉  | 1052/1319 [05:25<01:26,  3.08it/s]REQDONE t=1794801565.437 idx=933 tokens=154 err=False
+Evaluating:  80%|███████▉  | 1053/1319 [05:25<01:29,  2.97it/s]REQDONE t=1794801565.833 idx=432 tokens=91 err=False
+Evaluating:  80%|███████▉  | 1054/1319 [05:26<01:33,  2.83it/s]REQDONE t=1794801566.362 idx=934 tokens=155 err=False
+Evaluating:  80%|███████▉  | 1055/1319 [05:26<01:46,  2.48it/s]REQDONE t=1794801566.391 idx=4 tokens=129 err=False
+REQDONE t=1794801566.701 idx=428 tokens=246 err=False
+Evaluating:  80%|████████  | 1057/1319 [05:27<01:18,  3.36it/s]REQDONE t=1794801567.137 idx=931 tokens=256 err=False
+Evaluating:  80%|████████  | 1058/1319 [05:27<01:26,  3.01it/s]REQDONE t=1794801567.515 idx=3 tokens=81 err=False
+Evaluating:  80%|████████  | 1059/1319 [05:27<01:29,  2.91it/s]REQDONE t=1794801567.710 idx=937 tokens=125 err=False
+Evaluating:  80%|████████  | 1060/1319 [05:28<01:18,  3.30it/s]REQDONE t=1794801568.078 idx=435 tokens=86 err=False
+Evaluating:  80%|████████  | 1061/1319 [05:28<01:22,  3.11it/s]REQDONE t=1794801568.631 idx=433 tokens=153 err=False
+Evaluating:  81%|████████  | 1062/1319 [05:28<01:39,  2.58it/s]REQDONE t=1794801568.985 idx=940 tokens=79 err=False
+Evaluating:  81%|████████  | 1063/1319 [05:29<01:36,  2.65it/s]REQDONE t=1794801568.990 idx=436 tokens=90 err=False
+REQDONE t=1794801569.425 idx=434 tokens=163 err=False
+Evaluating:  81%|████████  | 1065/1319 [05:29<01:17,  3.26it/s]REQDONE t=1794801570.012 idx=936 tokens=196 err=False
+Evaluating:  81%|████████  | 1066/1319 [05:30<01:34,  2.67it/s]REQDONE t=1794801570.040 idx=939 tokens=140 err=False
+REQDONE t=1794801570.357 idx=437 tokens=94 err=False
+Evaluating:  81%|████████  | 1068/1319 [05:30<01:13,  3.43it/s]REQDONE t=1794801570.727 idx=935 tokens=256 err=False
+Evaluating:  81%|████████  | 1069/1319 [05:31<01:17,  3.23it/s]REQDONE t=1794801570.753 idx=6 tokens=94 err=False
+REQDONE t=1794801571.231 idx=938 tokens=216 err=False
+Evaluating:  81%|████████  | 1071/1319 [05:31<01:11,  3.49it/s]REQDONE t=1794801571.675 idx=439 tokens=74 err=False
+Evaluating:  81%|████████▏ | 1072/1319 [05:32<01:19,  3.11it/s]REQDONE t=1794801571.870 idx=5 tokens=131 err=False
+Evaluating:  81%|████████▏ | 1073/1319 [05:32<01:11,  3.44it/s]REQDONE t=1794801571.870 idx=942 tokens=108 err=False
+REQDONE t=1794801572.327 idx=2 tokens=256 err=False
+Evaluating:  82%|████████▏ | 1075/1319 [05:32<01:04,  3.76it/s]REQDONE t=1794801572.328 idx=941 tokens=133 err=False
+REQDONE t=1794801572.518 idx=438 tokens=126 err=False
+Evaluating:  82%|████████▏ | 1077/1319 [05:32<00:49,  4.92it/s]REQDONE t=1794801573.721 idx=944 tokens=120 err=False
+REQDONE t=1794801573.722 idx=441 tokens=111 err=False
+Evaluating:  82%|████████▏ | 1078/1319 [05:34<01:39,  2.43it/s]REQDONE t=1794801573.916 idx=440 tokens=144 err=False
+Evaluating:  82%|████████▏ | 1080/1319 [05:34<01:10,  3.40it/s]REQDONE t=1794801574.196 idx=947 tokens=70 err=False
+Evaluating:  82%|████████▏ | 1081/1319 [05:34<01:09,  3.44it/s]REQDONE t=1794801574.706 idx=946 tokens=95 err=False
+Evaluating:  82%|████████▏ | 1082/1319 [05:35<01:20,  2.93it/s]REQDONE t=1794801575.085 idx=10 tokens=134 err=False
+Evaluating:  82%|████████▏ | 1083/1319 [05:35<01:22,  2.85it/s]REQDONE t=1794801575.509 idx=12 tokens=111 err=False
+Evaluating:  82%|████████▏ | 1084/1319 [05:35<01:26,  2.70it/s]REQDONE t=1794801575.968 idx=444 tokens=124 err=False
+Evaluating:  82%|████████▏ | 1085/1319 [05:36<01:32,  2.54it/s]REQDONE t=1794801576.347 idx=9 tokens=189 err=False
+Evaluating:  82%|████████▏ | 1086/1319 [05:36<01:30,  2.56it/s]REQDONE t=1794801576.696 idx=7 tokens=256 err=False
+Evaluating:  82%|████████▏ | 1087/1319 [05:37<01:27,  2.64it/s]REQDONE t=1794801576.983 idx=442 tokens=175 err=False
+Evaluating:  82%|████████▏ | 1088/1319 [05:37<01:21,  2.84it/s]REQDONE t=1794801577.179 idx=949 tokens=82 err=False
+Evaluating:  83%|████████▎ | 1089/1319 [05:37<01:10,  3.27it/s]REQDONE t=1794801577.670 idx=943 tokens=256 err=False
+Evaluating:  83%|████████▎ | 1090/1319 [05:38<01:22,  2.77it/s]REQDONE t=1794801577.699 idx=8 tokens=256 err=False
+REQDONE t=1794801577.699 idx=11 tokens=190 err=False
+REQDONE t=1794801578.560 idx=945 tokens=245 err=False
+Evaluating:  83%|████████▎ | 1093/1319 [05:38<01:13,  3.08it/s]REQDONE t=1794801578.992 idx=951 tokens=64 err=False
+Evaluating:  83%|████████▎ | 1094/1319 [05:39<01:18,  2.88it/s]REQDONE t=1794801579.576 idx=446 tokens=144 err=False
+REQDONE t=1794801579.577 idx=447 tokens=100 err=False
+Evaluating:  83%|████████▎ | 1095/1319 [05:39<01:30,  2.49it/s]REQDONE t=1794801579.965 idx=443 tokens=256 err=False
+Evaluating:  83%|████████▎ | 1097/1319 [05:40<01:10,  3.13it/s]REQDONE t=1794801580.166 idx=948 tokens=188 err=False
+Evaluating:  83%|████████▎ | 1098/1319 [05:40<01:04,  3.41it/s]REQDONE t=1794801580.656 idx=445 tokens=193 err=False
+Evaluating:  83%|████████▎ | 1099/1319 [05:40<01:14,  2.94it/s]REQDONE t=1794801580.923 idx=449 tokens=91 err=False
+Evaluating:  83%|████████▎ | 1100/1319 [05:41<01:10,  3.11it/s]REQDONE t=1794801581.185 idx=14 tokens=195 err=False
+Evaluating:  83%|████████▎ | 1101/1319 [05:41<01:06,  3.27it/s]REQDONE t=1794801581.989 idx=13 tokens=256 err=False
+Evaluating:  84%|████████▎ | 1102/1319 [05:42<01:36,  2.25it/s]REQDONE t=1794801582.211 idx=957 tokens=53 err=False
+Evaluating:  84%|████████▎ | 1103/1319 [05:42<01:22,  2.63it/s]REQDONE t=1794801582.410 idx=450 tokens=152 err=False
+Evaluating:  84%|████████▎ | 1104/1319 [05:42<01:10,  3.04it/s]REQDONE t=1794801582.652 idx=451 tokens=112 err=False
+Evaluating:  84%|████████▍ | 1105/1319 [05:42<01:04,  3.30it/s]REQDONE t=1794801582.849 idx=454 tokens=62 err=False
+Evaluating:  84%|████████▍ | 1106/1319 [05:43<00:57,  3.68it/s]REQDONE t=1794801583.373 idx=954 tokens=147 err=False
+Evaluating:  84%|████████▍ | 1107/1319 [05:43<01:13,  2.89it/s]REQDONE t=1794801583.563 idx=15 tokens=223 err=False
+Evaluating:  84%|████████▍ | 1108/1319 [05:43<01:03,  3.33it/s]REQDONE t=1794801583.994 idx=952 tokens=198 err=False
+Evaluating:  84%|████████▍ | 1109/1319 [05:44<01:11,  2.95it/s]REQDONE t=1794801584.194 idx=448 tokens=213 err=False
+Evaluating:  84%|████████▍ | 1110/1319 [05:44<01:02,  3.36it/s]REQDONE t=1794801584.344 idx=950 tokens=256 err=False
+Evaluating:  84%|████████▍ | 1111/1319 [05:44<00:52,  3.95it/s]REQDONE t=1794801584.791 idx=958 tokens=91 err=False
+Evaluating:  84%|████████▍ | 1112/1319 [05:45<01:04,  3.21it/s]REQDONE t=1794801584.823 idx=956 tokens=122 err=False
+REQDONE t=1794801585.360 idx=452 tokens=157 err=False
+Evaluating:  84%|████████▍ | 1114/1319 [05:45<01:01,  3.34it/s]REQDONE t=1794801586.008 idx=953 tokens=242 err=False
+Evaluating:  85%|████████▍ | 1115/1319 [05:46<01:18,  2.59it/s]REQDONE t=1794801586.352 idx=453 tokens=172 err=False
+Evaluating:  85%|████████▍ | 1116/1319 [05:46<01:16,  2.67it/s]REQDONE t=1794801586.383 idx=959 tokens=103 err=False
+REQDONE t=1794801586.845 idx=457 tokens=98 err=False
+Evaluating:  85%|████████▍ | 1118/1319 [05:47<01:04,  3.13it/s]REQDONE t=1794801587.040 idx=962 tokens=76 err=False
+Evaluating:  85%|████████▍ | 1119/1319 [05:47<00:58,  3.44it/s]REQDONE t=1794801587.041 idx=964 tokens=62 err=False
+REQDONE t=1794801587.707 idx=456 tokens=148 err=False
+Evaluating:  85%|████████▍ | 1121/1319 [05:48<01:00,  3.25it/s]REQDONE t=1794801587.941 idx=955 tokens=240 err=False
+Evaluating:  85%|████████▌ | 1122/1319 [05:48<00:57,  3.43it/s]REQDONE t=1794801588.136 idx=961 tokens=130 err=False
+Evaluating:  85%|████████▌ | 1123/1319 [05:48<00:52,  3.73it/s]REQDONE t=1794801588.170 idx=461 tokens=91 err=False
+REQDONE t=1794801588.322 idx=455 tokens=172 err=False
+Evaluating:  85%|████████▌ | 1125/1319 [05:48<00:38,  5.09it/s]REQDONE t=1794801588.471 idx=460 tokens=113 err=False
+REQDONE t=1794801588.471 idx=462 tokens=58 err=False
+Evaluating:  85%|████████▌ | 1126/1319 [05:48<00:35,  5.38it/s]REQDONE t=1794801588.890 idx=463 tokens=55 err=False
+Evaluating:  86%|████████▌ | 1128/1319 [05:49<00:37,  5.12it/s]REQDONE t=1794801589.832 idx=458 tokens=191 err=False
+Evaluating:  86%|████████▌ | 1129/1319 [05:50<01:08,  2.79it/s]REQDONE t=1794801590.180 idx=967 tokens=112 err=False
+Evaluating:  86%|████████▌ | 1130/1319 [05:50<01:07,  2.81it/s]REQDONE t=1794801590.415 idx=960 tokens=225 err=False
+Evaluating:  86%|████████▌ | 1131/1319 [05:50<01:01,  3.07it/s]REQDONE t=1794801590.420 idx=970 tokens=74 err=False
+REQDONE t=1794801590.901 idx=464 tokens=130 err=False
+Evaluating:  86%|████████▌ | 1133/1319 [05:51<00:54,  3.44it/s]REQDONE t=1794801591.677 idx=459 tokens=256 err=False
+Evaluating:  86%|████████▌ | 1134/1319 [05:52<01:14,  2.48it/s]REQDONE t=1794801591.705 idx=965 tokens=196 err=False
+REQDONE t=1794801592.177 idx=963 tokens=256 err=False
+Evaluating:  86%|████████▌ | 1136/1319 [05:52<01:02,  2.92it/s]REQDONE t=1794801592.373 idx=968 tokens=153 err=False
+REQDONE t=1794801592.373 idx=467 tokens=138 err=False
+Evaluating:  86%|████████▌ | 1137/1319 [05:52<00:56,  3.23it/s]REQDONE t=1794801592.926 idx=966 tokens=209 err=False
+Evaluating:  86%|████████▋ | 1139/1319 [05:53<00:53,  3.37it/s]REQDONE t=1794801593.308 idx=465 tokens=169 err=False
+Evaluating:  86%|████████▋ | 1140/1319 [05:53<00:56,  3.17it/s]REQDONE t=1794801593.336 idx=971 tokens=155 err=False
+REQDONE t=1794801593.510 idx=470 tokens=82 err=False
+Evaluating:  87%|████████▋ | 1142/1319 [05:53<00:41,  4.29it/s]REQDONE t=1794801594.100 idx=969 tokens=182 err=False
+Evaluating:  87%|████████▋ | 1143/1319 [05:54<00:54,  3.23it/s]REQDONE t=1794801594.299 idx=469 tokens=113 err=False
+Evaluating:  87%|████████▋ | 1144/1319 [05:54<00:49,  3.52it/s]REQDONE t=1794801594.633 idx=466 tokens=194 err=False
+Evaluating:  87%|████████▋ | 1145/1319 [05:54<00:51,  3.37it/s]REQDONE t=1794801594.637 idx=973 tokens=115 err=False
+REQDONE t=1794801595.053 idx=972 tokens=142 err=False
+Evaluating:  87%|████████▋ | 1147/1319 [05:55<00:44,  3.84it/s]REQDONE t=1794801595.520 idx=974 tokens=124 err=False
+Evaluating:  87%|████████▋ | 1148/1319 [05:55<00:52,  3.25it/s]REQDONE t=1794801596.070 idx=468 tokens=235 err=False
+Evaluating:  87%|████████▋ | 1149/1319 [05:56<01:02,  2.72it/s]REQDONE t=1794801596.097 idx=472 tokens=96 err=False
+REQDONE t=1794801596.626 idx=977 tokens=99 err=False
+Evaluating:  87%|████████▋ | 1151/1319 [05:56<00:55,  3.03it/s]REQDONE t=1794801596.965 idx=475 tokens=86 err=False
+Evaluating:  87%|████████▋ | 1152/1319 [05:57<00:55,  3.01it/s]REQDONE t=1794801596.998 idx=476 tokens=67 err=False
+REQDONE t=1794801597.458 idx=975 tokens=141 err=False
+Evaluating:  87%|████████▋ | 1154/1319 [05:57<00:49,  3.35it/s]REQDONE t=1794801597.866 idx=978 tokens=119 err=False
+Evaluating:  88%|████████▊ | 1155/1319 [05:58<00:52,  3.10it/s]REQDONE t=1794801598.219 idx=474 tokens=129 err=False
+Evaluating:  88%|████████▊ | 1156/1319 [05:58<00:53,  3.03it/s]REQDONE t=1794801598.418 idx=473 tokens=151 err=False
+Evaluating:  88%|████████▊ | 1157/1319 [05:58<00:48,  3.37it/s]REQDONE t=1794801598.572 idx=980 tokens=97 err=False
+Evaluating:  88%|████████▊ | 1158/1319 [05:58<00:41,  3.87it/s]REQDONE t=1794801599.018 idx=471 tokens=177 err=False
+Evaluating:  88%|████████▊ | 1159/1319 [05:59<00:49,  3.22it/s]REQDONE t=1794801599.510 idx=983 tokens=58 err=False
+Evaluating:  88%|████████▊ | 1160/1319 [05:59<00:57,  2.77it/s]REQDONE t=1794801599.876 idx=981 tokens=120 err=False
+Evaluating:  88%|████████▊ | 1161/1319 [06:00<00:57,  2.76it/s]REQDONE t=1794801600.347 idx=480 tokens=77 err=False
+Evaluating:  88%|████████▊ | 1162/1319 [06:00<01:01,  2.53it/s]REQDONE t=1794801600.373 idx=481 tokens=70 err=False
+REQDONE t=1794801600.538 idx=985 tokens=61 err=False
+Evaluating:  88%|████████▊ | 1164/1319 [06:00<00:40,  3.87it/s]REQDONE t=1794801600.685 idx=477 tokens=146 err=False
+Evaluating:  88%|████████▊ | 1165/1319 [06:01<00:35,  4.33it/s]REQDONE t=1794801600.685 idx=478 tokens=127 err=False
+REQDONE t=1794801601.379 idx=982 tokens=129 err=False
+Evaluating:  88%|████████▊ | 1167/1319 [06:01<00:42,  3.58it/s]REQDONE t=1794801601.731 idx=482 tokens=82 err=False
+Evaluating:  89%|████████▊ | 1168/1319 [06:02<00:44,  3.38it/s]REQDONE t=1794801602.129 idx=976 tokens=256 err=False
+Evaluating:  89%|████████▊ | 1169/1319 [06:02<00:48,  3.12it/s]REQDONE t=1794801602.321 idx=484 tokens=74 err=False
+Evaluating:  89%|████████▊ | 1170/1319 [06:02<00:42,  3.48it/s]REQDONE t=1794801602.498 idx=979 tokens=212 err=False
+Evaluating:  89%|████████▉ | 1171/1319 [06:02<00:38,  3.88it/s]REQDONE t=1794801602.992 idx=483 tokens=128 err=False
+Evaluating:  89%|████████▉ | 1172/1319 [06:03<00:47,  3.09it/s]REQDONE t=1794801603.444 idx=485 tokens=89 err=False
+Evaluating:  89%|████████▉ | 1173/1319 [06:03<00:52,  2.78it/s]REQDONE t=1794801603.473 idx=986 tokens=144 err=False
+REQDONE t=1794801603.636 idx=486 tokens=87 err=False
+Evaluating:  89%|████████▉ | 1175/1319 [06:03<00:34,  4.14it/s]REQDONE t=1794801604.110 idx=987 tokens=153 err=False
+REQDONE t=1794801604.110 idx=988 tokens=126 err=False
+Evaluating:  89%|████████▉ | 1176/1319 [06:04<00:42,  3.36it/s]REQDONE t=1794801604.137 idx=984 tokens=185 err=False
+REQDONE t=1794801604.303 idx=989 tokens=114 err=False
+Evaluating:  89%|████████▉ | 1179/1319 [06:04<00:25,  5.59it/s]REQDONE t=1794801604.819 idx=488 tokens=90 err=False
+Evaluating:  89%|████████▉ | 1180/1319 [06:05<00:34,  4.08it/s]REQDONE t=1794801605.277 idx=489 tokens=78 err=False
+Evaluating:  90%|████████▉ | 1181/1319 [06:05<00:40,  3.43it/s]REQDONE t=1794801605.471 idx=490 tokens=59 err=False
+Evaluating:  90%|████████▉ | 1182/1319 [06:05<00:36,  3.73it/s]REQDONE t=1794801605.846 idx=479 tokens=251 err=False
+Evaluating:  90%|████████▉ | 1183/1319 [06:06<00:40,  3.39it/s]REQDONE t=1794801606.280 idx=487 tokens=160 err=False
+Evaluating:  90%|████████▉ | 1184/1319 [06:06<00:44,  3.01it/s]REQDONE t=1794801606.280 idx=991 tokens=137 err=False
+REQDONE t=1794801606.664 idx=492 tokens=55 err=False
+Evaluating:  90%|████████▉ | 1186/1319 [06:06<00:36,  3.68it/s]REQDONE t=1794801606.865 idx=491 tokens=74 err=False
+Evaluating:  90%|████████▉ | 1187/1319 [06:07<00:33,  3.92it/s]REQDONE t=1794801607.243 idx=995 tokens=88 err=False
+Evaluating:  90%|█████████ | 1188/1319 [06:07<00:37,  3.50it/s]REQDONE t=1794801607.615 idx=990 tokens=194 err=False
+Evaluating:  90%|█████████ | 1189/1319 [06:07<00:40,  3.24it/s]REQDONE t=1794801608.040 idx=993 tokens=158 err=False
+Evaluating:  90%|█████████ | 1190/1319 [06:08<00:43,  2.94it/s]REQDONE t=1794801608.465 idx=495 tokens=81 err=False
+Evaluating:  90%|█████████ | 1191/1319 [06:08<00:46,  2.74it/s]REQDONE t=1794801608.660 idx=992 tokens=178 err=False
+Evaluating:  90%|█████████ | 1192/1319 [06:08<00:40,  3.17it/s]REQDONE t=1794801609.459 idx=994 tokens=174 err=False
+Evaluating:  90%|█████████ | 1193/1319 [06:09<00:57,  2.19it/s]REQDONE t=1794801609.797 idx=996 tokens=159 err=False
+Evaluating:  91%|█████████ | 1194/1319 [06:10<00:52,  2.37it/s]REQDONE t=1794801609.802 idx=497 tokens=96 err=False
+REQDONE t=1794801609.995 idx=496 tokens=110 err=False
+Evaluating:  91%|█████████ | 1196/1319 [06:10<00:33,  3.64it/s]REQDONE t=1794801610.335 idx=998 tokens=140 err=False
+Evaluating:  91%|█████████ | 1197/1319 [06:10<00:35,  3.44it/s]REQDONE t=1794801610.556 idx=997 tokens=169 err=False
+REQDONE t=1794801610.556 idx=1002 tokens=85 err=False
+Evaluating:  91%|█████████ | 1198/1319 [06:10<00:32,  3.67it/s]REQDONE t=1794801610.973 idx=494 tokens=166 err=False
+Evaluating:  91%|█████████ | 1200/1319 [06:11<00:29,  4.08it/s]REQDONE t=1794801611.397 idx=498 tokens=118 err=False
+Evaluating:  91%|█████████ | 1201/1319 [06:11<00:33,  3.48it/s]REQDONE t=1794801611.708 idx=493 tokens=202 err=False
+Evaluating:  91%|█████████ | 1202/1319 [06:12<00:34,  3.42it/s]REQDONE t=1794801612.306 idx=1001 tokens=168 err=False
+Evaluating:  91%|█████████ | 1203/1319 [06:12<00:43,  2.68it/s]REQDONE t=1794801612.656 idx=1003 tokens=124 err=False
+Evaluating:  91%|█████████▏| 1204/1319 [06:12<00:42,  2.73it/s]REQDONE t=1794801612.694 idx=999 tokens=204 err=False
+REQDONE t=1794801613.239 idx=503 tokens=82 err=False
+Evaluating:  91%|█████████▏| 1206/1319 [06:13<00:37,  3.00it/s]REQDONE t=1794801613.268 idx=1000 tokens=212 err=False
+REQDONE t=1794801613.269 idx=1007 tokens=86 err=False
+REQDONE t=1794801613.789 idx=502 tokens=97 err=False
+Evaluating:  92%|█████████▏| 1209/1319 [06:14<00:28,  3.83it/s]REQDONE t=1794801613.797 idx=1004 tokens=111 err=False
+REQDONE t=1794801613.990 idx=501 tokens=107 err=False
+Evaluating:  92%|█████████▏| 1211/1319 [06:14<00:22,  4.76it/s]REQDONE t=1794801614.624 idx=1008 tokens=95 err=False
+Evaluating:  92%|█████████▏| 1212/1319 [06:14<00:30,  3.47it/s]REQDONE t=1794801614.966 idx=499 tokens=190 err=False
+Evaluating:  92%|█████████▏| 1213/1319 [06:15<00:31,  3.34it/s]REQDONE t=1794801615.544 idx=1006 tokens=153 err=False
+Evaluating:  92%|█████████▏| 1214/1319 [06:15<00:38,  2.75it/s]REQDONE t=1794801615.881 idx=1005 tokens=170 err=False
+Evaluating:  92%|█████████▏| 1215/1319 [06:16<00:37,  2.80it/s]REQDONE t=1794801616.347 idx=509 tokens=80 err=False
+Evaluating:  92%|█████████▏| 1216/1319 [06:16<00:39,  2.60it/s]REQDONE t=1794801616.684 idx=507 tokens=91 err=False
+Evaluating:  92%|█████████▏| 1217/1319 [06:17<00:37,  2.69it/s]REQDONE t=1794801616.717 idx=1010 tokens=116 err=False
+REQDONE t=1794801617.175 idx=504 tokens=179 err=False
+Evaluating:  92%|█████████▏| 1219/1319 [06:17<00:31,  3.16it/s]REQDONE t=1794801617.528 idx=506 tokens=128 err=False
+Evaluating:  92%|█████████▏| 1220/1319 [06:17<00:32,  3.07it/s]REQDONE t=1794801617.729 idx=500 tokens=256 err=False
+Evaluating:  93%|█████████▎| 1221/1319 [06:18<00:28,  3.40it/s]REQDONE t=1794801618.269 idx=508 tokens=137 err=False
+Evaluating:  93%|█████████▎| 1222/1319 [06:18<00:34,  2.78it/s]REQDONE t=1794801618.638 idx=511 tokens=82 err=False
+Evaluating:  93%|█████████▎| 1223/1319 [06:18<00:34,  2.76it/s]REQDONE t=1794801619.370 idx=1013 tokens=170 err=False
+Evaluating:  93%|█████████▎| 1224/1319 [06:19<00:44,  2.14it/s]REQDONE t=1794801619.704 idx=1012 tokens=178 err=False
+REQDONE t=1794801619.704 idx=1015 tokens=110 err=False
+Evaluating:  93%|█████████▎| 1225/1319 [06:20<00:40,  2.33it/s]REQDONE t=1794801620.093 idx=1017 tokens=80 err=False
+Evaluating:  93%|█████████▎| 1227/1319 [06:20<00:29,  3.10it/s]REQDONE t=1794801620.374 idx=512 tokens=112 err=False
+Evaluating:  93%|█████████▎| 1228/1319 [06:20<00:28,  3.20it/s]REQDONE t=1794801620.561 idx=505 tokens=256 err=False
+Evaluating:  93%|█████████▎| 1229/1319 [06:20<00:25,  3.57it/s]REQDONE t=1794801620.881 idx=1009 tokens=256 err=False
+Evaluating:  93%|█████████▎| 1230/1319 [06:21<00:25,  3.44it/s]REQDONE t=1794801621.208 idx=1016 tokens=120 err=False
+Evaluating:  93%|█████████▎| 1231/1319 [06:21<00:26,  3.32it/s]REQDONE t=1794801621.209 idx=1018 tokens=98 err=False
+REQDONE t=1794801621.708 idx=516 tokens=55 err=False
+Evaluating:  93%|█████████▎| 1233/1319 [06:22<00:23,  3.59it/s]REQDONE t=1794801622.101 idx=1011 tokens=256 err=False
+Evaluating:  94%|█████████▎| 1234/1319 [06:22<00:26,  3.27it/s]REQDONE t=1794801622.288 idx=517 tokens=60 err=False
+Evaluating:  94%|█████████▎| 1235/1319 [06:22<00:23,  3.63it/s]REQDONE t=1794801622.715 idx=515 tokens=119 err=False
+Evaluating:  94%|█████████▎| 1236/1319 [06:23<00:26,  3.16it/s]REQDONE t=1794801623.064 idx=1020 tokens=78 err=False
+Evaluating:  94%|█████████▍| 1237/1319 [06:23<00:26,  3.08it/s]REQDONE t=1794801623.091 idx=513 tokens=173 err=False
+REQDONE t=1794801623.623 idx=514 tokens=168 err=False
+Evaluating:  94%|█████████▍| 1239/1319 [06:23<00:24,  3.28it/s]REQDONE t=1794801623.651 idx=1014 tokens=256 err=False
+REQDONE t=1794801623.816 idx=510 tokens=256 err=False
+Evaluating:  94%|█████████▍| 1241/1319 [06:24<00:17,  4.46it/s]REQDONE t=1794801623.958 idx=1023 tokens=61 err=False
+Evaluating:  94%|█████████▍| 1242/1319 [06:24<00:15,  4.84it/s]REQDONE t=1794801624.776 idx=519 tokens=111 err=False
+Evaluating:  94%|█████████▍| 1243/1319 [06:25<00:26,  2.85it/s]REQDONE t=1794801624.998 idx=1019 tokens=191 err=False
+Evaluating:  94%|█████████▍| 1244/1319 [06:25<00:23,  3.14it/s]REQDONE t=1794801625.256 idx=524 tokens=82 err=False
+Evaluating:  94%|█████████▍| 1245/1319 [06:25<00:22,  3.31it/s]REQDONE t=1794801625.709 idx=523 tokens=105 err=False
+Evaluating:  94%|█████████▍| 1246/1319 [06:26<00:25,  2.91it/s]REQDONE t=1794801626.195 idx=522 tokens=127 err=False
+Evaluating:  95%|█████████▍| 1247/1319 [06:26<00:27,  2.61it/s]REQDONE t=1794801626.528 idx=520 tokens=157 err=False
+Evaluating:  95%|█████████▍| 1248/1319 [06:26<00:26,  2.71it/s]REQDONE t=1794801626.528 idx=521 tokens=147 err=False
+REQDONE t=1794801626.532 idx=527 tokens=100 err=False
+REQDONE t=1794801626.775 idx=1022 tokens=178 err=False
+Evaluating:  95%|█████████▍| 1251/1319 [06:27<00:14,  4.74it/s]REQDONE t=1794801626.775 idx=525 tokens=118 err=False
+REQDONE t=1794801627.296 idx=529 tokens=102 err=False
+Evaluating:  95%|█████████▍| 1253/1319 [06:27<00:15,  4.39it/s]REQDONE t=1794801627.662 idx=526 tokens=135 err=False
+Evaluating:  95%|█████████▌| 1254/1319 [06:27<00:16,  3.92it/s]REQDONE t=1794801628.283 idx=1021 tokens=248 err=False
+Evaluating:  95%|█████████▌| 1255/1319 [06:28<00:21,  2.98it/s]REQDONE t=1794801628.504 idx=518 tokens=240 err=False
+Evaluating:  95%|█████████▌| 1256/1319 [06:28<00:19,  3.24it/s]REQDONE t=1794801628.504 idx=536 tokens=48 err=False
+REQDONE t=1794801628.706 idx=535 tokens=59 err=False
+Evaluating:  95%|█████████▌| 1258/1319 [06:29<00:13,  4.46it/s]REQDONE t=1794801629.462 idx=538 tokens=83 err=False
+Evaluating:  95%|█████████▌| 1259/1319 [06:29<00:20,  2.91it/s]REQDONE t=1794801629.807 idx=530 tokens=182 err=False
+Evaluating:  96%|█████████▌| 1260/1319 [06:30<00:20,  2.91it/s]REQDONE t=1794801629.996 idx=531 tokens=151 err=False
+Evaluating:  96%|█████████▌| 1261/1319 [06:30<00:17,  3.29it/s]REQDONE t=1794801630.241 idx=537 tokens=101 err=False
+Evaluating:  96%|█████████▌| 1262/1319 [06:30<00:16,  3.47it/s]REQDONE t=1794801630.745 idx=528 tokens=225 err=False
+Evaluating:  96%|█████████▌| 1263/1319 [06:31<00:19,  2.87it/s]REQDONE t=1794801630.934 idx=534 tokens=152 err=False
+Evaluating:  96%|█████████▌| 1264/1319 [06:31<00:16,  3.30it/s]REQDONE t=1794801631.145 idx=539 tokens=119 err=False
+Evaluating:  96%|█████████▌| 1265/1319 [06:31<00:14,  3.62it/s]REQDONE t=1794801631.290 idx=533 tokens=170 err=False
+Evaluating:  96%|█████████▌| 1266/1319 [06:31<00:12,  4.20it/s]REQDONE t=1794801631.290 idx=545 tokens=73 err=False
+REQDONE t=1794801631.768 idx=540 tokens=132 err=False
+Evaluating:  96%|█████████▌| 1268/1319 [06:32<00:12,  4.19it/s]REQDONE t=1794801631.769 idx=543 tokens=89 err=False
+REQDONE t=1794801632.449 idx=532 tokens=218 err=False
+Evaluating:  96%|█████████▋| 1270/1319 [06:32<00:13,  3.59it/s]REQDONE t=1794801632.871 idx=548 tokens=85 err=False
+Evaluating:  96%|█████████▋| 1271/1319 [06:33<00:14,  3.22it/s]REQDONE t=1794801633.265 idx=544 tokens=126 err=False
+Evaluating:  96%|█████████▋| 1272/1319 [06:33<00:15,  3.03it/s]REQDONE t=1794801633.634 idx=549 tokens=100 err=False
+Evaluating:  97%|█████████▋| 1273/1319 [06:33<00:15,  2.94it/s]REQDONE t=1794801633.663 idx=541 tokens=191 err=False
+REQDONE t=1794801633.663 idx=547 tokens=117 err=False
+REQDONE t=1794801633.962 idx=546 tokens=150 err=False
+Evaluating:  97%|█████████▋| 1276/1319 [06:34<00:09,  4.55it/s]REQDONE t=1794801634.337 idx=556 tokens=73 err=False
+Evaluating:  97%|█████████▋| 1277/1319 [06:34<00:10,  3.99it/s]REQDONE t=1794801634.365 idx=542 tokens=198 err=False
+REQDONE t=1794801634.844 idx=558 tokens=55 err=False
+Evaluating:  97%|█████████▋| 1279/1319 [06:35<00:10,  3.97it/s]REQDONE t=1794801635.037 idx=555 tokens=92 err=False
+Evaluating:  97%|█████████▋| 1280/1319 [06:35<00:09,  4.17it/s]REQDONE t=1794801635.537 idx=554 tokens=110 err=False
+Evaluating:  97%|█████████▋| 1281/1319 [06:35<00:11,  3.35it/s]REQDONE t=1794801635.862 idx=557 tokens=116 err=False
+Evaluating:  97%|█████████▋| 1282/1319 [06:36<00:11,  3.28it/s]REQDONE t=1794801636.349 idx=551 tokens=151 err=False
+Evaluating:  97%|█████████▋| 1283/1319 [06:36<00:12,  2.84it/s]REQDONE t=1794801636.350 idx=553 tokens=136 err=False
+REQDONE t=1794801637.120 idx=560 tokens=112 err=False
+Evaluating:  97%|█████████▋| 1285/1319 [06:37<00:12,  2.73it/s]REQDONE t=1794801637.147 idx=563 tokens=100 err=False
+REQDONE t=1794801637.313 idx=559 tokens=126 err=False
+Evaluating:  98%|█████████▊| 1287/1319 [06:37<00:08,  3.78it/s]REQDONE t=1794801637.313 idx=565 tokens=93 err=False
+REQDONE t=1794801637.726 idx=562 tokens=110 err=False
+Evaluating:  98%|█████████▊| 1289/1319 [06:38<00:07,  4.10it/s]REQDONE t=1794801637.994 idx=569 tokens=79 err=False
+Evaluating:  98%|█████████▊| 1290/1319 [06:38<00:07,  4.02it/s]REQDONE t=1794801638.288 idx=566 tokens=115 err=False
+Evaluating:  98%|█████████▊| 1291/1319 [06:38<00:07,  3.86it/s]REQDONE t=1794801638.484 idx=561 tokens=137 err=False
+Evaluating:  98%|█████████▊| 1292/1319 [06:38<00:06,  4.10it/s]REQDONE t=1794801638.484 idx=568 tokens=107 err=False
+REQDONE t=1794801639.032 idx=550 tokens=256 err=False
+Evaluating:  98%|█████████▊| 1294/1319 [06:39<00:06,  3.90it/s]REQDONE t=1794801639.376 idx=552 tokens=235 err=False
+Evaluating:  98%|█████████▊| 1295/1319 [06:39<00:06,  3.62it/s]REQDONE t=1794801639.809 idx=571 tokens=100 err=False
+Evaluating:  98%|█████████▊| 1296/1319 [06:40<00:07,  3.18it/s]REQDONE t=1794801640.105 idx=579 tokens=45 err=False
+Evaluating:  98%|█████████▊| 1297/1319 [06:40<00:06,  3.23it/s]REQDONE t=1794801640.532 idx=564 tokens=189 err=False
+Evaluating:  98%|█████████▊| 1298/1319 [06:40<00:07,  2.93it/s]REQDONE t=1794801640.869 idx=572 tokens=128 err=False
+Evaluating:  98%|█████████▊| 1299/1319 [06:41<00:06,  2.94it/s]REQDONE t=1794801641.264 idx=573 tokens=108 err=False
+Evaluating:  99%|█████████▊| 1300/1319 [06:41<00:06,  2.81it/s]REQDONE t=1794801641.454 idx=577 tokens=101 err=False
+Evaluating:  99%|█████████▊| 1301/1319 [06:41<00:05,  3.25it/s]REQDONE t=1794801641.528 idx=567 tokens=190 err=False
+REQDONE t=1794801642.235 idx=575 tokens=135 err=False
+Evaluating:  99%|█████████▉| 1303/1319 [06:42<00:05,  2.88it/s]REQDONE t=1794801642.572 idx=574 tokens=145 err=False
+Evaluating:  99%|█████████▉| 1304/1319 [06:42<00:05,  2.92it/s]REQDONE t=1794801642.796 idx=576 tokens=161 err=False
+Evaluating:  99%|█████████▉| 1305/1319 [06:43<00:04,  3.21it/s]REQDONE t=1794801642.848 idx=570 tokens=217 err=False
+REQDONE t=1794801643.056 idx=578 tokens=160 err=False
+Evaluating:  99%|█████████▉| 1307/1319 [06:43<00:02,  4.26it/s]REQDONE t=1794801643.083 idx=581 tokens=152 err=False
+REQDONE t=1794801643.158 idx=580 tokens=156 err=False
+Evaluating:  99%|█████████▉| 1309/1319 [06:43<00:01,  6.05it/s]REQDONE t=1794801643.524 idx=582 tokens=167 err=False
+Evaluating:  99%|█████████▉| 1310/1319 [06:43<00:01,  4.81it/s]REQDONE t=1794801643.618 idx=591 tokens=82 err=False
+REQDONE t=1794801643.828 idx=585 tokens=167 err=False
+Evaluating:  99%|█████████▉| 1312/1319 [06:44<00:01,  5.35it/s]REQDONE t=1794801643.828 idx=588 tokens=130 err=False
+REQDONE t=1794801643.904 idx=583 tokens=199 err=False
+REQDONE t=1794801644.074 idx=586 tokens=177 err=False
+Evaluating: 100%|█████████▉| 1315/1319 [06:44<00:00,  7.14it/s]REQDONE t=1794801644.122 idx=589 tokens=165 err=False
+REQDONE t=1794801644.587 idx=584 tokens=256 err=False
+Evaluating: 100%|█████████▉| 1317/1319 [06:44<00:00,  5.72it/s]REQDONE t=1794801644.719 idx=587 tokens=256 err=False
+Evaluating: 100%|█████████▉| 1318/1319 [06:45<00:00,  5.98it/s]REQDONE t=1794801644.860 idx=590 tokens=243 err=False
+Evaluating: 100%|██████████| 1319/1319 [06:45<00:00,  6.18it/s]Evaluating: 100%|██████████| 1319/1319 [06:45<00:00,  3.26it/s]
+
+Results:
+Accuracy: 0.923
+Invalid responses: 0.000
+Total latency: 405.201 s
+Questions per second: 3.255
+Total output tokens: 184952
+Output tokens per second: 456.445
+Results saved to /data/models/WORKORDERS/evidence-index-shrink-20261115/gsm8k-fp8.json
+STAGE4 gsm8k done
+ALL_DONE

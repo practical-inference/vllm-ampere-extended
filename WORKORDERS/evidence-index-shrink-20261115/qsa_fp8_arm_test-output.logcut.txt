@@ -1,0 +1,9 @@
+W1115 22:13:18.334000 4124451 torch/_opaque_base.py:6] torch._opaque_base is deprecated, use torch._custom_class_base instead
+W1115 22:13:18.334000 4124451 torch/_library/opaque_object.py:288] register_opaque_type is deprecated, use register_custom_class instead
+W1115 22:13:18.335000 4124451 torch/_library/opaque_object.py:211] typ='value' is deprecated, use typ='constant' instead
+STORE ARM: bytes match torch cast exactly
+DECODE: arm-vs-fp8-expected max_abs=0.00000 max_rel=0.00000; ref-vs-bf16-expected max_abs=0.00000
+DECODE selection overlap arm-vs-bf16: 0.344
+PREFILL: arm-vs-bf16 max_abs=14.85036 (nonzero frac 0.753)
+PREFILL: arm-vs-fp8-expected max_abs=0.00000
+ALL KERNEL TESTS PASSED

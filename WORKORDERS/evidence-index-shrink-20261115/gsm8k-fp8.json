@@ -1,0 +1,12 @@
+{
+  "accuracy": 0.9234268385140257,
+  "invalid_rate": 0.0,
+  "latency": 405.2007183439564,
+  "questions_per_second": 3.2551768550428903,
+  "total_output_tokens": 184952,
+  "tokens_per_second": 456.44539021523326,
+  "num_questions": 1319,
+  "num_shots": 5,
+  "max_tokens": 256,
+  "timestamp": 1794801644.9094677
+}

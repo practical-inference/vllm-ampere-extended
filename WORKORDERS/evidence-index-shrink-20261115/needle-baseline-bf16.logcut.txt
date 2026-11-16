@@ -1,0 +1,116 @@
+2026-11-15 19:15:07,080 INFO HTTP Request: GET http://localhost:8017/v1/models "HTTP/1.1 200 OK"
+2026-11-15 19:15:07,082 INFO model=qwen3.8-flash-next rounds=40 per_round=9000 cap=300000
+2026-11-15 19:15:07,113 INFO needle planted: Shipping label: 754-214-125
+2026-11-15 19:15:11,482 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:12,229 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:12,231 INFO round 1: {'round': 1, 'user_tokens': 9027, 'cum_prompt_tokens': 9615, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 512, 'round_secs': 5.12}
+2026-11-15 19:15:14,184 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:15,132 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:15,133 INFO round 2: {'round': 2, 'user_tokens': 9011, 'cum_prompt_tokens': 18698, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number that was mentioned earlier in the conversation. Let me look back through the conversation history.\n\nIn the first message, there was a line that said: "Shipping label: 754-214-125"\n\nThis was mentioned in the original data dump. The user asked about it before, and I correctly identified it as 754-214-125. They\'re asking again', 'reply_tokens': 102, 'round_secs': 2.9}
+2026-11-15 19:15:17,009 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:17,858 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:17,858 INFO round 3: {'round': 3, 'user_tokens': 9011, 'cum_prompt_tokens': 27866, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number that was mentioned earlier in the conversation. Let me look back through the conversation history.\n\nIn the first message, there was a line that said: "Shipping label: 754-214-125"\n\nThis was embedded in the long list of operational data points. The user has asked this question multiple times, and I\'ve been answering with "754-214-125', 'reply_tokens': 113, 'round_secs': 2.73}
+2026-11-15 19:15:19,930 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:20,786 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:20,787 INFO round 4: {'round': 4, 'user_tokens': 9013, 'cum_prompt_tokens': 37036, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number that was mentioned earlier in the conversation. Let me look back through the conversation history.\n\nIn the very first message, there was a line that said: "Shipping label: 754-214-125"\n\nThis was embedded in the long list of operational data points. The user has asked this question multiple times, and I\'ve been answering with "754-214-12', 'reply_tokens': 122, 'round_secs': 2.93}
+2026-11-15 19:15:22,778 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:23,597 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:23,598 INFO round 5: {'round': 5, 'user_tokens': 9011, 'cum_prompt_tokens': 46204, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number mentioned earlier in the conversation. Let me look back through the conversation history.\n\nIn the very first message, there was a line that said: "Shipping label: 754-214-125"\n\nThis was embedded in the long list of operational data points. The user has asked this question multiple times, and I\'ve been answering with "754-214-125".', 'reply_tokens': 125, 'round_secs': 2.81}
+2026-11-15 19:15:25,734 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:26,666 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:26,667 INFO round 6: {'round': 6, 'user_tokens': 9004, 'cum_prompt_tokens': 55365, 'needle_ok': True, 'probe_text': 'The user is asking about a shipping label number that was mentioned earlier in the conversation. Let me look back through the conversation history.\n\nIn the very first message, there was a long list of operational data points. Embedded within that list was the line: "Shipping label: 754-214-125"\n\nThis has been the answer I\'ve been giving consistently throughout the conversation. The user keeps asking the same question repeatedly, and the answer remains', 'reply_tokens': 125, 'round_secs': 3.07}
+2026-11-15 19:15:32,685 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:32,915 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:38,674 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:38,675 INFO drift at 50000: {'boundary': 50000, 'cached_mean': -0.0027, 'cold_mean': -0.0088, 'drift': 0.006, 'gen_match': True}
+2026-11-15 19:15:40,466 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:41,373 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:41,375 INFO round 7: {'round': 7, 'user_tokens': 9011, 'cum_prompt_tokens': 64533, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 76, 'round_secs': 2.7}
+2026-11-15 19:15:43,301 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:44,234 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:44,236 INFO round 8: {'round': 8, 'user_tokens': 9006, 'cum_prompt_tokens': 73611, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 79, 'round_secs': 2.86}
+2026-11-15 19:15:46,091 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:47,005 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:47,006 INFO round 9: {'round': 9, 'user_tokens': 9006, 'cum_prompt_tokens': 82689, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 93, 'round_secs': 2.77}
+2026-11-15 19:15:49,045 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:49,983 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:49,984 INFO round 10: {'round': 10, 'user_tokens': 9011, 'cum_prompt_tokens': 91772, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 91, 'round_secs': 2.98}
+2026-11-15 19:15:51,907 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:52,859 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:52,860 INFO round 11: {'round': 11, 'user_tokens': 9010, 'cum_prompt_tokens': 100854, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 91, 'round_secs': 2.88}
+2026-11-15 19:15:57,810 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 19:15:58,120 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:08,450 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:08,451 INFO drift at 100000: {'boundary': 100000, 'cached_mean': -0.0285, 'cold_mean': -0.0315, 'drift': 0.003, 'gen_match': True}
+2026-11-15 19:16:10,529 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:11,469 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:11,470 INFO round 12: {'round': 12, 'user_tokens': 9013, 'cum_prompt_tokens': 109939, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 86, 'round_secs': 3.02}
+2026-11-15 19:16:13,423 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:14,335 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:14,336 INFO round 13: {'round': 13, 'user_tokens': 9016, 'cum_prompt_tokens': 119027, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 86, 'round_secs': 2.87}
+2026-11-15 19:16:16,330 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:17,261 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:17,274 INFO round 14: {'round': 14, 'user_tokens': 9011, 'cum_prompt_tokens': 128110, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 92, 'round_secs': 2.94}
+2026-11-15 19:16:19,343 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:20,402 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:20,404 INFO round 15: {'round': 15, 'user_tokens': 9001, 'cum_prompt_tokens': 137183, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 86, 'round_secs': 3.13}
+2026-11-15 19:16:22,457 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:23,447 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:23,449 INFO round 16: {'round': 16, 'user_tokens': 9013, 'cum_prompt_tokens': 146268, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 95, 'round_secs': 3.04}
+2026-11-15 19:16:25,628 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:26,633 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:26,635 INFO round 17: {'round': 17, 'user_tokens': 9004, 'cum_prompt_tokens': 155344, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 95, 'round_secs': 3.19}
+2026-11-15 19:16:28,718 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:29,855 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:29,855 INFO round 18: {'round': 18, 'user_tokens': 9000, 'cum_prompt_tokens': 164416, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 95, 'round_secs': 3.22}
+2026-11-15 19:16:32,124 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:33,190 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:33,191 INFO round 19: {'round': 19, 'user_tokens': 9013, 'cum_prompt_tokens': 173501, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 95, 'round_secs': 3.34}
+2026-11-15 19:16:35,350 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:36,459 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:36,460 INFO round 20: {'round': 20, 'user_tokens': 9000, 'cum_prompt_tokens': 182573, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 95, 'round_secs': 3.27}
+2026-11-15 19:16:38,777 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:39,844 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:39,845 INFO round 21: {'round': 21, 'user_tokens': 9006, 'cum_prompt_tokens': 191651, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 89, 'round_secs': 3.39}
+2026-11-15 19:16:41,999 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:43,068 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:43,069 INFO round 22: {'round': 22, 'user_tokens': 9005, 'cum_prompt_tokens': 200728, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 93, 'round_secs': 3.22}
+2026-11-15 19:16:54,012 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 19:16:54,502 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:15,348 INFO HTTP Request: POST http://localhost:8017/v1/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:15,349 INFO drift at 200000: {'boundary': 200000, 'cached_mean': -0.0358, 'cold_mean': -0.0202, 'drift': -0.0156, 'gen_match': True}
+2026-11-15 19:17:17,659 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:18,847 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:18,849 INFO round 23: {'round': 23, 'user_tokens': 9004, 'cum_prompt_tokens': 209804, 'needle_ok': False, 'probe_text': '\n\n754-214-12', 'reply_tokens': 87, 'round_secs': 3.5}
+2026-11-15 19:17:20,942 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:22,162 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:22,163 INFO round 24: {'round': 24, 'user_tokens': 9013, 'cum_prompt_tokens': 218888, 'needle_ok': False, 'probe_text': '\n\n7', 'reply_tokens': 78, 'round_secs': 3.31}
+2026-11-15 19:17:24,386 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:25,568 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:25,569 INFO round 25: {'round': 25, 'user_tokens': 9004, 'cum_prompt_tokens': 227954, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 86, 'round_secs': 3.41}
+2026-11-15 19:17:27,835 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:29,014 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:29,015 INFO round 26: {'round': 26, 'user_tokens': 9010, 'cum_prompt_tokens': 237036, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 87, 'round_secs': 3.45}
+2026-11-15 19:17:31,233 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:32,466 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:32,468 INFO round 27: {'round': 27, 'user_tokens': 9008, 'cum_prompt_tokens': 246116, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 88, 'round_secs': 3.45}
+2026-11-15 19:17:34,829 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:36,106 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:36,107 INFO round 28: {'round': 28, 'user_tokens': 9020, 'cum_prompt_tokens': 255208, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 86, 'round_secs': 3.64}
+2026-11-15 19:17:38,455 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:39,683 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:39,684 INFO round 29: {'round': 29, 'user_tokens': 9001, 'cum_prompt_tokens': 264281, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 89, 'round_secs': 3.58}
+2026-11-15 19:17:42,102 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:43,394 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:43,395 INFO round 30: {'round': 30, 'user_tokens': 9007, 'cum_prompt_tokens': 273360, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 86, 'round_secs': 3.71}
+2026-11-15 19:17:45,744 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:47,117 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:47,118 INFO round 31: {'round': 31, 'user_tokens': 9016, 'cum_prompt_tokens': 282448, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 89, 'round_secs': 3.72}
+2026-11-15 19:17:49,572 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:50,890 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:50,892 INFO round 32: {'round': 32, 'user_tokens': 9001, 'cum_prompt_tokens': 291521, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 86, 'round_secs': 3.77}
+2026-11-15 19:17:53,314 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:54,668 INFO HTTP Request: POST http://localhost:8017/v1/chat/completions "HTTP/1.1 200 OK"
+2026-11-15 19:17:54,670 INFO round 33: {'round': 33, 'user_tokens': 9002, 'cum_prompt_tokens': 300595, 'needle_ok': True, 'probe_text': '\n\n754-214-125', 'reply_tokens': 86, 'round_secs': 3.78}
+2026-11-15 19:17:54,670 INFO total cap 300000 reached at round 33
+2026-11-15 19:17:54,671 INFO SUMMARY {"needle_ok_any": true, "final_needle_ok": true, "per_round_recall": [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, false, true, true, true, true, true, true, true, true, true], "recall_curve": 23, "drifts": [{"boundary": 50000, "cached_mean": -0.0027, "cold_mean": -0.0088, "drift": 0.006, "gen_match": true}, {"boundary": 100000, "cached_mean": -0.0285, "cold_mean": -0.0315, "drift": 0.003, "gen_match": true}, {"boundary": 200000, "cached_mean": -0.0358, "cold_mean": -0.0202, "drift": -0.0156, "gen_match": true}], "model": "qwen3.8-flash-next", "seed": 42, "total_prompt_tokens": 300595}
