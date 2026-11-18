@@ -189,3 +189,15 @@ gate.
   scale). Residual gap to the video-off baseline (27.74) = #65534
   encoder-cache floor (1.85) + mm-profile CUDA-graph/static deltas — exact
   numeric parity is not reachable while video capability is enabled.
+- [x] 64K VIDEO-TOKEN CAP DEPLOYED (file-level) 2026-11-18 12:1x: the
+  monster item is Glm5NextVideoProcessor max_image_tokens=240000 in the
+  model dir's processor_config.json — set to 64000 (video scope only;
+  image_processor's 8000 untouched; backup processor_config.json.pre-
+  64kcap-20261118). Serve-args route is DEAD: the Rust frontend's clap
+  validator hard-rejects any args-json containing mm_processor_kwargs
+  ("not implemented in Rust frontend yet — remove to continue") — this
+  gate caused today's 35-restart crash loop; MM_KW knob removed from
+  the serve script. Measured parity: raise 8192->66,242 (was 242,242);
+  Available KV 27.55 GiB vs video-off 27.74 — video tax 4.83 -> 0.19 GiB
+  (0.7% of pool); vision served correctly ("Blue" probe), image latency
+  unchanged 0.22-0.29s.
