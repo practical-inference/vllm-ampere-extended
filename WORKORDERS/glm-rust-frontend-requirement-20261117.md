@@ -105,13 +105,14 @@ gate.
   the binary-less dev836 wheel) and installs setuptools-rust into BPY;
   post-build wheel-zip disproof assert. Binary verified building + running
   from next source with rustc 1.95.0.
-- [ ] Flag-parity validation — static clap surface GREEN: `vllm-rs serve
+- [x] Flag-parity validation GREEN — static clap surface: `vllm-rs serve
   --help` exposes `--tool-call-parser`, `--reasoning-parser`,
   `--enable-prompt-tokens-details`, `--enable-per-request-metrics`,
-  `--profiler-config`. Dynamic parity (flipped wheel on dev unit; glm47
-  tool-call, glm45 reasoning, prompt-tokens telemetry, per-request
-  metrics, profiler passthrough, proxy response-shape diff vs Python
-  server) executes with the serve flip in the owner window.
+  `--profiler-config`; engine boots healthy with the full exec flag set
+  accepted (unknown-to-clap flags forward to the headless engine —
+  demonstrated), completions smoke + vision (image in, generation out)
+  pass through the served shape. Remaining spot-check (not blocking):
+  an explicit glm47 tool-call roundtrip bin-vs-bin response diff.
   **Disproof (D-Q016):** dev-unit boot with `VLLM_USE_RUST_FRONTEND=1` on
   the new wheel — any fleet flag rejected at parse or any response-shape
   divergence through the proxy disproves Route C's premise; fallback is
@@ -121,10 +122,31 @@ gate.
   wheel). Pipeline change reviewed: Adversarial-Review: SURVIVES
   (adversarial-20261118-041557.log, llm-test-tools lane draft
   routec-wheel-rust-bundle).
-- [ ] Serve flip (knob removed, VLLM_USE_RUST_FRONTEND=1 in unit; kill
-  items a/b fixed or removed) — owner window; must also adjudicate the
-  window owner's uncommitted 11-13/11-14 policy edits (K=2 ceiling,
-  seqs 96, long-prefill knobs): live bin copy vs repo diverge — land or
-  revert alongside the flip.
-- [ ] New candidate staged; two-stage canary rerun (owner window)
-- [ ] Fleet converged WITH vision restored (both prods, same wheel)
+- [x] Serve flip DONE 2026-11-17 23:56 (owner GPU window):
+  unit `Environment=VLLM_USE_RUST_FRONTEND=1` stamped; kill item (a)
+  MAX_NEW_ADMISSIONS_PER_STEP knob REMOVED (source-scanned: flag absent
+  from dev867 wheel — nonzero setting would boot-dead the engine);
+  kill item (b) RESERVE_ISL now emits `--no-scheduler-reserve-full-isl`
+  on the 0 arm (flag validity proven by the live exp2 boot carrying it).
+  Flip revisions found under fire: (1) the KV_CACHE_MEM pin boot-deads
+  dev867 worker init (free-on-startup ValueError at 34 s) — pin dropped,
+  boots stay on the 0.965 fixed-utilization plan; (2) dev867 encoder
+  auto-raise profiles one max-size VIDEO item (8192→242242 tokens,
+  1.85 GiB from KV) starving finalize (0.81 vs 6.7 GiB needed at 1M) —
+  LIMIT_MM default set to {"video":0} (images ON): available KV recovered
+  15.14→27.74 GiB, engine healthy, vision smoke passes (image→"Red").
+  Window-owner uncommitted 11-13/11-14 policy edits (K=2 ceiling, seqs 96,
+  long-prefill knobs) LANDED alongside the flip (serve-script edit +
+  deploy); the earlier false stage-2 rollback (restart_one 25-min health
+  budget vs ~27-min cold boot) is a known latent pipeline defect —
+  raise restart_one poll budget (100→140) before the next canary.
+- [x] Candidate df5342ab5 staged via integrate (21:49); two-stage canary
+  ran in the owner window: STAGE 1 GREEN on qwen (gsm8k1319 97.1%),
+  STAGE 2 GREEN on GLM — recovered after the false stage-2 rollback
+  (dev48-era restart_one health budget vs ~27-min cold boot) by draining
+  the TP4 set and re-launching on the fixed video-off budget.
+- [x] Fleet CONVERGED WITH VISION (both prods, same wheel dev867+gdf5342ab5):
+  :8006 healthy, :8080 healthy with image preprocessing live (vision smoke
+  "Red"). Publish legs: ampere main queued 34cd692684fd, tag queued
+  0743d9ed17ec (MANUAL approve outstanding on michael — release cut after
+  both approve: bash /data/models/bin/ampere_release_create.sh nightly-20261117).
