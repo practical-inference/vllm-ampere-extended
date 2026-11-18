@@ -1,10 +1,10 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 60 source commits (72 files changed, 5709 insertions(+), 425 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 60 source commits (72 files changed, 5705 insertions(+), 434 deletions(-)).
 
-Diff base: upstream commit `919025c814` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 919025c814..b9631bef8f -- vllm/ csrc/` and `git diff --stat 919025c814..b9631bef8f -- vllm/ csrc/`.
+Diff base: upstream commit `952dc48bcf` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges 952dc48bcf..ac7d2658fe -- vllm/ csrc/` and `git diff --stat 952dc48bcf..ac7d2658fe -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
