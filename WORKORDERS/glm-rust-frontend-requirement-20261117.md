@@ -177,3 +177,15 @@ gate.
 - [ ] K-sweep v2: re-sweep on the video-ON dev914 wheel (0e5766712)
   with a realistic emcare prompt mix; the current ladder (K=3/4) is
   config-stale (swept video-off on an earlier wheel).
+- [x] VISION-TOWER CPU OFFLOAD ENABLED on GLM prod 2026-11-18 09:2x
+  (owner call — vision/no-vision parity): glm53 unit
+  `Environment=VLLM_VISION_CPU_OFFLOAD_GB=2`. Budget is a hard cap in
+  UVAOffloader (stops at it; partial offload is silent) — 2 GiB >= 1.05 GiB
+  global tower, TP4-sharded to 0.25 GiB/card; fired fully per card
+  (uva.py:68 "Total CPU offloaded parameters"); bulk-copy mode
+  (uva_offloading False; zero-copy UVA rereads tiles over PCIe = much
+  slower). Measured: Available KV 22.66 -> 22.91 GiB video-on; image calls
+  0.22-0.23s with the offloaded tower (PCIe bulk copy not visible at this
+  scale). Residual gap to the video-off baseline (27.74) = #65534
+  encoder-cache floor (1.85) + mm-profile CUDA-graph/static deltas — exact
+  numeric parity is not reachable while video capability is enabled.
