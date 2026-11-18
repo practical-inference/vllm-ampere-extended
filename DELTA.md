@@ -1,16 +1,16 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 60 source commits (72 files changed, 5705 insertions(+), 434 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 61 source commits (73 files changed, 5765 insertions(+), 439 deletions(-)).
 
-Diff base: upstream commit `5e0855d305` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 5e0855d305..53a5f03b0c -- vllm/ csrc/` and `git diff --stat 5e0855d305..53a5f03b0c -- vllm/ csrc/`.
+Diff base: upstream commit `92fd8cc668` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges 92fd8cc668..9800032521 -- vllm/ csrc/` and `git diff --stat 92fd8cc668..9800032521 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
 | Area | Commits |
 |---|---|
-| general fixes | 25 |
+| general fixes | 26 |
 | spec-decode fixes | 14 |
 | model bring-up (GLM5Next / Qwen4Exp / DSV41) | 7 |
 | sparse attention (TRITON_MLA_SPARSE) | 5 |
@@ -22,6 +22,7 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- [core] mm: micro-batch video encoder forwards to bound the KV transient (38d85fcfa2)
 - [core] qsa: sm_80 fp8-indexer arm — uint8 storage + software e4m3 dequant (145978c011)
 - config: wire the draft rope propagation in SpeculativeConfig.__post_init__ (708c44bb71)
 - fix: demand recording must not sit under the K0 diagnostics guard (31bc038e67)
