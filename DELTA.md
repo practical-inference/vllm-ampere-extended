@@ -3,8 +3,8 @@
 
 `main` = upstream `main` (nightly merge) + the commits below: 60 source commits (72 files changed, 5705 insertions(+), 434 deletions(-)).
 
-Diff base: upstream commit `952dc48bcf` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 952dc48bcf..ac7d2658fe -- vllm/ csrc/` and `git diff --stat 952dc48bcf..ac7d2658fe -- vllm/ csrc/`.
+Diff base: upstream commit `5e0855d305` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges 5e0855d305..53a5f03b0c -- vllm/ csrc/` and `git diff --stat 5e0855d305..53a5f03b0c -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
