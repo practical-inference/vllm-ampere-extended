@@ -160,6 +160,18 @@ gate.
   "Red"). Publish legs: ampere main queued 34cd692684fd, tag queued
   0743d9ed17ec (MANUAL approve outstanding on michael — release cut after
   both approve: bash /data/models/bin/ampere_release_create.sh nightly-20261117).
-- [ ] K-sweep v2: re-sweep on the video-ON a6f0 wheel (dev900) with a
-  realistic emcare prompt mix; the current ladder (K=3/4) is
-  config-stale (swept video-off).
+- [x] CANARY PASS COMPLETE 2026-11-18 08:47: PROMOTED 0e5766712 (dev914)
+  through the full pipeline — STAGE 0 preflight pass, STAGE 1 qwen-prod
+  tier-1 gates GREEN (gsm8k1319 96.7%, invalid 0.0%), STAGE 2 GLM
+  healthy + smoke + version OK; forgejo main published; ampere main
+  queued cf27e76aca4b + tag queued e772f8b0a074 (MANUAL approve on
+  michael; release cut after both: ampere_release_create.sh
+  nightly-20261118). Vision smoke passed on GLM prod video-ON.
+  Micro-batch change (38d85fcfa2) reviewed: Adversarial-Review: SURVIVES
+  (adversarial-20261118-140139.log, comment-tier; a2 refused first
+  round -> INCOMPLETE -> auto-rerun with fresh agents). exp2 preflight
+  order honored (dev slot bounce on dev900+dev914 before qwen prod;
+  qwen-prod checks stayed minimal by pipeline design).
+- [ ] K-sweep v2: re-sweep on the video-ON dev914 wheel (0e5766712)
+  with a realistic emcare prompt mix; the current ladder (K=3/4) is
+  config-stale (swept video-off on an earlier wheel).
