@@ -1,0 +1,125 @@
+# WORKORDER: Route C — package vllm-rs into the wheel pipeline, restore GLM vision durably
+
+Created: 2026-11-17 (columbo, llm-test-tools lane), surfaced by the manual CD
+canary the owner ordered. **Owner verdict recorded below: ROUTE C** — this is
+now the durable-fix workorder, executed next session.
+
+## What happened
+
+Manual canary fire 2026-11-17: candidate wheel
+`vllm-2026.10.2.dev836+ae.1.g7b01f0f8b` (next-tip after the 145-commit
+upstream/main merge) went STAGE 1 GREEN on qwen
+(gsm8k1319 97.0%, needle 0.86 agg, zero invalid). STAGE 2 (GLM) first died at
+model init — the merged code added a hard requirement:
+
+    vllm/models/glm5next/common/multimodal.py
+    ValueError: GLM-5.3-Flash multimodal preprocessing requires the Rust frontend.
+
+Upstream cause: `7c86910291 [Multimodal] Require Rust preprocessing for
+GLM-5.3-Flash (#67237)` — landed Nov 16, carried by the merge: media
+preprocessing moved from Python (which worked) to the Rust frontend. The
+boot-time memory-pool profiler constructs synthetic mm inputs for a
+vision-enabled model and now raises.
+
+**No rollback ever fired.** Fixed forward in the owner window: serve knob
+disables media → re-boot → health returned → the running promote script's
+poll judged STAGE 2 `healthy + smoke OK` + `version OK: dev836` at 20:32:27 →
+PROMOTED; forgejo main published via PR; ampere main + tag queued behind the
+gate.
+
+## Fleet state at close (truth)
+
+- :8006 and :8080: CONVERGED on dev836 — **GLM is TEXT-ONLY** (B4 pin+vision
+  promotion reversed as a stopgap until C lands).
+- state.env: LAST_PROMOTED=7b01f0f8b, PENDING=0, REJECTED=empty.
+- Gate requests staged for michael (MANUAL approve): ampere main push
+  `34cd692684fd`, tag push `0743d9ed17ec`; after both: cut release with
+  `bash /data/models/bin/ampere_release_create.sh nightly-20261117`.
+- Orphaned arms (re-armed by C):
+  - exp2 fp8-index attention-config: lane/qsa-fp8-index-sm80 (8145aa4c61) —
+    its site-packages arm was removed by the dev836 deploy; the lane must
+    merge to next with/before the C wheel.
+  - `serve_flash_mtp_fp8_draftq_mtile.sh`: `LIMIT_MM_PER_PROMPT` knob
+    ({"image":0,"video":0}) must be REMOVED by the C flip (media re-enabled).
+
+## Route C scope — execution order (next session)
+
+1. **Rust toolchain** on the box (user-space rustup, minimal profile).
+2. **Locate the vllm-rs frontend crate** + build contract — envs.py
+   auto-discovery expects the binary at `site-packages/vllm/vllm-rs`
+   (VLLM_RUST_FRONTEND_PATH="auto").
+3. **Integrate the Rust frontend build into the wheel pipeline**
+   (vllm_nightly_integrate.sh wheel step) and bundle the binary into the
+   wheel; merge the fp8-index lane into next first.
+4. **Flag-parity validation BEFORE promote (the gate)**: the Rust binary
+   replaces the Python API-server process; every fleet-stack flag must exist
+   and behave identically in Rust — `--tool-call-parser glm47`,
+   `--reasoning-parser glm45`, `--enable-prompt-tokens-details` (emcare
+   telemetry), `--enable-per-request-metrics`, profiler-config passthrough,
+   response-shape parity through the proxy. Name the disproof check (D-Q016).
+   **Kill items (adjudicated from the 2026-11-17 canary review):** two
+   pre-existing latent knob defects in the serve script — (a)
+   `MAX_NEW_ADMISSIONS_PER_STEP` emits `--max-new-admissions-per-step`, a
+   flag absent from dev836 wheel source (nearest real knob:
+   `--max-num-active-seqs`); (b) `RESERVE_ISL=0` emits nothing while upstream
+   defaults `scheduler_reserve_full_isl=True` — the documented "no- arm" is a
+   silent no-op, not a disable. Both inert under the deployed unit (defaults
+   0/1, no unit env). C's serve flip fixes or removes both knobs — not
+   inherited silently.
+5. **Serve flip**: remove the limit-mm knob (media enabled), unit
+   `Environment=VLLM_USE_RUST_FRONTEND=1`; restore exp2 attention-config
+   token if the arm is still unmerged.
+6. Re-stage candidate via integrate → two-stage canary rerun (owner window) →
+   fleet stays converged WITH vision.
+
+## Constraints
+
+- Never edit a file a live process executes: repo → deploy → bounce.
+- The other session's working-tree edits (ampere_image_validate.sh,
+  pr-pipeline/) stay theirs.
+- No prod bounce without an owner-named window; the 2026-11-17 canary fire
+  was the owner's explicit manual order.
+- Validate every dep-version drift against the validated matrix — the
+  apache-tvm-ffi 0.1.16 abort (fresh flashinfer 0.7.4 pull) is the precedent;
+  vllm-rs will bring new deps.
+- Watchers read machine verdicts (unit state, health, version), not journal
+  prose.
+
+## Status
+
+- [x] Owner decision — **ROUTE C** (2026-11-17 checkpoint:
+  session-archive/2026-11-17-glm-vision-routec-checkpoint.md)
+- [x] Rust toolchain installed (user-space) — rustup 1.95.0 minimal profile at
+  `~/.cargo/bin` (`--no-modify-path`; the integrate script exports it)
+- [x] vllm-rs crate located + build contract read — workspace `rust/`,
+  `vllm-cmd` package, Exec binding `--bin vllm-rs` + `native-tls-vendored`
+  (OpenSSL linked STATICALLY — no new pip deps, no ABI drift against the
+  validated matrix); auto-discovery expects `pkg_dir/vllm-rs`
+  (envs.py `_resolve_rust_cli_path`)
+- [x] fp8-index lane merged into next — re-landed as `145978c011`; range-diff
+  vs the cited `8145aa4c61` (stale forgejo-ref sha, pre-rebase): identical
+  modulo message/formatting. Already an ancestor of next tip `7b01f0f8b9`.
+- [x] Rust frontend build integrated into the wheel pipeline + bundled —
+  integrate 2b runs `-m build` with `VLLM_REQUIRE_RUST_FRONTEND=1` (without
+  it setup.py marks the extension optional — the silent skip that shipped
+  the binary-less dev836 wheel) and installs setuptools-rust into BPY;
+  post-build wheel-zip disproof assert. Binary verified building + running
+  from next source with rustc 1.95.0.
+- [ ] Flag-parity validation — static clap surface GREEN: `vllm-rs serve
+  --help` exposes `--tool-call-parser`, `--reasoning-parser`,
+  `--enable-prompt-tokens-details`, `--enable-per-request-metrics`,
+  `--profiler-config`. Dynamic parity (flipped wheel on dev unit; glm47
+  tool-call, glm45 reasoning, prompt-tokens telemetry, per-request
+  metrics, profiler passthrough, proxy response-shape diff vs Python
+  server) executes with the serve flip in the owner window.
+  **Disproof (D-Q016):** dev-unit boot with `VLLM_USE_RUST_FRONTEND=1` on
+  the new wheel — any fleet flag rejected at parse or any response-shape
+  divergence through the proxy disproves Route C's premise; fallback is
+  re-applying the LIMIT_MM stopgap and pulling the unit knob.
+- [ ] Serve flip (knob removed, VLLM_USE_RUST_FRONTEND=1 in unit; kill
+  items a/b fixed or removed) — owner window; must also adjudicate the
+  window owner's uncommitted 11-13/11-14 policy edits (K=2 ceiling,
+  seqs 96, long-prefill knobs): live bin copy vs repo diverge — land or
+  revert alongside the flip.
+- [ ] New candidate staged; two-stage canary rerun (owner window)
+- [ ] Fleet converged WITH vision restored (both prods, same wheel)
