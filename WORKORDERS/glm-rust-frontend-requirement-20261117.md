@@ -171,7 +171,7 @@ gate.
   (adversarial-20261118-140139.log, comment-tier; a2 refused first
   round -> INCOMPLETE -> auto-rerun with fresh agents). exp2 preflight
   Serve-script flip also reviewed in llm-test-tools (trailer-stamped:
-  Adversarial-Review: SURVIVES, 22ca522).
+  Adversarial-Review: SURVIVES (adversarial-20261118-154810.log), 22ca522).
   order honored (dev slot bounce on dev900+dev914 before qwen prod;
   qwen-prod checks stayed minimal by pipeline design).
 - [ ] K-sweep v2: re-sweep on the video-ON dev914 wheel (0e5766712)
