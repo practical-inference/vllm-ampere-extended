@@ -133,8 +133,18 @@ gate.
   boots stay on the 0.965 fixed-utilization plan; (2) dev867 encoder
   auto-raise profiles one max-size VIDEO item (8192→242242 tokens,
   1.85 GiB from KV) starving finalize (0.81 vs 6.7 GiB needed at 1M) —
-  LIMIT_MM default set to {"video":0} (images ON): available KV recovered
+  LIMIT_MM interim cap {"video":0} (images ON): available KV recovered
   15.14→27.74 GiB, engine healthy, vision smoke passes (image→"Red").
+  (3) MICRO-BATCH FIX LANDED 2026-11-18 06:15 (next a6f0fb18f, dev900
+  wheel): video encoder forwards chunked along the temporal grid in
+  vllm/v1/worker/gpu/mm/encoder_runner.py — pixel rows are t-major, so
+  sequential slices + torch.cat reproduce one embed_multimodal call
+  exactly; budget knob VLLM_MM_ENCODER_CHUNK_ROWS (default 16384 patch
+  rows, 0=off). Interim {"video":0} cap REMOVED (media fully ON),
+  max_model_len 1048576→786432 (owner call). Measured: Available KV
+  22.66 GiB video-on (vs 0.81 pre-fix), engine healthy, vision smoke
+  passes (green PNG read); ampere remote stale at 7b01f0f8b — new
+  candidate needs main+tag re-queue after canary verdict.
   Window-owner uncommitted 11-13/11-14 policy edits (K=2 ceiling, seqs 96,
   long-prefill knobs) LANDED alongside the flip (serve-script edit +
   deploy); the earlier false stage-2 rollback (restart_one 25-min health
@@ -150,3 +160,6 @@ gate.
   "Red"). Publish legs: ampere main queued 34cd692684fd, tag queued
   0743d9ed17ec (MANUAL approve outstanding on michael — release cut after
   both approve: bash /data/models/bin/ampere_release_create.sh nightly-20261117).
+- [ ] K-sweep v2: re-sweep on the video-ON a6f0 wheel (dev900) with a
+  realistic emcare prompt mix; the current ladder (K=3/4) is
+  config-stale (swept video-off).
