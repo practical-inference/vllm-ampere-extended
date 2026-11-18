@@ -116,6 +116,11 @@ gate.
   the new wheel — any fleet flag rejected at parse or any response-shape
   divergence through the proxy disproves Route C's premise; fallback is
   re-applying the LIMIT_MM stopgap and pulling the unit knob.
+  The wheel-bundle assert itself was disproof-checked both directions
+  (red on the shipped binary-less dev836 wheel, green on a member-carrying
+  wheel). Pipeline change reviewed: Adversarial-Review: SURVIVES
+  (adversarial-20261118-041557.log, llm-test-tools lane draft
+  routec-wheel-rust-bundle).
 - [ ] Serve flip (knob removed, VLLM_USE_RUST_FRONTEND=1 in unit; kill
   items a/b fixed or removed) — owner window; must also adjudicate the
   window owner's uncommitted 11-13/11-14 policy edits (K=2 ceiling,
