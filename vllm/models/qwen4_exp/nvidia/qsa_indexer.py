@@ -117,6 +117,18 @@ class QSAIndexer(nn.Module):
         self.index_head_dim = int(config.indexer_head_dim)
         self.token_topk = int(config.indexer_budget)
         self.compress_ratio = int(config.indexer_compress_ratio)
+        from .ops.qsa_indexer import (
+            QSA_TOPK_BACKENDS,
+            init_gvr2,
+            use_gvr2_topk,
+        )
+
+        self.topk_backend = vllm_config.kernel_config.sparse_indexer_topk_backend
+        if self.topk_backend not in QSA_TOPK_BACKENDS:
+            raise ValueError(
+                f"sparse_indexer_topk_backend={self.topk_backend!r} is not "
+                f"supported by Qwen4Exp QSA; use one of {QSA_TOPK_BACKENDS}"
+            )
         block_topk = self.token_topk // self.compress_ratio
         if block_topk not in (64, 128, 512, 2048):
             # ponytail: dev-only topk-512 accuracy arm allows 128/64; drop
@@ -125,6 +137,9 @@ class QSAIndexer(nn.Module):
                 f"QSA indexer_budget // indexer_compress_ratio must be "
                 f"one of 64, 128, 512, 2048, got {block_topk}"
             )
+        # Width 64 is float4-aligned, so this only checks platform and k.
+        if use_gvr2_topk(self.topk_backend, block_topk, 64):
+            init_gvr2(vllm_config.scheduler_config.max_num_batched_tokens)
         self.rotary_emb = rotary_emb
         self.use_fused_pre_indexer = _supports_fused_pre_indexer(
             rotary_emb,
@@ -424,6 +439,7 @@ class QSAIndexer(nn.Module):
                 self.compress_ratio,
                 decode_query_len,
                 block_indices[decode_slice],
+                self.topk_backend,
             )
 
         # Prefill requests follow the leading decode rows in the reordered batch.
@@ -441,6 +457,7 @@ class QSAIndexer(nn.Module):
                 compressed_metadata.max_query_len,
                 block_indices[prefill_slice],
                 compressed_metadata.max_seq_len,
+                self.topk_backend,
             )
         expand_qsa_block_indices(
             block_indices,
