@@ -337,6 +337,10 @@ if TYPE_CHECKING:
     VLLM_WEIGHT_OFFLOADING_DISABLE_PIN_MEMORY: bool = False
     VLLM_WEIGHT_OFFLOADING_DISABLE_UVA: bool = False
     VLLM_VISION_CPU_OFFLOAD_GB: float = 0.0
+    # Max pre-merge ViT patch rows per video encoder forward. A max-size video
+    # item is one huge forward whose activation peak is retained as non-KV
+    # headroom; chunking along the temporal grid bounds it instead. 0 = off.
+    VLLM_MM_ENCODER_CHUNK_ROWS: int = 16384
     VLLM_EMBED_UVA: bool = False
     VLLM_RELOAD_MODE: Literal["layerwise", "direct"] = "layerwise"
     VLLM_KV_OFFLOAD_MAX_BATCH_DESCRIPTORS: int = 0
@@ -2377,6 +2381,9 @@ environment_variables: dict[str, Callable[[], Any]] = {
     # image forwards pay one PCIe copy of the tower per call.
     "VLLM_VISION_CPU_OFFLOAD_GB": lambda: float(
         os.getenv("VLLM_VISION_CPU_OFFLOAD_GB", "0")
+    ),
+    "VLLM_MM_ENCODER_CHUNK_ROWS": lambda: int(
+        os.getenv("VLLM_MM_ENCODER_CHUNK_ROWS", "16384")
     ),
     # Qwen3.5/Qwen4Exp family: keep the token embedding in pinned host RAM
     # behind a CUDA UVA view (default off). Skips tied embeddings.

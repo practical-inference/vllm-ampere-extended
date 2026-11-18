@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import torch
 
+from vllm import envs
 from vllm.logger import init_logger
 from vllm.model_executor.models.interfaces import SupportsMultiModal, supports_realtime
 from vllm.multimodal.encoder_budget import MultiModalBudget
@@ -160,6 +161,54 @@ class EncoderRunner:
             format_gib(cache_bytes),
         )
 
+    @staticmethod
+    def _video_chunk_slices(t: int, hw: int, budget: int) -> list[int]:
+        """Split t temporal units into slices whose patch rows (units*hw) fit
+        the budget. Sum equals t; a single unit over budget stays one slice."""
+        if hw <= 0 or budget <= 0:
+            return [t]
+        per = max(1, budget // hw)
+        slices = []
+        while t > 0:
+            units = min(per, t)
+            slices.append(units)
+            t -= units
+        return slices
+
+    def _embed_video_bounded(self, mm_kwargs_batch) -> list[torch.Tensor]:
+        # A max-size video item is a huge single forward whose activation peak
+        # is retained as non-KV headroom. Pixel rows are ordered t-major per
+        # grid, so temporal slices encoded in sequence and re-concatenated
+        # reproduce one embed_multimodal call exactly.
+        chunk_rows = envs.VLLM_MM_ENCODER_CHUNK_ROWS
+        pixel_key = "pixel_values_videos"
+        if chunk_rows <= 0 or set(mm_kwargs_batch) != {pixel_key, "video_grid_thw"}:
+            return self.model.embed_multimodal(**mm_kwargs_batch)
+        pixels = mm_kwargs_batch[pixel_key]
+        grids = mm_kwargs_batch["video_grid_thw"]
+        if pixels.shape[0] <= chunk_rows:
+            return self.model.embed_multimodal(**mm_kwargs_batch)
+        outputs: list[torch.Tensor] = []
+        for grid in grids.tolist():
+            t, h, w = grid
+            hw = h * w
+            offset = 0
+            parts = []
+            for units in self._video_chunk_slices(t, hw, chunk_rows):
+                rows = units * hw
+                sub = self.model.embed_multimodal(
+                    **{
+                        pixel_key: pixels[offset : offset + rows],
+                        "video_grid_thw": torch.tensor(
+                            [[units, h, w]], dtype=torch.long, device=grids.device
+                        ),
+                    }
+                )
+                parts.extend(sub)
+                offset += rows
+            outputs.append(parts[0] if len(parts) == 1 else torch.cat(parts))
+        return outputs
+
     @torch.inference_mode()
     def execute_mm_encoder(
         self, mm_kwargs: list[tuple[str, MultiModalKwargsItem]]
@@ -179,11 +228,10 @@ class EncoderRunner:
                 and cg_manager.supports_batch(modality, mm_kwargs_batch)
                 else None
             )
-            batch_outputs = (
-                cudagraph_output
-                if cudagraph_output is not None
-                else self.model.embed_multimodal(**mm_kwargs_batch)
-            )
+            if cudagraph_output is not None:
+                batch_outputs = cudagraph_output
+            else:
+                batch_outputs = self._embed_video_bounded(mm_kwargs_batch)
             sanity_check_mm_encoder_outputs(batch_outputs, expected_num_items=num_items)
             encoder_outputs.extend(batch_outputs)
         return [encoder_outputs[i] for i in np.argsort(order)]
