@@ -90,6 +90,10 @@ repos:
     - id: pip-compile
       alias: pip-compile-quantization-deps
       name: pip-compile-quantization-deps
+      language: python
+      entry: python tools/pre_commit/pip_compile_blessed.py
+      pass_filenames: false
+      additional_dependencies: [uv==0.13.6]
       args: [
         requirements/test/quantization_deps.in,
         -o, requirements/test/quantization_deps_cuda.txt,
@@ -105,6 +109,10 @@ repos:
     - id: pip-compile
       alias: pip-compile-quantization-deps-rocm
       name: pip-compile-quantization-deps-rocm
+      language: python
+      entry: python tools/pre_commit/pip_compile_blessed.py
+      pass_filenames: false
+      additional_dependencies: [uv==0.13.6]
       args: [
         requirements/test/quantization_deps.in,
         -o, requirements/test/quantization_deps_rocm.txt,

@@ -155,6 +155,7 @@ def fused_save_compress_norm(
         CACHE_BLOCK=cache_block,
         INSERT_CACHE=kv_cache is not None,
         SANITIZE_CACHE_NANS=_ON_GFX950,
+        SW_E4M3=not current_platform.supports_fp8(),
         num_warps=4,
         **({"launch_pdl": False} if current_platform.is_cuda() else {}),
     )
@@ -192,6 +193,7 @@ def _fused_save_compress_norm_kernel(
     CACHE_BLOCK: tl.constexpr,
     INSERT_CACHE: tl.constexpr,
     SANITIZE_CACHE_NANS: tl.constexpr,
+    SW_E4M3: tl.constexpr,
 ):
     pid = tl.program_id(0)
     d = tl.arange(0, 512)
@@ -260,6 +262,7 @@ def _fused_save_compress_norm_kernel(
                         CACHE_BLOCK,
                         COMPRESS_RATIO,
                         SANITIZE_CACHE_NANS,
+                        SW_E4M3,
                     )
             if not HAS_PREV_ROWS:
                 num_rows = tl.minimum(end - start, STATE_BLOCK)
@@ -309,6 +312,7 @@ def _fused_save_compress_norm_kernel(
             CACHE_BLOCK,
             COMPRESS_RATIO,
             SANITIZE_CACHE_NANS,
+            SW_E4M3,
         )
 
 
@@ -381,6 +385,7 @@ def _insert_latent(
     CACHE_BLOCK: tl.constexpr,
     COMPRESS_RATIO: tl.constexpr,
     SANITIZE_CACHE_NANS: tl.constexpr,
+    SW_E4M3: tl.constexpr,
 ):
     slot = tl.load(cache_slots + t, t < num_cache_tokens, other=-1)
     if (slot >= 0) & ((position + 1) % COMPRESS_RATIO == 0):
@@ -395,6 +400,7 @@ def _insert_latent(
             CACHE_BLOCK,
             COMPRESS_RATIO,
             SANITIZE_CACHE_NANS,
+            SW_E4M3,
         )
 
 
@@ -619,6 +625,7 @@ def _store_v4_record(
     CACHE_BLOCK: tl.constexpr,
     COMPRESS_RATIO: tl.constexpr,
     SANITIZE_CACHE_NANS: tl.constexpr,
+    SW_E4M3: tl.constexpr,
 ):
     d = tl.arange(0, 512)
     page = cache + (slot // CACHE_BLOCK).to(tl.int64) * CACHE_STRIDE
