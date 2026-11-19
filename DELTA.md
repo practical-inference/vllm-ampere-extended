@@ -1,10 +1,10 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 66 source commits (72 files changed, 5784 insertions(+), 407 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 67 source commits (72 files changed, 5791 insertions(+), 407 deletions(-)).
 
-Diff base: upstream commit `9a2e60358d` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 9a2e60358d..a29cd09f34 -- vllm/ csrc/` and `git diff --stat 9a2e60358d..a29cd09f34 -- vllm/ csrc/`.
+Diff base: upstream commit `d2da27eb2d` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges d2da27eb2d..05dd5cad49 -- vllm/ csrc/` and `git diff --stat d2da27eb2d..05dd5cad49 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
@@ -12,8 +12,8 @@ Areas upstream does not ship for this hardware are what this distribution exists
 |---|---|
 | general fixes | 27 |
 | spec-decode fixes | 14 |
+| model bring-up (GLM5Next / Qwen4Exp / DSV41) | 8 |
 | sparse attention (TRITON_MLA_SPARSE) | 7 |
-| model bring-up (GLM5Next / Qwen4Exp / DSV41) | 7 |
 | KV-cache / offload fixes | 5 |
 | fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 2 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + model bring-up (GLM5Next / Qwen4Exp / DSV41) + spec-decode fixes + KV-cache / offload fixes) | 1 |
@@ -23,6 +23,7 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- fix(v1) fork: repair merge drift — pip-compile entries + SW_E4M3 chain + valve dupes (89cbb64c56)
 - [Core] Fix mypy static-gate drift in video chunker returns (92f71ba38a)
 - [core] mm: micro-batch video encoder forwards to bound the KV transient (38d85fcfa2)
 - [core] qsa: sm_80 fp8-indexer arm — uint8 storage + software e4m3 dequant (145978c011)
