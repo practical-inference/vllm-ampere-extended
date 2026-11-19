@@ -183,17 +183,17 @@ class EncoderRunner:
         chunk_rows = envs.VLLM_MM_ENCODER_CHUNK_ROWS
         pixel_key = "pixel_values_videos"
         if chunk_rows <= 0 or set(mm_kwargs_batch) != {pixel_key, "video_grid_thw"}:
-            return self.model.embed_multimodal(**mm_kwargs_batch)
+            return list(self.model.embed_multimodal(**mm_kwargs_batch))
         pixels = mm_kwargs_batch[pixel_key]
         grids = mm_kwargs_batch["video_grid_thw"]
         if pixels.shape[0] <= chunk_rows:
-            return self.model.embed_multimodal(**mm_kwargs_batch)
+            return list(self.model.embed_multimodal(**mm_kwargs_batch))
         outputs: list[torch.Tensor] = []
         for grid in grids.tolist():
             t, h, w = grid
             hw = h * w
             offset = 0
-            parts = []
+            parts: list[torch.Tensor] = []
             for units in self._video_chunk_slices(t, hw, chunk_rows):
                 rows = units * hw
                 sub = self.model.embed_multimodal(
