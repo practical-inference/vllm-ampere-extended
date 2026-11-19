@@ -239,10 +239,10 @@ def test_k0_fold_copies_same_block_draft_less_rows(conv_state_dim_first):
     draft-less decode row with a non-neutral staged bias.
 
     The fold reads the accepted checkpoint column (temporal:
-    ``bt[src_col + token_bias]``; conv: left shift by ``token_bias``) and
+    `bt[src_col + token_bias]`; conv: left shift by `token_bias`) and
     writes the running block, so the regular decode kernels -- which read
     offset 0 -- start from the accepted state. Rows with drafts, a neutral
-    bias, or ``HAS_K0_FOLD`` off keep the historical same-block no-op.
+    bias, or `HAS_K0_FOLD` off keep the historical same-block no-op.
     """
     device = torch.device("cuda")
     torch.manual_seed(0)

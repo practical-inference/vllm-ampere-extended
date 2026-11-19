@@ -180,7 +180,6 @@ def build_offloading_config(
             group.page_size_bytes for _, group in selected_groups
         )
 
-
     replicated_layout = (
         vllm_config.model_config.use_mla
         and parallel_config.tensor_parallel_size > 1

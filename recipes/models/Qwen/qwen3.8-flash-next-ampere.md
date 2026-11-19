@@ -49,7 +49,7 @@ GPU 0 has a total capacity of 95.15 GiB of which 16.06 GiB is free.
 bf16 KV for this architecture at 262144 context does not fit the ~15 GiB
 left after the ~79 GiB of weights on a 96 GB card. The fork boots the same
 checkpoint because its SM80 software-fp8 KV path halves KV bytes and pins
-the pool explicitly (`--kv-cache-dtype fp8 --kv-cache-memory 11G`). Capture
+the pool explicitly (`--kv-cache-dtype fp8 --kv-cache-memory-bytes 11G`). Capture
 procedure: `recipes/bench/capture_stock_failure.sh` (dev-slot window; stops
 the fork unit, serves stock with fork-only features stripped, captures the
 outcome, restores). Raw evidence in this directory:

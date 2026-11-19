@@ -3,10 +3,10 @@
 """DeepSeek-V4.1 sparse MLA attention on the Triton path, for SM80.
 
 SM80 (A100) cannot run FlashMLA (SM90+ TMA/FP8 kernels), and the CuteDSL /
-Triton ``dequantize_and_gather_k_cache`` gather either fails to compile or
-casts to fp8e4nv. The pure-Triton pieces exist: ``dequant_ds_mla_slots``
+Triton `dequantize_and_gather_k_cache` gather either fails to compile or
+casts to fp8e4nv. The pure-Triton pieces exist: `dequant_ds_mla_slots`
 index-gathers the legacy 584B fp8 records into a bf16 workspace with a
-software e4m3 decode, and ``triton_mla_sparse_attention`` scores that
+software e4m3 decode, and `triton_mla_sparse_attention` scores that
 workspace with attn-sink folding. This layer keeps the FlashMLA layer's
 metadata flow (chunk plan, index combine, topk mapping) and replaces every
 kernel call with gather-to-workspace + Triton attention.
@@ -68,7 +68,7 @@ def _paged_slot_ids(
     positions: torch.Tensor,
     valid: torch.Tensor,
 ) -> torch.Tensor:
-    """Global cache slot ids (int32) for paged rows at ``positions``.
+    """Global cache slot ids (int32) for paged rows at `positions`.
 
     Invalid rows are clamped inside the block table before the lookup, then
     masked to -1 (the dequant gather's zero-fill sentinel).
@@ -86,7 +86,7 @@ def _dequant_v41_rows(
     slots: torch.Tensor,
     cache_block_size: int,
 ) -> None:
-    """Gather the V4.1 legacy 584B fp8 records at ``slots`` into bf16 rows."""
+    """Gather the V4.1 legacy 584B fp8 records at `slots` into bf16 rows."""
     dequant_ds_mla_slots(
         ws_rows,
         cache.view(torch.uint8),
@@ -105,10 +105,10 @@ def _inverse_gptj_rope(
     cos_sin_cache: torch.Tensor,
     rope_dim: int,
 ) -> torch.Tensor:
-    """Undo the query's GPT-J rotation on the last ``rope_dim`` dims (fp32).
+    """Undo the query's GPT-J rotation on the last `rope_dim` dims (fp32).
 
-    Same partner/sign formula as ``fused_inv_rope_fp8_quant`` (which cannot
-    compile on SM80), for the bf16 ``_o_proj`` fallback.
+    Same partner/sign formula as `fused_inv_rope_fp8_quant` (which cannot
+    compile on SM80), for the bf16 `_o_proj` fallback.
     """
     cos_sin = cos_sin_cache[positions].float()
     half = rope_dim // 2
@@ -132,9 +132,9 @@ def _decode_ws_ids(
 ) -> torch.Tensor:
     """Attention row ids [T, 1, W+K] int32 into the decode gather workspace.
 
-    Workspace rows ``[0, T*W)`` hold the SWA gather (token-major), rows
-    ``[T*W, T*(W+K))`` the compressed topk gather; masked columns are -1
-    (the kernel's no-op sentinel), replacing flash_mla's ``topk_length``.
+    Workspace rows `[0, T*W)` hold the SWA gather (token-major), rows
+    `[T*W, T*(W+K))` the compressed topk gather; masked columns are -1
+    (the kernel's no-op sentinel), replacing flash_mla's `topk_length`.
     """
     tok = torch.arange(num_tokens, device=device, dtype=torch.int32).unsqueeze(1)
     cols = torch.arange(width_swa + width_topk, device=device, dtype=torch.int32)
@@ -178,9 +178,9 @@ class DeepseekSparseSWATritonFlashMLABackend(DeepseekSparseSWAFlashMLABackend):
 class DeepseekV4TritonAttention(DeepseekV4FlashMLAAttention):
     """DeepSeek V4.1 sparse MLA on Triton dequant-gather + Triton attention.
 
-    Same flow as ``DeepseekV4FlashMLAAttention``; the FlashMLA kernels are
-    replaced by ``dequant_ds_mla_slots`` gathers into the layer's bf16
-    workspace and ``triton_mla_sparse_attention`` on top.
+    Same flow as `DeepseekV4FlashMLAAttention`; the FlashMLA kernels are
+    replaced by `dequant_ds_mla_slots` gathers into the layer's bf16
+    workspace and `triton_mla_sparse_attention` on top.
     """
 
     backend_cls = DeepseekV4TritonFlashMLABackend
@@ -329,13 +329,13 @@ class DeepseekV4TritonAttention(DeepseekV4FlashMLAAttention):
     ) -> torch.Tensor:
         """Remap combine_topk_swa_indices rows into this workspace's layout.
 
-        The combiner emits ``req * M + local`` ids for an M-wide per-request
+        The combiner emits `req * M + local` ids for an M-wide per-request
         slab; this workspace keeps the compressed region request-major first
-        (rows ``[0, chunk_size*N)``), then the SWA gather region
-        (``[chunk_size*N, chunk_size*M)``). Entries past ``combined_lens``
+        (rows `[0, chunk_size*N)`), then the SWA gather region
+        (`[chunk_size*N, chunk_size*M)`). Entries past `combined_lens`
         hold workspace leftovers, so mask them to -1: unlike
-        flash_mla_sparse_fwd, ``triton_mla_sparse_attention`` has no
-        ``topk_length``.
+        flash_mla_sparse_fwd, `triton_mla_sparse_attention` has no
+        `topk_length`.
         """
         device = combined_indices.device
         cols = torch.arange(

@@ -11,7 +11,7 @@
 - model: qwen3.8-flash
   launch: >-
     vllm serve /models/qwen3.8-flash --max-model-len 262144 --language-model-only
-    --kv-cache-dtype fp8 --kv-cache-memory 11000000000 --gpu-memory-utilization 0.965
+    --kv-cache-dtype fp8 --kv-cache-memory-bytes 11000000000 --gpu-memory-utilization 0.965
     --max-num-seqs 32 --max-num-batched-tokens 4096 --max-cudagraph-capture-size 32
     --no-scheduler-reserve-full-isl
     --speculative-config '{"method":"qwen4_exp_mtp","num_speculative_tokens":2}'

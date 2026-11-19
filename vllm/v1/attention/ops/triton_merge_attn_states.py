@@ -20,7 +20,7 @@ def mask_empty_context(
     A prefill query whose context chunk is empty attended to no keys, so its
     partial attention is undefined: the backend leaves the output rows as
     uninitialized scratch (which may hold NaN/Inf) even when it reports an LSE
-    of -inf. Sanitize both here so ``merge_attn_states`` can stay generic:
+    of -inf. Sanitize both here so `merge_attn_states` can stay generic:
     force the LSE to -inf (zero softmax weight) and zero the undefined output
     rows (so a zero weight cannot combine with NaN/Inf). Emptiness is derived
     from the context offsets, not from the -inf LSE, so no merge kernel has to
@@ -61,7 +61,7 @@ def warmup_mask_empty_context(
     head_size: int,
     device: torch.device,
 ) -> None:
-    """Prime ``mask_empty_context_kernel`` so first prefill doesn't JIT."""
+    """Prime `mask_empty_context_kernel` so first prefill doesn't JIT."""
     num_tokens = 128
     lse = torch.zeros(num_heads, num_tokens, dtype=torch.float32, device=device)
     output = torch.empty(

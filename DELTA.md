@@ -1,10 +1,10 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 62 source commits (72 files changed, 5764 insertions(+), 439 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 66 source commits (72 files changed, 5785 insertions(+), 407 deletions(-)).
 
 Diff base: upstream commit `79897d9f47` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 79897d9f47..a9cfb7052f -- vllm/ csrc/` and `git diff --stat 79897d9f47..a9cfb7052f -- vllm/ csrc/`.
+`git log --no-merges 79897d9f47..68f8694451 -- vllm/ csrc/` and `git diff --stat 79897d9f47..68f8694451 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
@@ -12,10 +12,11 @@ Areas upstream does not ship for this hardware are what this distribution exists
 |---|---|
 | general fixes | 27 |
 | spec-decode fixes | 14 |
+| sparse attention (TRITON_MLA_SPARSE) | 7 |
 | model bring-up (GLM5Next / Qwen4Exp / DSV41) | 7 |
-| sparse attention (TRITON_MLA_SPARSE) | 5 |
-| KV-cache / offload fixes | 4 |
+| KV-cache / offload fixes | 5 |
 | fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 2 |
+| fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + model bring-up (GLM5Next / Qwen4Exp / DSV41) + spec-decode fixes + KV-cache / offload fixes) | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + KV-cache / offload fixes) | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + spec-decode fixes) | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + SM80 / pre-SM89 fp8 fallbacks + model bring-up (GLM5Next / Qwen4Exp / DSV41) + spec-decode fixes + KV-cache / offload fixes) | 1 |
@@ -30,9 +31,12 @@ Areas upstream does not ship for this hardware are what this distribution exists
 - fix: torch.accelerator APIs in fork-delta worker/model code (785ec31b15)
 - fix: port fork test/offloader call sites onto the upstream kv-cache interface rename (7894bf8633)
 - fix(v1) fork: restore the copy-event wait + the MAMBA env registrations on main (1519c55404)
+- fix: restore the fused-mqa-topk prefill path in the glm5next kpool indexer (4bbf9a18dd)
 - fix(v1): keep spec-decode draft padding out of input_ids under async scheduling (c27c4f4b30)
+- ci: fix the red pr-check workflow (pre-commit hooks + stale tests) (b460b0e7fa)
 - feat: token-embedding UVA offload for Qwen4Exp (VLLM_EMBED_UVA=1) (4dc2d4dbd4)
 - fix: warm the compile cache before the pinned-path memory profile (5647cb9445)
+- ci: fix verify-tag provenance parser for the new wheel version format + lint the merged tree (767978ed36)
 - feat: vision tower CPU offload via UVAOffloader bulk-copy (VLLM_VISION_CPU_OFFLOAD_GB) (eb067aa792)
 - worker: profile transient + cudagraph claims in the pinned-KV path (4de178aa35)
 - bench: memprofile via allocator history (torch.profiler inert under graph capture) (3933a8d246)
@@ -40,6 +44,7 @@ Areas upstream does not ship for this hardware are what this distribution exists
 - bench: env-gated per-op device-memory attribution for forward bench (VLLM_BENCH_MEMPROFILE) (2a6b776fd8)
 - bench: emit per-case peak-memory in forward bench output-json (local measurement tool) (9c185b8a81)
 - feat(sched): KV valve demand trigger — pool-size-insensitive arming (a61560efe6)
+- feat(sched): KV valve demand trigger — pool-size-insensitive arming (3698f05c93)
 - fix(sched): KV valve arms only when requests are waiting (d130dcef04)
 - fix(sched): key dynamic-SD tier on the running batch, not per-step scheduled count (9d8ce24a64)
 - correction: f3e27e6ef2 'whitespace only' claim false — remove resurrected dead single_group_spec (d2c1a7fde9)

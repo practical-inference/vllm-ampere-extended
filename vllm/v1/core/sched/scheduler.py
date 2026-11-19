@@ -2122,12 +2122,12 @@ class Scheduler(SchedulerInterface):
 
         # Dynamic speculative decoding: compute optimal K. Under the
         # formed-batch uniform-tier rule the step's demoted tier governs
-        # the schedule; otherwise the table keys on the running batch size --
-        # the concurrency the schedule is expressed in (the per-step
-        # scheduled count collapses to 1-2 during a chunked-prefill ramp,
-        # pinning a large wave to the K=max tier for the whole ramp).
+        # the schedule; otherwise the table answers, keyed on the running
+        # batch -- the concurrency the schedule is expressed in. The
+        # per-step scheduled count collapses to 1-2 during a chunked-prefill
+        # ramp, pinning a large wave to the K=max tier for the whole ramp.
         num_spec_tokens_to_schedule = self.num_spec_tokens
-        if self.dynamic_sd_lookup is not None and len(num_scheduled_tokens) > 0:
+        if self.dynamic_sd_lookup is not None and self.running:
             if self._priced_admission or self._slot_release:
                 num_spec_tokens_to_schedule = step_tier
             else:

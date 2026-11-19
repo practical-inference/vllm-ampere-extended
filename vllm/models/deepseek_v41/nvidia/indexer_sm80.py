@@ -2,14 +2,14 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 """DeepSeek V4.1 Lightning Indexer on the Triton FP8 path, for SM80.
 
-SM80 (A100) has neither DeepGEMM nor FP4 hardware: ``dsa_indexer_uses_fp4``
+SM80 (A100) has neither DeepGEMM nor FP4 hardware: `dsa_indexer_uses_fp4`
 is False there, so the indexer keeps the FP8-132 K pool (128 e4m3 values +
 4 B fp32 scale per row, values then scales per page) and scores it with the
-Triton MQA-logits fallbacks ``sparse_attn_indexer`` routes to when
-``is_deep_gemm_supported()`` is False (``fp8_mqa_logits_triton`` on prefill,
-``fp8_paged_mqa_logits_triton`` on decode). The K store writes and both
+Triton MQA-logits fallbacks `sparse_attn_indexer` routes to when
+`is_deep_gemm_supported()` is False (`fp8_mqa_logits_triton` on prefill,
+`fp8_paged_mqa_logits_triton` on decode). The K store writes and both
 readers consume that record unchanged; only the candidate-pool scorer needs
-a replacement, since ``SparseMQAIndexer`` hard-requires SM100 + DeepGEMM.
+a replacement, since `SparseMQAIndexer` hard-requires SM100 + DeepGEMM.
 """
 
 import torch

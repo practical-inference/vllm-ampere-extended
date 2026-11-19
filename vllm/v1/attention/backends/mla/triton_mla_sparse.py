@@ -105,10 +105,10 @@ def _dedup_dequant_gather(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Deduplicating dequant-gather for large sparse-MLA batches.
 
-    The 2-pass path gathers ``num_tokens x topk`` rows per call (16.8M at an
+    The 2-pass path gathers `num_tokens x topk` rows per call (16.8M at an
     8192-token chunk, topk 2048) while those queries select from at most
-    ``max_seq_len + tail`` distinct slots — at long context the gather is
-    ~40x duplicated work (prod trace 2026-10-21: ``_dequant_ds_mla_slots_kernel``
+    `max_seq_len + tail` distinct slots — at long context the gather is
+    ~40x duplicated work (prod trace 2026-10-21: `_dequant_ds_mla_slots_kernel`
     = 26% of prefill CUDA time, 2x the attention kernel itself).
 
     Sort + inclusive-cumsum ranks + idempotent scatter: every unique slot is
@@ -117,7 +117,7 @@ def _dedup_dequant_gather(
     device syncs. Bit-exact vs the 2-pass path: each query reads the same
     dequantized row values in the same topk order.
 
-    Returns (workspace_view, ws_indices) for ``_forward_bf16_kv``.
+    Returns (workspace_view, ws_indices) for `_forward_bf16_kv`.
     """
     num_tokens, topk_w = topk_indices.shape
     flat = topk_indices.reshape(-1)
