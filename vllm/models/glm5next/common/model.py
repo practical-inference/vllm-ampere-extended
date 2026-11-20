@@ -1390,12 +1390,17 @@ class Glm5NextForConditionalGeneration(
     # Fused projections for LoRA
     packed_modules_mapping = {
         "gate_up_proj": ["gate_proj", "up_proj"],
+        # 2026-11-20: the checkpoint's ignore list names shard 4
+        # self_attn.forget_gate.f_a_proj (nested submodule); the flat
+        # "f_a_proj" string expanded to a path no ignore entry matched ->
+        # partial match crashed all TP4 workers at load (ValueError:
+        # different quantization schemes for ...in_proj_qkvbfg_a).
         "in_proj_qkvbfg_a": [
             "q_proj",
             "k_proj",
             "v_proj",
             "b_proj",
-            "f_a_proj",
+            "forget_gate.f_a_proj",
             "g_a_proj",
         ],
         "fused_qkv_a_proj": ["q_a_proj", "kv_a_proj_with_mqa"],
