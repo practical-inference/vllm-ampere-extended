@@ -432,7 +432,16 @@ class Glm5NextLinearAttention(GatedDeltaNetAttention):
             projection_size,
             bias=False,
             quant_config=self.quant_config,
-            prefix=f"{prefix}.f_b_proj",
+            # Quant-resolution name must match the checkpoint ignore list's
+            # actual entry for this column: the ckpt names shard 4/6 halves
+            # under the nested trainer path (...self_attn.forget_gate.f_b_proj);
+            # the flat prefix missed the ignore entry -> column was built
+            # W4A16-packed while the ckpt stores a plain bf16 weight ->
+            # KeyError 'layers.0.self_attn.f_b_proj.weight' crashed all TP
+            # workers at engine load (2026-11-21 06:11 boot). Same naming
+            # mechanism the fused in_proj_qkvbfg_a expansion and g_b entry
+            # already rely on.
+            prefix=f"{prefix}.forget_gate.f_b_proj",
         )
         self.dt_bias = nn.Parameter(
             torch.empty(divide(projection_size, self.tp_size), dtype=torch.float32)
