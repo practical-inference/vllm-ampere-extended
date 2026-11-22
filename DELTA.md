@@ -1,10 +1,10 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 75 source commits (76 files changed, 5919 insertions(+), 413 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 76 source commits (76 files changed, 5927 insertions(+), 413 deletions(-)).
 
 Diff base: upstream commit `0e3c8dbdae` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 0e3c8dbdae..02c88461ae -- vllm/ csrc/` and `git diff --stat 0e3c8dbdae..02c88461ae -- vllm/ csrc/`.
+`git log --no-merges 0e3c8dbdae..a89b66ec3a -- vllm/ csrc/` and `git diff --stat 0e3c8dbdae..a89b66ec3a -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
@@ -15,7 +15,7 @@ Areas upstream does not ship for this hardware are what this distribution exists
 | model bring-up (GLM5Next / Qwen4Exp / DSV41) | 10 |
 | sparse attention (TRITON_MLA_SPARSE) | 7 |
 | KV-cache / offload fixes | 5 |
-| fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 2 |
+| fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 3 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + model bring-up (GLM5Next / Qwen4Exp / DSV41) + spec-decode fixes + KV-cache / offload fixes) | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + KV-cache / offload fixes) | 1 |
 | fork delta (squash: sparse attention (TRITON_MLA_SPARSE) + spec-decode fixes) | 1 |
@@ -23,6 +23,7 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- [Core] Migrate fork K0 routing onto upstream enable_prefix_caching (a89b66ec3a)
 - [Bugfix][Parser] GLM-4.7: leak unclosed tool-region text to content instead of swallowing the turn (ddbfd295d6)
 - [fix] glm5next: resolve KDA f_b_proj quant lookup under nested forget_gate path (2ba07b6635)
 - [fix] glm5next: fused in_proj_qkvbfg_a ignore-expansion names shard 4 forget_gate.f_a_proj (69d1b659e3)
