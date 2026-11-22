@@ -1,18 +1,18 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 67 source commits (72 files changed, 5791 insertions(+), 407 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 75 source commits (76 files changed, 5919 insertions(+), 413 deletions(-)).
 
-Diff base: upstream commit `7a3650fc6f` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges 7a3650fc6f..23853d45c1 -- vllm/ csrc/` and `git diff --stat 7a3650fc6f..23853d45c1 -- vllm/ csrc/`.
+Diff base: upstream commit `0e3c8dbdae` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges 0e3c8dbdae..02c88461ae -- vllm/ csrc/` and `git diff --stat 0e3c8dbdae..02c88461ae -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
 | Area | Commits |
 |---|---|
-| general fixes | 27 |
-| spec-decode fixes | 14 |
-| model bring-up (GLM5Next / Qwen4Exp / DSV41) | 8 |
+| general fixes | 32 |
+| spec-decode fixes | 15 |
+| model bring-up (GLM5Next / Qwen4Exp / DSV41) | 10 |
 | sparse attention (TRITON_MLA_SPARSE) | 7 |
 | KV-cache / offload fixes | 5 |
 | fork delta (squash: spec-decode fixes + KV-cache / offload fixes) | 2 |
@@ -23,6 +23,9 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- [Bugfix][Parser] GLM-4.7: leak unclosed tool-region text to content instead of swallowing the turn (ddbfd295d6)
+- [fix] glm5next: resolve KDA f_b_proj quant lookup under nested forget_gate path (2ba07b6635)
+- [fix] glm5next: fused in_proj_qkvbfg_a ignore-expansion names shard 4 forget_gate.f_a_proj (69d1b659e3)
 - fix(v1) fork: repair merge drift — pip-compile entries + SW_E4M3 chain + valve dupes (89cbb64c56)
 - [Core] Fix mypy static-gate drift in video chunker returns (92f71ba38a)
 - [core] mm: micro-batch video encoder forwards to bound the KV transient (38d85fcfa2)
@@ -31,6 +34,11 @@ Areas upstream does not ship for this hardware are what this distribution exists
 - fix: demand recording must not sit under the K0 diagnostics guard (31bc038e67)
 - fix: torch.accelerator APIs in fork-delta worker/model code (785ec31b15)
 - fix: port fork test/offloader call sites onto the upstream kv-cache interface rename (7894bf8633)
+- feat(v1) fork: guarded admission — max_new_admissions_per_step caps waiting->RUNNING admissions, flattening defer->burst->storm group admission; None default inert (1588ddc3e6)
+- fix(v1) fork: route OOM history arm to new torch impl (enabled='all'), bool enabled hit the legacy path that rejects context kwarg and killed all workers (4aecdb8693)
+- fix(v1) fork: env-gated OOM snapshot tooling with python-stack frames + GLM allocator-lever window prep (ada6d48424)
+- fix(v1) fork: restore the copy-event wait + the MAMBA env registrations on main (3fc4021c63)
+- fix(v1): keep spec-decode draft padding out of input_ids under async scheduling (3bea39ad2b)
 - fix(v1) fork: restore the copy-event wait + the MAMBA env registrations on main (1519c55404)
 - fix: restore the fused-mqa-topk prefill path in the glm5next kpool indexer (4bbf9a18dd)
 - fix(v1): keep spec-decode draft padding out of input_ids under async scheduling (c27c4f4b30)
