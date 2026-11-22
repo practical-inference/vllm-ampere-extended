@@ -193,6 +193,7 @@ class StreamingParserEngine:
 
     def _reset_json_collection_state(self) -> None:
         # State shared by JSON-array and semicolon-separated tool bodies.
+        self._tool_text_swallowed = ""
         self._json_collection_started: bool = False
         self._json_collection_in_element: bool = False
         self._json_collection_had_element: bool = False
@@ -482,7 +483,7 @@ class StreamingParserEngine:
         if transition.skip_in_token_id_mode and self._ever_had_token_ids:
             return self._emit_for_state(value, token_count)
 
-        return self._apply_transition(transition, value, token_count)
+        return self._apply_transition(transition, value, token_count, terminal)
 
     def _emit_for_state(self, text: str, token_count: int = 0) -> list[SemanticEvent]:
         if self.state == ParserState.MESSAGE_HEADER:
@@ -524,6 +525,7 @@ class StreamingParserEngine:
         transition: Transition,
         value: str,
         token_count: int = 0,
+        terminal: str = "",
     ) -> list[SemanticEvent]:
         events: list[SemanticEvent] = []
         previous_state = self.state
@@ -550,6 +552,16 @@ class StreamingParserEngine:
             self._message_header_buffer = ""
             self._message_header_token_count = 0
 
+        if (
+            transition.next_state in self._TOOL_STATES
+            and self.state not in self._TOOL_STATES
+        ):
+            self._tool_text_swallowed += self.config.terminal_literal(terminal) or ""
+        elif (
+            self.state in self._TOOL_STATES
+            and transition.next_state not in self._TOOL_STATES
+        ):
+            self._tool_text_swallowed = ""
         self.state = transition.next_state
 
         for event_type in transition.events:

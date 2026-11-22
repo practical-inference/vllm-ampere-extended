@@ -64,6 +64,7 @@ struct GlmXmlToolParser {
     buffer: String,
     mode: GlmMode,
     emitted_tool_count: usize,
+    content_has_nonws: bool,
     tool_parameters: ToolSchemas,
     separator: Separator,
 }
@@ -75,6 +76,7 @@ impl GlmXmlToolParser {
             buffer: String::new(),
             mode: GlmMode::Text,
             emitted_tool_count: 0,
+            content_has_nonws: false,
             tool_parameters: ToolSchemas::from_tools(tools),
             separator,
         }
@@ -84,7 +86,11 @@ impl GlmXmlToolParser {
     fn apply_event(&mut self, event: GlmEvent, output: &mut ToolParserOutput) -> Result<()> {
         match event {
             GlmEvent::Text { len: consumed_len } => {
-                output.push_text(&self.buffer[..consumed_len]);
+                let text = &self.buffer[..consumed_len];
+                if text.contains(|ch: char| !ch.is_whitespace()) {
+                    self.content_has_nonws = true;
+                }
+                output.push_text(text);
             }
             GlmEvent::ToolCallStart => {
                 self.mode = GlmMode::ToolCall {
@@ -114,6 +120,7 @@ impl GlmXmlToolParser {
     fn reset(&mut self) -> String {
         self.mode = GlmMode::Text;
         self.emitted_tool_count = 0;
+        self.content_has_nonws = false;
         std::mem::take(&mut self.buffer)
     }
 
@@ -136,7 +143,20 @@ impl GlmXmlToolParser {
             match self.mode {
                 GlmMode::Text => output.push_text(&self.buffer),
                 GlmMode::ToolCall { .. } => {
-                    return Err(ToolParserError::IncompleteToolCall { parser: "GLM MoE" });
+                    // An unclosed tool region that registered nothing would
+                    // otherwise vanish the whole turn; leak its recorded text
+                    // so the model sees something recoverable in its history.
+                    // A turn that already emitted content or an accepted call
+                    // parses exactly as before (markup dropped at the caller).
+                    if self.emitted_tool_count == 0
+                        && !self.content_has_nonws
+                        && self.buffer.contains(|ch: char| !ch.is_whitespace())
+                    {
+                        output.push_text(TOOL_CALL_START);
+                        output.push_text(&self.buffer);
+                    } else {
+                        return Err(ToolParserError::IncompleteToolCall { parser: "GLM MoE" });
+                    }
                 }
                 GlmMode::AfterToolCall => {}
             }
@@ -453,10 +473,67 @@ mod tests {
     }
 
     #[test]
-    fn glm45_finish_fails_incomplete_tool_call() {
+    fn glm45_finish_leaks_unclosed_tool_region_to_text() {
         let mut parser = Glm45MoeToolParser::new(&test_tools());
 
         parser.parse_chunk("<tool_call>get_weather\n<arg_key>city</arg_key>").unwrap();
+        let output = parser.finish().unwrap();
+
+        assert!(output.calls().is_empty());
+        assert_eq!(
+            output.normal_text(),
+            "<tool_call>get_weather\n<arg_key>city</arg_key>"
+        );
+    }
+
+    #[test]
+    fn glm47_finish_leaks_unclosed_tool_region_to_text() {
+        let mut parser = Glm47MoeToolParser::create(&test_tools(), test_tokenizer()).unwrap();
+
+        parser
+            .parse_chunk("<tool_call>get_weather <arg_key>city</arg_key><arg_value>Paris")
+            .unwrap();
+        let output = parser.finish().unwrap();
+
+        assert!(output.calls().is_empty());
+        assert_eq!(
+            output.normal_text(),
+            "<tool_call>get_weather <arg_key>city</arg_key><arg_value>Paris"
+        );
+    }
+
+    #[test]
+    fn glm45_finish_fails_unclosed_region_after_accepted_call() {
+        let mut parser = Glm45MoeToolParser::new(&test_tools());
+
+        parser
+            .parse_chunk(&format!(
+                "{}<tool_call>get_weather\n<arg_key>city</arg_key>",
+                glm45_tool_call("get_weather", &[("city", "Paris")])
+            ))
+            .unwrap();
+        let error = parser.finish().unwrap_err();
+
+        assert!(error.as_report().to_string().contains("incomplete GLM MoE tool call"));
+    }
+
+    #[test]
+    fn glm45_finish_fails_unclosed_region_after_content() {
+        let mut parser = Glm45MoeToolParser::new(&test_tools());
+
+        parser
+            .parse_chunk("Checking the weather. <tool_call>get_weather\n<arg_key>city</arg_key>")
+            .unwrap();
+        let error = parser.finish().unwrap_err();
+
+        assert!(error.as_report().to_string().contains("incomplete GLM MoE tool call"));
+    }
+
+    #[test]
+    fn glm45_finish_fails_whitespace_only_unclosed_region() {
+        let mut parser = Glm45MoeToolParser::new(&test_tools());
+
+        parser.parse_chunk("<tool_call> ").unwrap();
         let error = parser.finish().unwrap_err();
 
         assert!(error.as_report().to_string().contains("incomplete GLM MoE tool call"));

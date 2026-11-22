@@ -186,6 +186,7 @@ class ParserEngine(Parser):
         self._deferred_reasoning: str = ""
         self._content_has_nonws: bool = False
         self._suppress_tool_calls: bool = False
+        self._turn_registered_any: bool = False
 
         self._arg_converter = parser_engine_config.arg_converter
         self._complete_tool_call_validator = (
@@ -305,6 +306,7 @@ class ParserEngine(Parser):
         self._deferred_content = ""
         self._deferred_reasoning = ""
         self._content_has_nonws = False
+        self._turn_registered_any = False
         self._prompt_streaming_prepared = False
 
     def adjust_request(
@@ -936,6 +938,27 @@ class ParserEngine(Parser):
                     if not suppress:
                         seen_tool_event = True
                         self._handle_tool_end(event, tool_call_deltas)
+                        slot = (
+                            self._tool_slots[event.tool_index]
+                            if 0 <= event.tool_index < len(self._tool_slots)
+                            else None
+                        )
+                        if (
+                            slot is not None
+                            and not tool_call_deltas
+                            and not self._turn_registered_any
+                            and not slot.name_sent
+                            and not self._content_has_nonws
+                            and (slot.name or slot.args)
+                        ):
+                            # An unclosed tool region would otherwise vanish
+                            # the whole turn; leak its text so the model
+                            # sees something recoverable in its history.
+                            content_parts.append(
+                                self._engine._tool_text_swallowed
+                                + slot.name
+                                + slot.args
+                            )
                 case EventType.REASONING_START:
                     pass  # no delta-level effect
 
@@ -978,6 +1001,7 @@ class ParserEngine(Parser):
             if reasoning is not None:
                 kwargs["reasoning"] = reasoning
             if tool_call_deltas:
+                self._turn_registered_any = True
                 kwargs["tool_calls"] = tool_call_deltas
             return DeltaMessage(**kwargs)
         return None

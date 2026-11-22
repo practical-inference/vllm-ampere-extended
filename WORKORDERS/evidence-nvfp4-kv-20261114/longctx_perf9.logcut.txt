@@ -1,0 +1,5 @@
+round1 prompt_tokens=None ttft=16.4s decode=68.1 tok/s needle_hit=True
+round1 answer[:120]: 'We need answer only from reference material. Need find launch code. Material contains sentence: "The launch code for the'
+round2 prompt_tokens=None ttft=0.4s decode=68.6 tok/s needle_hit=False
+round2 answer[:200]: 'We need answer. Need comply. User asks: "Now write a two-sentence summary of what kind of document this material resembles, then repeat the vault code." We need only from reference material? The initi'
+round3(300K) prompt_tokens=None ttft=41.7s decode=68.4 tok/s needle_hit=True

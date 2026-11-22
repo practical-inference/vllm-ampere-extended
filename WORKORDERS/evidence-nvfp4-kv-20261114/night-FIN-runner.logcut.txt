@@ -1,0 +1,34 @@
+[FIN] boot marker 11-14 01:06:35; waiting health http://127.0.0.1:8080 ...
+[FIN] healthy at 01:12:46; running repro
+[FIN] repro rc=0 done 01:24:15
+[FIN] post-repro health=200
+=== CRASH SIGNATURES ===
+497
+=== ANALYZER (since boot) ===
+heartbeats: 69  span 01:12:53 -> 01:24:13
+Running: max=5 mean=3.8
+collapse windows (>=30s at gen<20 tok/s): 3 total, 3 with traffic
+  01:13:03->01:17:43 (290s): prompt_max=40063 KV=2-11% Run=3-3 Wait_max=0 Def_max=0
+  01:18:03->01:18:43 (50s): prompt_max=0 KV=2-6% Run=2-2 Wait_max=0 Def_max=0
+  01:19:03->01:24:03 (310s): prompt_max=30063 KV=4-32% Run=5-5 Wait_max=0 Def_max=0
+wait/defer non-zero: 0/69 (0.0%), max=0
+gen tok/s: mean=6 p50=3 max=81
+=== CANARY/GAP LINES ===
+{"phase": "canary", "ttft_s": 0.082, "wall_s": 688.298, "n_chunks": 1348, "tok_s": 2.0}
+{"phase": "canary-gaps", "n": 1347, "p50_ms": 16.5, "p90_ms": 1260.1, "max_s": 1.59}
+{"phase": "canary-gaps", "n": 1347, "p50_ms": 16.5, "p90_ms": 1260.1, "max_s": 1.59}
+{"phase": "storm-0", "ttft_s": 312.001, "wall_s": 315.668, "n_chunks": 4, "tok_s": 1.1}
+{"phase": "storm-1", "ttft_s": 319.179, "wall_s": 319.672, "n_chunks": 4, "tok_s": 8.1}
+{"phase": "storm-2", "ttft_s": 319.124, "wall_s": 319.617, "n_chunks": 4, "tok_s": 8.1}
+{"phase": "storm-3", "ttft_s": 319.556, "wall_s": 319.564, "n_chunks": 2, "tok_s": 255.2}
+{"phase": "storm-wall", "wall_s": 319.8}
+[FIN] RUN-DONE 01:24:16
+=== SOAK SUMMARY ===
+samples=120 dead_samples=0
+2026-11-14T03:39:47-07:00,200,0.0
+
+soak 2026-11-14T01:24:16-07:00 -> 2026-11-14T03:39:47-07:00
+180
+E1b FINAL: alive=True kv=0.3%
+ramp-rc=0
+SOAK-DONE 2026-11-14T03:40:42-07:00

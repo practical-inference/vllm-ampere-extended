@@ -1354,6 +1354,10 @@ class Scheduler(SchedulerInterface):
             )
             # Cleared once self.async_kv_waiting's head can't start a load.
             take_async_kv = True
+            num_new_admissions = 0
+            max_new_admissions = (
+                self.scheduler_config.max_new_admissions_per_step or float("inf")
+            )
             while True:
                 # Paused streaming sessions (WAITING_FOR_STREAMING_REQ) are not
                 # in `running` but still hold a model-runner request slot.
@@ -1380,6 +1384,8 @@ class Scheduler(SchedulerInterface):
                 if not request_queue or (
                     not loads_only and input_budget <= draft_slots
                 ):
+                    break
+                if num_new_admissions >= max_new_admissions:
                     break
 
                 request = request_queue.peek_request()
@@ -2015,6 +2021,7 @@ class Scheduler(SchedulerInterface):
                 request = request_queue.pop_request()
                 self.deferred_waiting.discard(request)
                 self.running.append(request)
+                num_new_admissions += 1
                 if num_external_computed_tokens > 0:
                     # load_kv_async is False here
                     has_sync_kv_loads = True
