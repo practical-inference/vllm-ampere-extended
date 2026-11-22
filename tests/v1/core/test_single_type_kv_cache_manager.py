@@ -79,7 +79,7 @@ def test_external_computed_blocks_do_not_corrupt_free_pool():
 def test_mamba_speculative_block_relocation_requires_exclusive_ownership():
     spec = MambaManager.layer_config(
         MambaSpec(block_size=4, shapes=((1, 1),), dtypes=(torch.float32,)),
-        mamba_cache_mode="align",
+        enable_prefix_caching=True,
         num_speculative_blocks=1,
     )
     block_pool = BlockPool(num_gpu_blocks=4, enable_caching=True, hash_block_size=4)
@@ -362,13 +362,13 @@ def test_mamba_k0_crossing_release_swaps_window_for_nulls():
 def test_mamba_retirement_crosses_null_gaps():
     spec = MambaManager.layer_config(
         MambaSpec(block_size=4, shapes=((1, 1),), dtypes=(torch.float32,)),
-        mamba_cache_mode="align",
+        enable_prefix_caching=True,
     )
-    pool = BlockPool(num_gpu_blocks=8, enable_caching=False, hash_block_size=4)
+    pool = BlockPool(num_gpu_blocks=8, enable_caching=True, hash_block_size=4)
     manager = MambaManager(
         new_kv_cache_group(["layer"], spec),
         block_pool=pool,
-        enable_caching=False,
+        enable_caching=True,
         kv_cache_group_id=0,
         scheduler_block_size=4,
     )
@@ -400,7 +400,7 @@ def test_mamba_retirement_crosses_null_gaps():
 def test_mamba_retirement_bounds_prefill_states(block_size, in_flight_chunks):
     spec = MambaManager.layer_config(
         MambaSpec(block_size=block_size, shapes=((1, 1),), dtypes=(torch.float32,)),
-        mamba_cache_mode="align",
+        enable_prefix_caching=True,
         num_speculative_blocks=5,
     )
     pool = BlockPool(num_gpu_blocks=1000, enable_caching=True, hash_block_size=256)
@@ -440,7 +440,7 @@ def test_mamba_checkpoint_admission_matches_allocation(
     """Checkpoint admission must match the subsequent physical allocation."""
     spec = MambaManager.layer_config(
         MambaSpec(block_size=block_size, shapes=((1, 1),), dtypes=(torch.float32,)),
-        mamba_cache_mode="align",
+        enable_prefix_caching=True,
         num_speculative_blocks=num_speculative_blocks,
         num_prefill_checkpoint_blocks=1,
         prefill_checkpoint_alignment=64,
@@ -497,7 +497,7 @@ def test_mamba_checkpoint_hash_maps_only_to_checkpoint_block(
     block_size = 128
     spec = MambaManager.layer_config(
         MambaSpec(block_size=block_size, shapes=((1, 1),), dtypes=(torch.float32,)),
-        mamba_cache_mode="align",
+        enable_prefix_caching=True,
         num_speculative_blocks=num_speculative_blocks,
         num_prefill_checkpoint_blocks=1,
         prefill_checkpoint_alignment=16,
@@ -510,8 +510,6 @@ def test_mamba_checkpoint_hash_maps_only_to_checkpoint_block(
         kv_cache_group_id=0,
         scheduler_block_size=block_size,
     )
-    # MTP/EAGLE moves the checkpoint one block below the last full block.
-    manager.drop_eagle_checkpoint_block = True
     init_none_hash(sha256)
     prompt_tokens = 6 * block_size + 50
     request = Request(
@@ -531,7 +529,7 @@ def test_mamba_checkpoint_hash_maps_only_to_checkpoint_block(
             request,
             end,
             retention_interval=retention_interval,
-            replay_boundaries=[5 * block_size],
+            replay_boundaries=(5 * block_size,),
         )
         request.num_computed_tokens = end
 
@@ -754,7 +752,6 @@ def test_dflash_window_hit_needs_only_the_window_before_request_end(
         block_pool=block_pool,
         block_size=block_size,
         manager_config=new_dflash_window_layer().manager_config,
-        drop_eagle_block=False,
         alignment_tokens=block_size,
         num_request_tokens=41,
     )
@@ -803,7 +800,6 @@ def test_dflash_window_sparse_retention_caches_only_what_a_replay_reads(
         block_pool=block_pool,
         block_size=4,
         manager_config=layer.manager_config,
-        drop_eagle_block=False,
         alignment_tokens=4,
         num_request_tokens=40,
     )
@@ -1062,7 +1058,6 @@ def test_chunked_local_attention_possible_cached_prefix():
             block_pool=block_pool,
             block_size=chunked_local_attention_spec.spec.block_size,
             manager_config=chunked_local_attention_spec.manager_config,
-            drop_eagle_block=False,
             alignment_tokens=block_size,
         )[0][0]
         assert len(computed_blocks) == expect_length
@@ -1133,7 +1128,6 @@ def test_sliding_window_possible_cached_prefix():
             block_pool=block_pool,
             block_size=sliding_window_spec.spec.block_size,
             manager_config=sliding_window_spec.manager_config,
-            drop_eagle_block=False,
             alignment_tokens=block_size,
         )[0][0]
         assert len(computed_blocks) == expect_length
@@ -1199,7 +1193,6 @@ def test_sliding_window_cache_hit_with_finer_hash_alignment():
         block_pool=block_pool,
         block_size=sliding_window_spec.spec.block_size,
         manager_config=sliding_window_spec.manager_config,
-        drop_eagle_block=False,
         alignment_tokens=hash_block_size,
     )
 
