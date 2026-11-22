@@ -9414,7 +9414,7 @@ def _mamba_priced_scheduler(
         num_speculative_tokens_per_batch_size=schedule_table,
         kv_cache_layer_config=mamba_layer(
             MambaSpec(block_size=16, shapes=((1, 1),), dtypes=(torch.float32,)),
-            mamba_cache_mode="align",
+            enable_prefix_caching=True,
             num_speculative_blocks=2,
         ),
     )
@@ -9616,7 +9616,7 @@ def _mamba_slot_release_scheduler(
         num_speculative_tokens_per_batch_size=schedule_table,
         kv_cache_layer_config=mamba_layer(
             MambaSpec(block_size=16, shapes=((1, 1),), dtypes=(torch.float32,)),
-            mamba_cache_mode="align",
+            enable_prefix_caching=True,
             num_speculative_blocks=2,
         ),
     )
@@ -9948,7 +9948,7 @@ def _hybrid_priced_scheduler(
         num_speculative_tokens_per_batch_size=schedule_table,
         kv_cache_layer_config=mamba_layer(
             MambaSpec(block_size=16, shapes=((1, 1),), dtypes=(torch.float32,)),
-            mamba_cache_mode="align",
+            enable_prefix_caching=True,
             num_speculative_blocks=2,
         ),
         kv_cache_groups=[
@@ -9961,7 +9961,9 @@ def _hybrid_priced_scheduler(
             new_kv_cache_group(
                 ["mamba"],
                 MambaSpec(block_size=16, shapes=((1, 1),), dtypes=(torch.float32,)),
-                MambaManager.config(mamba_cache_mode="align", num_speculative_blocks=2),
+                MambaManager.config(
+                    enable_prefix_caching=True, num_speculative_blocks=2
+                ),
             ),
         ],
     )

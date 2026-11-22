@@ -190,7 +190,7 @@ class PleShortConvAttentionMetadataBuilder(ShortConvAttentionMetadataBuilder):
         # checkpoint_builder comes from the base __init__ (super() above).
         self._k0_regular_decode: bool = (
             self.num_spec > 0
-            and self.vllm_config.cache_config.mamba_cache_mode == "align"
+            and self.vllm_config.cache_config.enable_prefix_caching
             and (envs.VLLM_MAMBA_K0_SLOT_RELEASE or envs.VLLM_MAMBA_PRICED_ADMISSION)
         )
         self.use_full_cuda_graph = (

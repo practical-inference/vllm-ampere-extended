@@ -107,11 +107,11 @@ def test_mamba_speculative_block_relocation_requires_exclusive_ownership():
 def _align_manager(
     num_spec_blocks: int = 2,
     num_gpu_blocks: int = 16,
-    mode: str = "align",
+    enable_prefix_caching: bool = True,
 ) -> tuple[MambaManager, BlockPool]:
     spec = MambaManager.layer_config(
         MambaSpec(block_size=4, shapes=((1, 1),), dtypes=(torch.float32,)),
-        mamba_cache_mode=mode,
+        enable_prefix_caching=enable_prefix_caching,
         num_speculative_blocks=num_spec_blocks,
     )
     pool = BlockPool(
@@ -155,7 +155,7 @@ def test_mamba_priced_admission_mark_guards():
     no_window, _ = _align_manager(num_spec_blocks=0)
     assert no_window.mark_spec_admission_tier0("r") is False
 
-    non_align, _ = _align_manager(mode="none")
+    non_align, _ = _align_manager(enable_prefix_caching=False)
     assert non_align.mark_spec_admission_tier0("r") is False
 
     manager, pool = _align_manager()

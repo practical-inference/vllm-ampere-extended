@@ -235,7 +235,7 @@ def test_align_fold_routes_zero_draft_rows_to_the_regular_path(
     meta = _decode_metadata(
         _builder(
             use_spec_decode=True,
-            mamba_cache_mode="align",
+            enable_prefix_caching=True,
             shapes=MambaStateShapeCalculator.kda_state_shape(
                 tp_world_size=1, num_heads=4, head_dim=32, num_spec=NUM_SPEC
             ),

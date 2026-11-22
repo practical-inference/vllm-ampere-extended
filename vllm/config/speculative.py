@@ -2190,6 +2190,14 @@ class SpeculativeConfig:
         assert self.draft_model_config is not None
         return getattr(self.draft_model_config.hf_config, "n_predict", None) or 1
 
+    def use_gemma4_mtp(self) -> bool:
+        return (
+            self.method == "mtp"
+            and self.draft_model_config is not None
+            and getattr(self.draft_model_config.hf_config, "model_type", None)
+            == "gemma4_mtp"
+        )
+
     def use_multi_module_mtp(self) -> bool:
         if self.method != "mtp" or self.draft_model_config is None:
             return False

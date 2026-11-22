@@ -2569,7 +2569,7 @@ class MambaManager(SingleTypeKVCacheManager):
     def _spec_admission_priceable(self, request_id: str) -> bool:
         return (
             self.num_speculative_blocks > 0
-            and self.mamba_cache_mode == "align"
+            and self.prefix_caching
             and request_id not in self._allocated_block_reqs
         )
 
@@ -2606,7 +2606,7 @@ class MambaManager(SingleTypeKVCacheManager):
         Prefix-hit-blind: it can only over-price an admission — the
         per-row priced retry stays the net for the opposite error.
         """
-        if self.num_speculative_blocks <= 0 or self.mamba_cache_mode != "align":
+        if self.num_speculative_blocks <= 0 or not self.prefix_caching:
             return 0
         resident = 2 + self.num_prefill_checkpoint_blocks
         window = self.num_speculative_blocks

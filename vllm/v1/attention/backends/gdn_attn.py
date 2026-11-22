@@ -216,7 +216,7 @@ class GDNAttentionMetadataBuilder(AttentionMetadataBuilder[GDNAttentionMetadata]
         # runner — the V2 align preprocess is now the only path.)
         self._k0_regular_decode: bool = (
             self.use_spec_decode
-            and self.vllm_config.cache_config.mamba_cache_mode == "align"
+            and self.vllm_config.cache_config.enable_prefix_caching
             and (envs.VLLM_MAMBA_K0_SLOT_RELEASE or envs.VLLM_MAMBA_PRICED_ADMISSION)
         )
         self._init_reorder_batch_threshold(1, self.use_spec_decode)
