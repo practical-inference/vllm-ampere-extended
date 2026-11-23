@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from openai.types.responses import CustomTool, ToolChoiceFunction
 from openai.types.responses.tool_choice_allowed import ToolChoiceAllowed
+from prometheus_client import REGISTRY
 from xgrammar import Grammar, StructuralTag
 from xgrammar import get_model_structural_tag as get_xgrammar_builtin_structural_tag
 from xgrammar.testing import _is_grammar_accept_string
@@ -57,6 +58,7 @@ from vllm.tool_parsers.minimax_m2_tool_parser import MinimaxM2ToolParser
 from vllm.tool_parsers.plamo3_engine_tool_parser import Plamo3EngineToolParser
 from vllm.tool_parsers.qwen3_engine_tool_parser import Qwen3EngineToolParser
 from vllm.tool_parsers.required_preserving import (
+    REQUIRED_PRESERVING_MAX_KEYS,
     expand_loose_to_required_preserving,
 )
 from vllm.tool_parsers.step3p5_tool_parser import Step3p5ToolParser
@@ -2172,6 +2174,74 @@ def test_glm47_operator_level_overrides_parser_default(
     assert content["type"] == "or"
     for branch in content["elements"]:
         assert branch["json_schema"] == sample_tools[0].function.parameters
+
+
+def _pinned_requests() -> float:
+    metric = "vllm:tool_grammar_any_order_requests_total"
+    return REGISTRY.get_sample_value(metric) or 0.0
+
+
+def _wide_strict_tool(n_keys: int) -> ChatCompletionToolsParam:
+    props = {f"k{i}": {"type": "string"} for i in range(n_keys)}
+    return ChatCompletionToolsParam(
+        type="function",
+        function={
+            "name": "wide",
+            "strict": True,
+            "parameters": {
+                "type": "object",
+                "properties": props,
+                "required": list(props),
+            },
+        },
+    )
+
+
+def _adjust_strict_request(tool: ChatCompletionToolsParam):
+    class TestParser(DelegatingParser):
+        tool_parser_cls = Glm47MoeModelToolParser
+        tool_strict_level = ToolStrictLevel.PARAMETER
+
+    request = ChatCompletionRequest(
+        messages=[],
+        model="m",
+        tools=[tool.model_dump(exclude_none=True)],
+        tool_choice="required",
+    )
+    return TestParser(MagicMock(), tools=[tool]).adjust_request(request)
+
+
+def test_glm47_past_the_cap_keeps_any_order_and_is_counted(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(envs, "VLLM_ENFORCE_STRICT_TOOL_CALLING", True)
+
+    before = _pinned_requests()
+    out = _adjust_strict_request(_wide_strict_tool(REQUIRED_PRESERVING_MAX_KEYS + 1))
+
+    content = json.loads(out.structured_outputs.structural_tag)["format"]["tags"][0][
+        "content"
+    ]
+    # Shipped decode behavior is preserved past the cap: loose any_order, not
+    # a silently narrowed declared-order grammar.
+    assert content["type"] == "json_schema"
+    assert content["any_order"] is True
+    # Counted per request, so tool-call failures can be joined to past-cap
+    # grammar instead of inferred from a once-per-process warning.
+    assert _pinned_requests() == before + 1
+
+
+def test_glm47_within_the_cap_is_not_counted(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(envs, "VLLM_ENFORCE_STRICT_TOOL_CALLING", True)
+
+    before = _pinned_requests()
+    out = _adjust_strict_request(_wide_strict_tool(2))
+
+    content = json.loads(out.structured_outputs.structural_tag)["format"]["tags"][0][
+        "content"
+    ]
+    assert content["type"] == "or"
+    assert _pinned_requests() == before
 
 
 @pytest.mark.parametrize(

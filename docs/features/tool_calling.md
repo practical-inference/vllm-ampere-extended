@@ -150,7 +150,7 @@ Most OpenAI-compatible clients and agent frameworks never set `strict` on their 
 | --- | --- |
 | `auto` | Follow the request's tool choice and per-tool strictness. Required/named choices activate structural tags; `tool_choice="auto"` activates them when at least one tool sets `strict: true`. |
 | `function` | Constrain the tool-call envelope (markup and the function name) for every request with tools, leaving argument contents free unless the client marked the tool `strict: true`. |
-| `parameter` | Additionally pin argument schemas for every tool, as if every tool had `strict: true`. |
+| `parameter` | Additionally pin argument schemas for every tool, as if every tool had `strict: true`. Past the required-preserving key cap the schema stays loose any-order — see [Past-Cap Key Ordering](#past-cap-key-ordering). |
 
 ```bash
 vllm serve ... --tool-strict-level function
@@ -159,6 +159,14 @@ vllm serve ... --tool-strict-level function
 When the option is unset, the tool parser's default level applies: `function` for `glm47`, `auto` for the other parsers. Passing `--tool-strict-level auto` overrides a parser default.
 
 The floor never relaxes a constraint the request would already receive: tools the client marked `strict: true` keep their schemas at every level. With `tool_choice="auto"`, the grammar does not force a tool call; a plain text response stays valid. `VLLM_ENFORCE_STRICT_TOOL_CALLING=false` disables structural tags entirely and takes precedence over this option.
+
+### Past-Cap Key Ordering
+
+Restoring any-order acceptance means expanding each loose `any_order: true` schema node into an or-format over key permutations — one fully-validated branch per ordering. That shape costs `k!` branches, so the expansion is capped at 6 keys, and past the cap the node keeps loose any-order semantics.
+
+What that leaves unenforced depends on the xgrammar version. Under xgrammar 0.2.9, `any_order=True` still rejects missing required keys and unknown keys; the surviving hole is **uniqueness** — a repeated member name (`"city"` twice) is accepted. Under 0.2.8 missing required keys were accepted as well, which is the condition the or-permutation expansion was written to fix.
+
+A request built past the cap is counted by `vllm:tool_grammar_any_order_requests_total`, so a loose any-order grammar is visible per request instead of only in a once-per-process warning. The constraint itself is left untouched — nothing that reaches the decoder is annotated or narrowed.
 
 ## Automatic Function Calling
 

@@ -38,9 +38,23 @@ import json
 import warnings
 from typing import Any
 
+from prometheus_client import Counter
+
 REQUIRED_PRESERVING_MAX_KEYS = 6
 _MARKER_KEY = "x-required-preserving-marker"
 _FALLBACK_KEY = "x-any-order-loose-fallback"
+
+ANY_ORDER_METRIC = "vllm:tool_grammar_any_order_requests_total"
+
+_ANY_ORDER_REQUESTS = Counter(
+    name=ANY_ORDER_METRIC,
+    documentation=(
+        "Requests whose strict tool grammar exceeded the required-preserving "
+        "permutation cap and kept loose any-order semantics; on xgrammar 0.2.9 "
+        "required keys and unknown keys are still checked, duplicate members "
+        "are accepted."
+    ),
+)
 
 
 def _reordered(schema: dict[str, Any], order: list[str]) -> dict[str, Any]:
@@ -72,9 +86,13 @@ def _node_to_format(
     }
 
 
-def _expand_format_node(node: dict[str, Any]) -> dict[str, Any]:
+def _expand_format_node(
+    node: dict[str, Any], stats: dict[str, int] | None = None
+) -> dict[str, Any]:
     """Expand every marked (loose any_order:true) json_schema node.
 
+    `stats` optionally accumulates `past_cap`: nodes that exceeded
+    REQUIRED_PRESERVING_MAX_KEYS and kept loose any-order semantics.
     Recursion covers every parent shape that can nest a json_schema node:
     or/sequence (elements), triggered tags & separator tags (tags), dispatch
     rule sets (rules — serialized as [pattern, format] pairs).
@@ -92,11 +110,13 @@ def _expand_format_node(node: dict[str, Any]) -> dict[str, Any]:
             if len(keys) > REQUIRED_PRESERVING_MAX_KEYS:
                 warnings.warn(
                     f"required-preserving expansion capped: {len(keys)} keys > "
-                    f"{REQUIRED_PRESERVING_MAX_KEYS}; node keeps loose "
-                    "any_order semantics (required keys may be missing, "
-                    "duplicates accepted)",
+                    f"{REQUIRED_PRESERVING_MAX_KEYS}; node keeps loose any_order "
+                    "semantics (on xgrammar 0.2.9 required keys and unknown keys "
+                    "are still checked; duplicate members are accepted)",
                     stacklevel=2,
                 )
+                if stats is not None:
+                    stats["past_cap"] += 1
                 leaf = {k: v for k, v in marked.items() if k != _MARKER_KEY}
                 out = _node_to_format(leaf, style, True, ws, excludes)
             else:
@@ -115,13 +135,13 @@ def _expand_format_node(node: dict[str, Any]) -> dict[str, Any]:
     for attr in ("elements", "content", "tags"):
         v = node.get(attr)
         if isinstance(v, list):
-            node[attr] = [_expand_format_node(x) for x in v]
+            node[attr] = [_expand_format_node(x, stats) for x in v]
         elif isinstance(v, dict):
-            node[attr] = _expand_format_node(v)
+            node[attr] = _expand_format_node(v, stats)
     rules = node.get("rules")
     if isinstance(rules, list):
         node["rules"] = [
-            [rule[0], _expand_format_node(rule[1])]
+            [rule[0], _expand_format_node(rule[1], stats)]
             if isinstance(rule, list) and len(rule) == 2
             else rule
             for rule in rules
@@ -135,12 +155,16 @@ def expand_loose_to_required_preserving(structural_tag_json: str) -> str:
 
     Input/output: the serialized StructuralTag (model_dump_json shape). The
     C++ core receives only or-format/json_schema nodes it already
-    understands; the loose semantics survive only above the cap (warned,
-    any_order:true on the fallback node for structural auditors).
+    understands; the loose semantics survive only above the cap, where the
+    request is warned and counted. The constraint itself is not annotated —
+    nothing that reaches the decoder is mutated.
     """
     parsed = json.loads(structural_tag_json)
+    stats = {"past_cap": 0}
     if parsed.get("type") == "structural_tag" and isinstance(
         parsed.get("format"), dict
     ):
-        parsed["format"] = _expand_format_node(parsed["format"])
+        parsed["format"] = _expand_format_node(parsed["format"], stats)
+    if stats["past_cap"]:
+        _ANY_ORDER_REQUESTS.inc()
     return json.dumps(parsed)
