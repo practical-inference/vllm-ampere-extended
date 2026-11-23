@@ -21,9 +21,11 @@ branch leaf — the C++ core's or-format reads only `elements`, so constraint
 material on the or node itself is dropped (2026-11-03 review finding F1,
 fixed 21/21 in the harness probe).
 
-k! branch growth is capped (REQUIRED_PRESERVING_MAX_KEYS); above the cap the
-node keeps the loose semantics — carried onto the format node (`any_order:
-true`, the warning fires) so the fallback is delivered, not silent.
+k! branch growth is capped (REQUIRED_PRESERVING_MAX_KEYS). Past the cap the
+order freedom is dropped rather than the contract: the node ships
+declared-order-strict (`any_order: false`) carrying `_FALLBACK_KEY` in the
+schema, and the warning fires — a pin is delivered and auditable, never a
+silent loss of presence/uniqueness.
 
 Upstream path: the same expansion is proposed to xgrammar upstream as
 `any_order="required_preserving"` (issue-first, 2026-11-02; rebuilt
@@ -37,6 +39,8 @@ import itertools
 import json
 import warnings
 from typing import Any
+
+from prometheus_client import Counter
 
 REQUIRED_PRESERVING_MAX_KEYS = 6
 _MARKER_KEY = "x-required-preserving-marker"
@@ -90,15 +94,19 @@ def _expand_format_node(node: dict[str, Any]) -> dict[str, Any]:
             marked = {**schema, _MARKER_KEY: True}
             keys = _object_keys(marked)
             if len(keys) > REQUIRED_PRESERVING_MAX_KEYS:
+                # Past the cap drop order freedom, never the contract: a
+                # declared-order branch is fully validated (presence +
+                # uniqueness held) and constant-size, while loose any_order
+                # validates nothing.
                 warnings.warn(
                     f"required-preserving expansion capped: {len(keys)} keys > "
-                    f"{REQUIRED_PRESERVING_MAX_KEYS}; node keeps loose "
-                    "any_order semantics (required keys may be missing, "
-                    "duplicates accepted)",
+                    f"{REQUIRED_PRESERVING_MAX_KEYS}; key order pinned to "
+                    "declared order (required keys still present, still unique)",
                     stacklevel=2,
                 )
                 leaf = {k: v for k, v in marked.items() if k != _MARKER_KEY}
-                out = _node_to_format(leaf, style, True, ws, excludes)
+                leaf[_FALLBACK_KEY] = True
+                out = _node_to_format(leaf, style, False, ws, excludes)
             else:
                 stripped = {k: v for k, v in marked.items() if k != _MARKER_KEY}
                 out = {
@@ -129,18 +137,41 @@ def _expand_format_node(node: dict[str, Any]) -> dict[str, Any]:
     return node
 
 
+_ORDER_PINNED_REQUESTS = Counter(
+    name="vllm:tool_grammar_order_pinned_requests_total",
+    documentation=(
+        "Requests whose strict tool grammar exceeded the required-preserving "
+        "permutation cap, so key order was pinned to declared order."
+    ),
+)
+
+
+def _count_pinned_nodes(node: Any) -> int:
+    """Count past-cap fallback nodes recorded in a parsed tag."""
+    if isinstance(node, dict):
+        return int(node.get(_FALLBACK_KEY) is True) + sum(
+            _count_pinned_nodes(v) for v in node.values()
+        )
+    if isinstance(node, list):
+        return sum(_count_pinned_nodes(x) for x in node)
+    return 0
+
+
 def expand_loose_to_required_preserving(structural_tag_json: str) -> str:
     """Expand every loose `any_order: true` json_schema node in a serialized
     tag into the required-preserving or-permutation shape.
 
     Input/output: the serialized StructuralTag (model_dump_json shape). The
     C++ core receives only or-format/json_schema nodes it already
-    understands; the loose semantics survive only above the cap (warned,
-    any_order:true on the fallback node for structural auditors).
+    understands. Past the cap order freedom is dropped instead of the
+    contract: the node ships declared-order-strict carrying `_FALLBACK_KEY`,
+    the warning fires, and the request is counted.
     """
     parsed = json.loads(structural_tag_json)
     if parsed.get("type") == "structural_tag" and isinstance(
         parsed.get("format"), dict
     ):
         parsed["format"] = _expand_format_node(parsed["format"])
+    if _count_pinned_nodes(parsed):
+        _ORDER_PINNED_REQUESTS.inc()
     return json.dumps(parsed)

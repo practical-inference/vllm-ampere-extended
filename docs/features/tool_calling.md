@@ -150,7 +150,7 @@ Most OpenAI-compatible clients and agent frameworks never set `strict` on their 
 | --- | --- |
 | `auto` | Follow the request's tool choice and per-tool strictness. Required/named choices activate structural tags; `tool_choice="auto"` activates them when at least one tool sets `strict: true`. |
 | `function` | Constrain the tool-call envelope (markup and the function name) for every request with tools, leaving argument contents free unless the client marked the tool `strict: true`. |
-| `parameter` | Additionally pin argument schemas for every tool, as if every tool had `strict: true`. |
+| `parameter` | Additionally pin argument schemas for every tool, as if every tool had `strict: true`. Past the required-preserving key cap, key order is pinned to declared order — see [Past-Cap Key Ordering](#past-cap-key-ordering). |
 
 ```bash
 vllm serve ... --tool-strict-level function
@@ -159,6 +159,12 @@ vllm serve ... --tool-strict-level function
 When the option is unset, the tool parser's default level applies: `function` for `glm47`, `auto` for the other parsers. Passing `--tool-strict-level auto` overrides a parser default.
 
 The floor never relaxes a constraint the request would already receive: tools the client marked `strict: true` keep their schemas at every level. With `tool_choice="auto"`, the grammar does not force a tool call; a plain text response stays valid. `VLLM_ENFORCE_STRICT_TOOL_CALLING=false` disables structural tags entirely and takes precedence over this option.
+
+### Past-Cap Key Ordering
+
+Strict grammars restore any-order acceptance by expanding each loose `any_order: true` schema node into an or-format over key permutations — one fully-validated branch per ordering. That shape costs `k!` branches, so the expansion is capped at 6 keys. Past the cap vLLM drops **order freedom rather than the contract**: the node ships declared-order-strict, so required keys are still present exactly once and value schemas stay pinned, instead of falling back to presence- and uniqueness-blind any-order.
+
+A request built this way is counted by `vllm:tool_grammar_order_pinned_requests_total`, and the constraint carries `x-any-order-loose-fallback: true` in its schema, so a pinned call can be told apart from a fully any-order one when triaging tool-call failures.
 
 ## Automatic Function Calling
 
