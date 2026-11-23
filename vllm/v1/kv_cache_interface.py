@@ -825,6 +825,15 @@ def prefix_lookup_groups(
     return list(lookups.values())
 
 
+@dataclass(frozen=True, slots=True)
+class KVCacheStage:
+    """The KV cache of one pipeline stage."""
+
+    bytes_per_block: int
+    """Bytes one block takes in the device KV cache of each worker of the
+    stage: the size the engine core plans that worker's `num_blocks` with."""
+
+
 @dataclass
 class KVCacheConfig:
     """The KV cache configuration of a model."""
@@ -867,6 +876,10 @@ class KVCacheConfig:
     counts (and allocator slack) differ; consumers that need process-identical
     geometry (e.g. the shared offload region) must use this stamped value
     instead of deriving from their own projection. 0 when unstamped."""
+
+    pipeline_stages: tuple[KVCacheStage, ...] = ()
+    """The KV cache of every pipeline stage, by PP rank, resolved by the engine
+    core so that both halves of a KV connector see every stage."""
 
     needs_kv_cache_zeroing: bool = field(init=False)
     """Whether newly allocated attention blocks must be zeroed before use.
