@@ -1,16 +1,16 @@
 <!-- markdownlint-disable MD060 -->
 # Delta vs upstream vLLM
 
-`main` = upstream `main` (nightly merge) + the commits below: 76 source commits (76 files changed, 5927 insertions(+), 413 deletions(-)).
+`main` = upstream `main` (nightly merge) + the commits below: 80 source commits (78 files changed, 6003 insertions(+), 426 deletions(-)).
 
-Diff base: upstream commit `d6d1616c1c` — the tip this tree last merged from origin. Reproduce at this commit with:
-`git log --no-merges d6d1616c1c..19b8688472 -- vllm/ csrc/` and `git diff --stat d6d1616c1c..19b8688472 -- vllm/ csrc/`.
+Diff base: upstream commit `99b0b0b0f3` — the tip this tree last merged from origin. Reproduce at this commit with:
+`git log --no-merges 99b0b0b0f3..f9be5cd918 -- vllm/ csrc/` and `git diff --stat 99b0b0b0f3..f9be5cd918 -- vllm/ csrc/`.
 
 Areas upstream does not ship for this hardware are what this distribution exists to carry; general fixes are contributed upstream first (see README). Regenerated automatically by the nightly integrate.
 
 | Area | Commits |
 |---|---|
-| general fixes | 32 |
+| general fixes | 36 |
 | spec-decode fixes | 15 |
 | model bring-up (GLM5Next / Qwen4Exp / DSV41) | 10 |
 | sparse attention (TRITON_MLA_SPARSE) | 7 |
@@ -23,6 +23,10 @@ Areas upstream does not ship for this hardware are what this distribution exists
 
 <details><summary>Full commit list</summary>
 
+- [Parser][glm47] Free-text arg values run to their closing tag (aad244b60d)
+- [Bugfix] Count past-cap any-order tool grammars (080f700535)
+- Revert "[Bugfix] Pin key order past the required-preserving permutation cap" (7bde5ae0ae)
+- [Bugfix] Pin key order past the required-preserving permutation cap (d9d6d8522e)
 - [Core] Migrate fork K0 routing onto upstream enable_prefix_caching (a89b66ec3a)
 - [Bugfix][Parser] GLM-4.7: leak unclosed tool-region text to content instead of swallowing the turn (ddbfd295d6)
 - [fix] glm5next: resolve KDA f_b_proj quant lookup under nested forget_gate path (2ba07b6635)
