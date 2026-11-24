@@ -223,6 +223,7 @@ class StreamingParserEngine:
         self._in_skipped_tool_span = False
         self._reset_args_state()
         self._reset_json_collection_state()
+        self._in_arg_value = False
 
     def feed(
         self,
@@ -425,6 +426,17 @@ class StreamingParserEngine:
                 self._in_skipped_tool_span = False
             return self._emit_for_state(value, token_count)
 
+        # Inside a free-text arg value only its closing terminal applies:
+        # any other terminal the lexer finds is literal model text. The
+        # value region tracking itself must stay live through this guard,
+        # so it runs before every bypass below.
+        if (
+            self.config.arg_value_region is not None
+            and self._in_arg_value
+            and terminal != self.config.arg_value_region[1]
+        ):
+            return self._emit_for_state(value, token_count)
+
         if self.skip_reasoning_parsing and terminal in self._reasoning_markup_terminals:
             return self._emit_for_state(value, token_count)
 
@@ -531,6 +543,22 @@ class StreamingParserEngine:
         previous_state = self.state
         message_header = ""
         message_header_token_count = 0
+
+        # Free-text arg value region tracking (terminal-keyed, applied on
+        # every transition): the open terminal opens it, its close terminal
+        # closes it, and any fresh entry into or exit from the tool-args
+        # state closes it. The guard in _on_terminal consults this flag.
+        if self.config.arg_value_region is not None:
+            open_terminal, close_terminal = self.config.arg_value_region
+            if terminal == close_terminal:
+                self._in_arg_value = False
+            elif terminal == open_terminal:
+                self._in_arg_value = True
+            elif (
+                previous_state != ParserState.TOOL_ARGS
+                or transition.next_state != ParserState.TOOL_ARGS
+            ):
+                self._in_arg_value = False
 
         if (
             self.state == ParserState.TOOL_ARGS

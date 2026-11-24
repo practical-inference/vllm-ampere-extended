@@ -106,6 +106,14 @@ class ParserEngineConfig:
 
     arg_structural_chars: frozenset[str] | None = None
 
+    # Free-text arg value region as (open_terminal, close_terminal) names.
+    # While the region is open (the open terminal fired, its close terminal
+    # not yet), any other terminal the lexer finds is literal value text,
+    # not a state transition: the templates that drop values raw cannot
+    # escape markup inside them (e.g. the call's own end marker quoted in
+    # an edit payload). None disables the guard.
+    arg_value_region: tuple[str, str] | None = None
+
     # Called with the raw argument text after each streaming conversion whose
     # prefix-safe JSON extends the JSON streamed so far; returns an extender
     # when the text ends in an open value that is the last value in the

@@ -11,6 +11,7 @@ non-streaming parse, without converting the whole argument on every delta.
 """
 
 import dataclasses
+import json
 
 import pytest
 
@@ -328,3 +329,85 @@ class TestStreamedToolArguments:
     )
     def test_no_value_extender_unless_open_value_is_last(self, raw_args):
         assert _glm47_arg_value_extender(raw_args) is None
+
+
+class TestLiteralCallEndInsideValue:
+    """The template drops arg values raw: a value quoting the call's own
+    end marker is value text, not a terminator. Regression for the
+    tool-call truncation class (edit payloads cut at a quoted close
+    marker, tail leaked as content) seen live 2026-11-18..23."""
+
+    def test_call_end_marker_inside_value_stays_in_value(self, parser, mock_request):
+        marker_value = "quoted the marker" + chr(60) + "/tool_call>mid-doc\nsecond line"
+        text = (
+            THINK_END
+            + TOOL_CALL_START
+            + "Write\n"
+            + "@AK@file_path@AKE@@AV@/repo/app.py@AVE@\n"
+            + "@AK@content@AKE@@AV@"
+            + marker_value
+            + "@AVE@\n"
+            + TOOL_CALL_END
+        )
+        for a, b in [
+            ("@AK@", "@AK@x"),
+        ]:
+            pass
+        text = (
+            text.replace("@AK@", chr(60) + "arg_key" + chr(62))
+            .replace("@AKE@", chr(60) + "/arg_key" + chr(62))
+            .replace("@AV@", chr(60) + "arg_value" + chr(62))
+            .replace("@AVE@", chr(60) + "/arg_value" + chr(62))
+        )
+
+        streamed = _stream_arguments(parser, mock_request, _pieces(text, 5))
+        result = parser.extract_tool_calls(text, mock_request)
+
+        args = json.loads(streamed)
+        assert args["content"] == marker_value
+        assert result.content is None
+        assert len(result.tool_calls) == 1
+
+    def test_key_end_marker_inside_value_stays_in_value(self, parser, mock_request):
+        """Same class: a quoted key-end marker inside an open value."""
+        marker_value = "value quoting " + chr(60) + "/arg_key" + chr(62) + " inside"
+        text = (
+            THINK_END
+            + TOOL_CALL_START
+            + "Write\n"
+            + chr(60)
+            + "arg_key"
+            + chr(62)
+            + "file_path"
+            + chr(60)
+            + "/arg_key"
+            + chr(62)
+            + chr(60)
+            + "arg_value"
+            + chr(62)
+            + "/repo/app.py"
+            + chr(60)
+            + "/arg_value"
+            + chr(62)
+            + "\n"
+            + chr(60)
+            + "arg_key"
+            + chr(62)
+            + "content"
+            + chr(60)
+            + "/arg_key"
+            + chr(62)
+            + chr(60)
+            + "arg_value"
+            + chr(62)
+            + marker_value
+            + chr(60)
+            + "/arg_value"
+            + chr(62)
+            + "\n"
+            + TOOL_CALL_END
+        )
+
+        streamed = _stream_arguments(parser, mock_request, _pieces(text, 5))
+
+        assert json.loads(streamed)["content"] == marker_value

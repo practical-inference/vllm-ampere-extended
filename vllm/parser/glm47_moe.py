@@ -259,6 +259,7 @@ def glm47_moe_config(thinking: bool = True) -> ParserEngineConfig:
             **arg_tag_transitions,
         },
         turn_boundary_tokens=GLM_TURN_BOUNDARIES,
+        arg_value_region=("ARG_VALUE_START", "ARG_VALUE_END"),
         arg_converter=_glm47_arg_converter,
         arg_structural_chars=frozenset(">"),
         arg_value_extender=_glm47_arg_value_extender,
