@@ -26,20 +26,20 @@ def _draft_config() -> Qwen3Config:
 
 def test_target_rope_reaches_draft():
     composed = SpeculativeConfig.compose_draft_hf_overrides(
-        {"rope_scaling": dict(YARN)}
+        {"rope_parameters": dict(YARN)}
     )
     draft = composed(_draft_config())
-    assert draft.rope_scaling == YARN
+    assert draft.rope_parameters == YARN
 
 
 def test_draft_without_target_rope_is_untouched():
     draft = _draft_config()
-    before = draft.rope_scaling
+    before = draft.rope_parameters
     composed = SpeculativeConfig.compose_draft_hf_overrides(
         {"max_position_embeddings": 12345}
     )
     composed(draft)
-    assert draft.rope_scaling == before
+    assert draft.rope_parameters == before
     # max_position_embeddings stays target-only so the draft max-model-len
     # clamp keeps holding (#63909).
     assert draft.max_position_embeddings != 12345
@@ -59,11 +59,11 @@ def test_text_config_nesting_respected():
     draft = _draft_config()
     draft.text_config = Qwen3Config()
     composed = SpeculativeConfig.compose_draft_hf_overrides(
-        {"text_config": {"rope_scaling": dict(YARN)}}
+        {"text_config": {"rope_parameters": dict(YARN)}}
     )
     composed(draft)
-    # nested configs merge into the existing rope_scaling dict rather than
-    # replacing it (the draft's default rope_theta survives)
-    assert draft.text_config.rope_scaling["rope_type"] == "yarn"
-    assert draft.text_config.rope_scaling["factor"] == 2.0
-    assert draft.rope_scaling["rope_type"] != "yarn"  # outer config untouched
+    # the nested draft text config takes the yarn override...
+    assert draft.text_config.rope_parameters["rope_type"] == "yarn"
+    assert draft.text_config.rope_parameters["factor"] == 2.0
+    # ...while the outer config stays untouched
+    assert draft.rope_parameters["rope_type"] != "yarn"

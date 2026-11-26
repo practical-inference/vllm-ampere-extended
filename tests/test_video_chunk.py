@@ -1,10 +1,14 @@
-# Self-check for the video-encoder micro-batch chunker (WO glm-rust-frontend-20261117).
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+
+# Self-check for the video-encoder micro-batch chunker.
 # Run from the repo root: PYTHONPATH=. python -m pytest tests/test_video_chunk.py
 from vllm.v1.worker.gpu.mm.encoder_runner import EncoderRunner
 
 
 def test_slices_cover_and_respect_budget():
-    for t, hw, budget in [(379, 2560, 16384), (100, 100, 999), (1, 5, 10), (430, 1000, 16384)]:
+    budgets = [(379, 2560, 16384), (100, 100, 999), (1, 5, 10), (430, 1000, 16384)]
+    for t, hw, budget in budgets:
         s = EncoderRunner._video_chunk_slices(t, hw, budget)
         assert sum(s) == t, (t, hw, budget, s)
         for units in s:

@@ -1182,8 +1182,7 @@ environment_variables: dict[str, Callable[[], Any]] = {
     # reads os.environ directly per call (intentionally not this cached
     # machinery — the switch must stay live after enable_envs_cache());
     # declared here for documentation. Default: off
-    "VLLM_MQA_LOGITS_LEGACY": lambda: os.getenv("VLLM_MQA_LOGITS_LEGACY", "0")
-    == "1",
+    "VLLM_MQA_LOGITS_LEGACY": lambda: os.getenv("VLLM_MQA_LOGITS_LEGACY", "0") == "1",
     # KV context length each adaptive-verification profiling request pretends to
     # carry, so the profiled step reads a realistic amount of cache.
     # Raise it for long-context deployments, where step cost is dominated by

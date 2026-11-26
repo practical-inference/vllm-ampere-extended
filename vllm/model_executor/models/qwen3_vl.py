@@ -49,6 +49,7 @@ from transformers.models.qwen3_vl.video_processing_qwen3_vl import (
 )
 from transformers.video_utils import VideoMetadata
 
+import vllm.envs as envs
 from vllm.compilation.decorators import (
     should_torch_compile_mm_encoder,
     support_torch_compile,
@@ -84,7 +85,6 @@ from vllm.model_executor.layers.vocab_parallel_embedding import (
     VocabParallelEmbedding,
 )
 from vllm.model_executor.models.module_mapping import MultiModelKeys
-import vllm.envs as envs
 from vllm.multimodal import MULTIMODAL_REGISTRY
 from vllm.multimodal.hasher import MultiModalHasher
 from vllm.multimodal.inputs import (

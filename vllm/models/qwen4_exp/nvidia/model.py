@@ -14,6 +14,7 @@ from vllm.config import VllmConfig
 from vllm.config.kernel import NATIVE_MEGA_MOE_BACKENDS
 from vllm.distributed import get_pp_group
 from vllm.forward_context import get_forward_context, is_forward_context_available
+from vllm.logger import init_logger
 from vllm.model_executor.layers.fusion.mm_input_norm import build_mm_input_norm
 from vllm.model_executor.layers.logits_processor import LogitsProcessor
 from vllm.model_executor.layers.mamba.gdn.qwen_gdn_linear_attn import (
@@ -56,13 +57,6 @@ from vllm.model_executor.models.qwen3_vl import (
     Qwen3VLMultiModalProcessor,
     Qwen3VLProcessingInfo,
 )
-import vllm.envs as envs
-from vllm.logger import init_logger
-from vllm.utils.torch_utils import (
-    get_accelerator_view_from_cpu_tensor,
-)
-
-logger = init_logger(__name__)
 from vllm.model_executor.models.utils import (
     AutoWeightsLoader,
     PPMissingLayer,
@@ -86,6 +80,9 @@ from vllm.multimodal import MULTIMODAL_REGISTRY
 from vllm.multimodal.inputs import MultiModalFeatureSpec
 from vllm.sequence import IntermediateTensors
 from vllm.tokenizers.registry import cached_tokenizer_from_config
+from vllm.utils.torch_utils import (
+    get_accelerator_view_from_cpu_tensor,
+)
 from vllm.v1.attention.backends.registry import MambaAttentionBackendEnum
 from vllm.v1.kv_cache_interface import MambaSpec
 
@@ -96,6 +93,8 @@ from .mega_moe import Qwen4ExpMegaMoeBlock
 from .ops.cute_dsl.hc_down_silu import request_hc_down_silu_warmup
 from .ple_layer import Qwen4ExpPLELayer
 from .qsa import Qwen4ExpQSAAttention
+
+logger = init_logger(__name__)
 
 # Transformers v5.18 renamed `qwen_sparse_attention` to `indexed_attention`
 # TODO: Delete qwen_... once Transformers 5.18.0 is the minimum required version.
@@ -188,8 +187,7 @@ def _offload_embedding_to_uva(embedding: nn.Module, tied: bool) -> None:
         return
     if tied:
         logger.info_once(
-            "VLLM_EMBED_UVA=1 but the embedding is tied to lm_head; "
-            "leaving it in VRAM."
+            "VLLM_EMBED_UVA=1 but the embedding is tied to lm_head; leaving it in VRAM."
         )
         return
     weight = getattr(embedding, "weight_packed", None)

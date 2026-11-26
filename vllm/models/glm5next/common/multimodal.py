@@ -13,7 +13,6 @@ from einops import rearrange
 
 import vllm.envs as envs
 from vllm import _custom_ops as ops
-from vllm import envs
 from vllm.config import SchedulerConfig
 from vllm.distributed import (
     get_tensor_model_parallel_world_size,

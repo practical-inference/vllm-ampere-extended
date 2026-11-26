@@ -61,9 +61,8 @@ def _propagate_rope_to_draft(target_hf_config: Any, draft_hf_config: Any) -> Non
     """
     tgt_tc = target_hf_config.get_text_config()
     drf_tc = draft_hf_config.get_text_config()
-    for attr in ("rope_parameters", "rope_scaling"):
-        if hasattr(tgt_tc, attr):
-            setattr(drf_tc, attr, getattr(tgt_tc, attr))
+    if hasattr(tgt_tc, "rope_parameters"):
+        drf_tc.rope_parameters = tgt_tc.rope_parameters
 
 
 # Positional-encoding keys the draft must share with the target (#58080).
@@ -1566,10 +1565,7 @@ class SpeculativeConfig:
         # rotary cache while yarn 2x let the target run to 524288, and any
         # request past 262144 device-asserted in the drafter's position-indexed
         # cache lookup (vectorized_gather_kernel OOB, 2026-11-13 cold-load kill).
-        if (
-            self.draft_model_config is not None
-            and self.target_model_config is not None
-        ):
+        if self.draft_model_config is not None and self.target_model_config is not None:
             _propagate_rope_to_draft(
                 self.target_model_config.hf_config,
                 self.draft_model_config.hf_config,
