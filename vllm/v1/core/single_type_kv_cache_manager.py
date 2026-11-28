@@ -1969,9 +1969,7 @@ class MambaManager(SingleTypeKVCacheManager):
         self.prefix_caching = params.enable_prefix_caching
         self.num_speculative_blocks: int = params.num_speculative_blocks
         self.prefill_checkpoint_alignment = params.prefill_checkpoint_alignment
-        self.num_prefill_checkpoint_blocks: int = (
-            params.num_prefill_checkpoint_blocks
-        )
+        self.num_prefill_checkpoint_blocks: int = params.num_prefill_checkpoint_blocks
         self.has_prefill_checkpoint_blocks = (
             self.prefix_caching and params.num_prefill_checkpoint_blocks > 0
         )

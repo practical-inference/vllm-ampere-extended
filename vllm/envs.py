@@ -63,6 +63,8 @@ if TYPE_CHECKING:
     VLLM_MAMBA_PRICED_ADMISSION: bool = False
     VLLM_MAMBA_K0_SLOT_RELEASE: bool = False
     VLLM_SPARSE_INDEXER_MAX_DECODE_LOGITS_MB: int = 2048
+    VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS: int = 4096
+    VLLM_MQA_LOGITS_LEGACY: bool = False
     VLLM_ADAPTIVE_VERIFICATION_PROFILE_CONTEXT_LEN: int = 8192
     VLLM_XPU_PP_MICROBATCH: bool = True
     VLLM_DISTRIBUTED_USE_SPLIT_GROUP: bool = False
@@ -1166,6 +1168,21 @@ environment_variables: dict[str, Callable[[], Any]] = {
     "VLLM_SPARSE_INDEXER_MAX_DECODE_LOGITS_MB": lambda: int(
         os.getenv("VLLM_SPARSE_INDEXER_MAX_DECODE_LOGITS_MB", "2048")
     ),
+    # Dispatch threshold (query tokens) for the sparse-MLA fp8 dequant-gather
+    # dedup fast path: at or above it, deduplicate the gather (sort + rank
+    # remap) instead of gathering num_tokens x topk rows (~40x duplicated
+    # work at long context, measured on A100-class SM80). Below it the
+    # 2-pass gather is cheaper; values <= 0 disable dedup. Default: 4096
+    "VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS": lambda: int(
+        os.getenv("VLLM_SPARSE_MLA_DEDUP_MIN_TOKENS", "4096")
+    ),
+    # Force the legacy one-CTA-per-(row, tile) prefill schedule in
+    # fp8_mqa_logits_triton instead of the row-blocked kernel. Escape
+    # hatch / A/B switch for the row-blocked schedule. The dispatcher
+    # reads os.environ directly per call (intentionally not this cached
+    # machinery — the switch must stay live after enable_envs_cache());
+    # declared here for documentation. Default: off
+    "VLLM_MQA_LOGITS_LEGACY": lambda: os.getenv("VLLM_MQA_LOGITS_LEGACY", "0") == "1",
     # KV context length each adaptive-verification profiling request pretends to
     # carry, so the profiled step reads a realistic amount of cache.
     # Raise it for long-context deployments, where step cost is dominated by

@@ -2680,7 +2680,6 @@ def test_kv_cache_valve_does_not_preempt_with_nothing_waiting():
     assert len(scheduler_output2.num_scheduled_tokens) == 2
 
 
-
 def test_pending_hisparse_reclamation_defers_preemption(monkeypatch):
     """Pending reclamation must stall rather than preempt its owning request."""
     scheduler = create_scheduler(enable_prefix_caching=False)
